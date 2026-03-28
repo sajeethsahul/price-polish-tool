@@ -1,4 +1,4 @@
-import { Outlet, Link, useLoaderData, useNavigate } from "react-router";
+import { Outlet, Link, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
 import { AppProvider as PolarisProvider } from "@shopify/polaris";
 import {
@@ -11,20 +11,24 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import "@shopify/polaris/build/esm/styles.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const auth = await authenticate.admin(request);
-  
-  if (!auth) {
-    console.error("[Price Polish] Authentication failed - no auth object returned.");
-  } else {
-    console.log(`[Price Polish] Session active for shop: ${auth.session.shop}`);
-  }
+  const url = new URL(request.url);
+  const host = url.searchParams.get("host");
 
+  const auth = await authenticate.admin(request);
+
+  // 🔥 CRITICAL: handle redirect properly
   if (auth?.redirect) {
-    console.log("[Price Polish] Redirecting user for authentication...");
     return auth.redirect;
   }
 
+  if (!auth) {
+    console.error("[Price Polish] Authentication failed");
+    throw new Response("Unauthorized", { status: 401 });
+  }
+
   const { admin, session } = auth;
+
+  console.log(`[Price Polish] Session active for shop: ${session.shop}`);
 
   let currencyCode = "USD";
 
@@ -40,20 +44,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const data = await response.json();
     currencyCode = data?.data?.shop?.currencyCode || "USD";
   } catch (error) {
-    console.error("GraphQL error:", error);
+    console.error("[Price Polish] GraphQL error:", error);
   }
-
-  const url = new URL(request.url);
-  const host = url.searchParams.get("host");
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     currencyCode,
     shop: session.shop,
-    host,
+    host, // 🔥 REQUIRED FOR APP BRIDGE
   };
 };
 
+// 🔥 REQUIRED FOR EMBEDDED APPS
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
@@ -61,7 +63,8 @@ export const headers: HeadersFunction = (headersArgs) => {
 export default function AppLayout() {
   const data = useLoaderData<typeof loader>();
 
-  if (!data || !("apiKey" in data)) {
+  // 🔥 Handle redirect safely
+  if (!data || typeof data !== "object" || !("apiKey" in data)) {
     return null;
   }
 
