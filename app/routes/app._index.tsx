@@ -19,6 +19,7 @@ import {
   Pagination,
   Box,
   Checkbox,
+  Select,
   Grid,
 } from "@shopify/polaris";
 
@@ -58,6 +59,7 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"all" | "increase" | "decrease" | "high_impact">("all");
+  const [sortOrder, setSortOrder] = useState<string>("name_asc");
   const [firstVisit, setFirstVisit] = useState(false);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false });
   
@@ -247,9 +249,9 @@ export default function Dashboard() {
     return { lift, liftPercent, count };
   }, [previews]);
 
-  // Filtering Logic
+  // Filtering & Sorting Logic
   const filteredPreviews = useMemo(() => {
-    return previews.filter(p => {
+    let result = previews.filter(p => {
       const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
       const price = parseFloat(p.newPrice);
       const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
@@ -266,7 +268,37 @@ export default function Dashboard() {
 
       return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
     });
-  }, [previews, searchQuery, minPrice, maxPrice, activeFilter]);
+
+    // Apply Sorting
+    result.sort((a, b) => {
+      const oldA = parseFloat(a.oldPrice);
+      const newA = parseFloat(a.newPrice);
+      const diffA = oldA !== 0 ? ((newA - oldA) / oldA) * 100 : 0;
+
+      const oldB = parseFloat(b.oldPrice);
+      const newB = parseFloat(b.newPrice);
+      const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
+
+      switch (sortOrder) {
+        case "name_asc":
+          return a.title.localeCompare(b.title);
+        case "name_desc":
+          return b.title.localeCompare(a.title);
+        case "price_asc":
+          return newA - newB;
+        case "price_desc":
+          return newB - newA;
+        case "change_asc":
+          return diffA - diffB;
+        case "change_desc":
+          return diffB - diffA;
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
@@ -475,6 +507,21 @@ export default function Dashboard() {
                       onChange={setSearchQuery}
                       autoComplete="off"
                       placeholder="Product title..."
+                    />
+                  </Box>
+                  <Box width="200px">
+                    <Select
+                      label="Sort by"
+                      options={[
+                        { label: "Name (A-Z)", value: "name_asc" },
+                        { label: "Name (Z-A)", value: "name_desc" },
+                        { label: "Price (Low to High)", value: "price_asc" },
+                        { label: "Price (High to Low)", value: "price_desc" },
+                        { label: "% Change (Asc)", value: "change_asc" },
+                        { label: "% Change (Desc)", value: "change_desc" },
+                      ]}
+                      value={sortOrder}
+                      onChange={setSortOrder}
                     />
                   </Box>
                   <Box width="150px">
