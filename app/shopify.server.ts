@@ -17,6 +17,15 @@ const shopify = shopifyApp({
   sessionStorage: new PrismaSessionStorage(prisma) as any,
   distribution: AppDistribution.SingleMerchant,
   isEmbeddedApp: true,
+  hooks: {
+    afterAuth: async ({ session }) => {
+      console.log(`[Shopify Auth] Session created/updated for shop: ${session.shop}`);
+    },
+  },
+  cookies: {
+    secure: true,
+    sameSite: "none",
+  },
   future: {
     expiringOfflineAccessTokens: true,
   },

@@ -12,8 +12,15 @@ import "@shopify/polaris/build/esm/styles.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const auth = await authenticate.admin(request);
+  
+  if (!auth) {
+    console.error("[Price Polish] Authentication failed - no auth object returned.");
+  } else {
+    console.log(`[Price Polish] Session active for shop: ${auth.session.shop}`);
+  }
 
   if (auth?.redirect) {
+    console.log("[Price Polish] Redirecting user for authentication...");
     return auth.redirect;
   }
 
