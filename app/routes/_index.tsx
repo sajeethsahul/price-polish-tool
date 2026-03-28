@@ -14,5 +14,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // If shop exists → trigger OAuth
   await authenticate.admin(request);
 
-  return null;
+  // After auth, redirect to the main app dashboard
+  return redirect("/app" + url.search);
 };
+
+export default function Index() {
+  return null;
+}

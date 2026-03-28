@@ -25,7 +25,7 @@ import {
   Icon,
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
-import { formatMoney, getCurrencySymbol } from "../utils/format";
+import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
@@ -224,6 +224,9 @@ export default function Dashboard() {
     let csv = "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain\n";
     let totalProfit = 0;
 
+    const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
+    const dec = isZeroDecimal ? 0 : 2;
+
     previews.forEach(p => {
         const base = parseFloat(p.originalBasePrice);
         const final = parseFloat(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
@@ -236,11 +239,11 @@ export default function Dashboard() {
 
         const titleSafe = p.title.replace(/"/g, '""');
 
-        csv += `"${titleSafe}","${p.variantId}",${base.toFixed(2)},${markupAdded.toFixed(2)},${roundingAdj.toFixed(2)},${final.toFixed(2)},${netGain.toFixed(2)}\n`;
+        csv += `"${titleSafe}","${p.variantId}",${base.toFixed(dec)},${markupAdded.toFixed(dec)},${roundingAdj.toFixed(dec)},${final.toFixed(dec)},${netGain.toFixed(dec)}\n`;
     });
     
     csv += `,,,,,,,\n`;
-    csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(2)}\n`;
+    csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(dec)}\n`;
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
