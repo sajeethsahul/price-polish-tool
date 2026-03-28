@@ -9,6 +9,7 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
 import "@shopify/polaris/build/esm/styles.css";
+import { useEffect } from "react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -69,6 +70,23 @@ export default function AppLayout() {
   }
 
   const { apiKey, currencyCode, shop, host } = data;
+
+  useEffect(() => {
+    if (window.top === window.self) {
+      return;
+    }
+
+    if (!window.location.search.includes("embedded=1")) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("embedded", "1");
+
+      // ✅ SAFE CHECK
+      if (window.top) {
+        window.top.location.href = url.toString();
+      }
+    }
+  }, []);
+
 
   return (
     <ShopifyAppProvider apiKey={apiKey} embedded>
