@@ -47,7 +47,14 @@ export const headers: HeadersFunction = (headersArgs) => {
 };
 
 export default function AppLayout() {
-  const { apiKey, currencyCode } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+
+  // ✅ Handle redirect case safely
+  if (!data || typeof data !== "object" || !("apiKey" in data)) {
+    return null; // or loader redirect already handled
+  }
+
+  const { apiKey, currencyCode } = data;
 
   return (
     <ShopifyAppProvider apiKey={apiKey} embedded>
