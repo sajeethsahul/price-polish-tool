@@ -1,9 +1,18 @@
+import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
+import { authenticate } from "../shopify.server";
 
-export async function loader() {
-  return redirect("/app");
-}
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-export default function Index() {
+  // If no shop → go to login
+  if (!shop) {
+    return redirect("/auth/login");
+  }
+
+  // If shop exists → trigger OAuth
+  await authenticate.admin(request);
+
   return null;
-}
+};
