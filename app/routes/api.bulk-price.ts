@@ -12,7 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const body = await request.json();
-        const items: Array<{ variantId: string; oldPrice: string; newPrice: string }> = body.items;
+        const items: Array<{ variantId: string; oldPrice: string; newPrice: string; isManual?: boolean }> = body.items;
         const isAll = body.isAll || false;
 
         if (!items || !Array.isArray(items) || items.length === 0) {
@@ -37,6 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 variantId: item.variantId,
                 oldPrice: parseFloat(item.oldPrice),
                 newPrice: parseFloat(item.newPrice),
+                isManual: item.isManual || false, // NEW
                 batchId,
             })),
         });

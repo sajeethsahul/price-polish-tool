@@ -21,7 +21,10 @@ import {
   Checkbox,
   Select,
   Grid,
+  Tooltip,
+  Icon,
 } from "@shopify/polaris";
+import { InfoIcon } from "@shopify/polaris-icons";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
@@ -31,8 +34,10 @@ interface PreviewItem {
   title: string;
   image: string;
   variantId: string;
-  oldPrice: string;
-  newPrice: string;
+  oldPrice: string; // This is the current price in Shopify
+  newPrice: string; // This is the rule-calculated price
+  originalBasePrice: string; // NEW: The true original price before any polish
+  overriddenPrice?: string;
 }
 
 interface LastUpdateInfo {
@@ -61,6 +66,7 @@ export default function Dashboard() {
   const [activeFilter, setActiveFilter] = useState<"all" | "increase" | "decrease" | "high_impact">("all");
   const [sortOrder, setSortOrder] = useState<string>("name_asc");
   const [firstVisit, setFirstVisit] = useState(false);
+  const [activeMarkup, setActiveMarkup] = useState(0);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false });
   
   const shopify = useAppBridge();
@@ -76,6 +82,7 @@ export default function Dashboard() {
       const data = await res.json();
       if (res.ok) {
         setPreviews(data.previews ?? []);
+        setActiveMarkup(data.markupPercent ?? 0);
         if ((data.previews ?? []).length === 0) {
           setFirstVisit(true);
           setMessage({ type: "warning", text: "No products found or no rules configured.", details: "Please ensure you have products in your store and pricing rules are set up correctly." });
@@ -112,11 +119,18 @@ export default function Dashboard() {
     setMessage(null);
     setProgress(0);
 
+    const itemsWithFinalPrices = itemsToUpdate.map(item => ({
+      variantId: item.variantId,
+      oldPrice: item.oldPrice,
+      newPrice: item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice,
+      isManual: item.overriddenPrice !== undefined // Send flag to backend
+    }));
+
     try {
       const res = await fetch("/api/bulk-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: itemsToUpdate }),
+        body: JSON.stringify({ items: itemsWithFinalPrices }),
       });
       
       const data = await res.json();
@@ -131,10 +145,8 @@ export default function Dashboard() {
         setProgress(100);
 
         if (data.failedCount === 0) {
-          shopify.toast.show(`Successfully updated ${data.successCount} products`);
-          // Update local state
-          const updatedIds = new Set(itemsToUpdate.map(i => i.variantId));
-          setPreviews(prev => prev.map(p => updatedIds.has(p.variantId) ? { ...p, oldPrice: p.newPrice } : p));
+          shopify.toast.show("Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
+          handlePreview(); // Auto-refresh the list
           setSelectedItems(new Set());
         } else {
           shopify.toast.show("Some products failed to update", { isError: true });
@@ -148,7 +160,7 @@ export default function Dashboard() {
       setIsProcessing(false);
       setProgress(0);
     }
-  }, [shopify]);
+  }, [shopify, handlePreview]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     handleApplyBatch([item]);
@@ -173,7 +185,7 @@ export default function Dashboard() {
       if (res.ok) {
         setLastUpdate(null);
         shopify.toast.show(`Restored ${data.restoredCount} products`);
-        setPreviews([]);
+        handlePreview(); // Auto-refresh the list
         setSelectedItems(new Set());
       } else {
         throw new Error(data.error || "Failed to undo changes.");
@@ -183,7 +195,74 @@ export default function Dashboard() {
     } finally {
       setIsProcessing(false);
     }
-  }, [lastUpdate, shopify]);
+  }, [lastUpdate, shopify, handlePreview]);
+
+  const handlePriceChange = useCallback((variantId: string, value: string) => {
+    // Prevent typing excessively long strings
+    if (value.length > 15) return;
+    // Max 6 numbers before decimal, max 2 decimals
+    if (value !== "" && !/^\d{0,6}(\.\d{0,2})?$/.test(value)) return;
+    
+    setPreviews((prev) =>
+      prev.map((item) =>
+        item.variantId === variantId
+          ? {
+              ...item,
+              overriddenPrice: value
+            }
+          : item
+      )
+    );
+  }, []);
+
+  const handleDownloadReport = useCallback(() => {
+    if (previews.length === 0) return;
+
+    let csv = "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain\n";
+    let totalProfit = 0;
+
+    previews.forEach(p => {
+        const base = parseFloat(p.originalBasePrice);
+        const final = parseFloat(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
+        
+        const markupAdded = base * (activeMarkup / 100);
+        const roundingAdj = final - (base + markupAdded);
+        const netGain = final - base;
+        
+        totalProfit += netGain;
+
+        const titleSafe = p.title.replace(/"/g, '""');
+
+        csv += `"${titleSafe}","${p.variantId}",${base.toFixed(2)},${markupAdded.toFixed(2)},${roundingAdj.toFixed(2)},${final.toFixed(2)},${netGain.toFixed(2)}\n`;
+    });
+    
+    csv += `,,,,,,,\n`;
+    csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(2)}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    link.href = url;
+    link.setAttribute("download", `PricePolish_Impact_Report_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [previews, activeMarkup]);
+
+  const resetOverride = useCallback((variantId: string) => {
+    setPreviews((prev) =>
+      prev.map((item) =>
+        item.variantId === variantId
+          ? {
+              ...item,
+              overriddenPrice: undefined
+            }
+          : item
+      )
+    );
+  }, []);
 
   const handlePushStorefront = useCallback(async (clear = false) => {
     setIsProcessing(true);
@@ -235,7 +314,7 @@ export default function Dashboard() {
     
     previews.forEach(p => {
       const oldP = parseFloat(p.oldPrice);
-      const newP = parseFloat(p.newPrice);
+      const newP = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
       if (oldP !== newP) {
         totalOld += oldP;
         totalNew += newP;
@@ -253,12 +332,13 @@ export default function Dashboard() {
   const filteredPreviews = useMemo(() => {
     let result = previews.filter(p => {
       const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const price = parseFloat(p.newPrice);
+      const currentNewPrice = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
+      const price = currentNewPrice;
       const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
       const matchesMax = maxPrice === "" || price <= parseFloat(maxPrice);
       
       const oldP = parseFloat(p.oldPrice);
-      const newP = parseFloat(p.newPrice);
+      const newP = currentNewPrice;
       const diffPercent = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
 
       let matchesSmartFilter = true;
@@ -272,11 +352,11 @@ export default function Dashboard() {
     // Apply Sorting
     result.sort((a, b) => {
       const oldA = parseFloat(a.oldPrice);
-      const newA = parseFloat(a.newPrice);
+      const newA = a.overriddenPrice !== undefined ? parseFloat(a.overriddenPrice) || 0 : parseFloat(a.newPrice);
       const diffA = oldA !== 0 ? ((newA - oldA) / oldA) * 100 : 0;
 
       const oldB = parseFloat(b.oldPrice);
-      const newB = parseFloat(b.newPrice);
+      const newB = b.overriddenPrice !== undefined ? parseFloat(b.overriddenPrice) || 0 : parseFloat(b.newPrice);
       const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
 
       switch (sortOrder) {
@@ -299,6 +379,23 @@ export default function Dashboard() {
 
     return result;
   }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
+
+  const handleMinPriceChange = useCallback((value: string) => {
+    if (value.length > 15) return;
+    if (value !== "" && !/^\d{0,6}(\.\d{0,2})?$/.test(value)) return;
+    setMinPrice(value);
+  }, []);
+
+  const handleMaxPriceChange = useCallback((value: string) => {
+    if (value.length > 15) return;
+    if (value !== "" && !/^\d{0,6}(\.\d{0,2})?$/.test(value)) return;
+    setMaxPrice(value);
+  }, []);
+
+  const handleSearchChange = useCallback((value: string) => {
+    if (value.length > 100) return;
+    setSearchQuery(value);
+  }, []);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
@@ -350,6 +447,14 @@ export default function Dashboard() {
             <Text as="p">💡 <strong>Tip:</strong> The "Apply" button becomes disabled once your price is perfectly synced with your current Pricing Rules. Change your rules to reactivate it!</Text>
           </BlockStack>
         </Banner>
+
+        {metrics.isLive && (
+          <Banner tone="warning">
+            <BlockStack gap="200">
+              <Text as="p">⚠️ <strong>Live Pricing is ON:</strong> Any prices you "Apply" here will permanently change your Shopify database. Because your Live Rules are active, the storefront extension will apply its rules <strong>on top</strong> of these new prices. If you want the "Applied" price to be the final price, please stop Live Pricing or adjust your rules.</Text>
+            </BlockStack>
+          </Banner>
+        )}
 
         {message && (
           <Banner
@@ -413,6 +518,11 @@ export default function Dashboard() {
               <BlockStack gap="100">
                 <InlineStack gap="200" blockAlign="center">
                   <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
+                  <Tooltip content="This is a virtual overlay. It changes what customers see on your website instantly without changing your Shopify database.">
+                    <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                      <Icon source={InfoIcon} tone="subdued" />
+                    </span>
+                  </Tooltip>
                   {metrics.isLive ? (
                     <Badge tone="success">Live Pricing: ON</Badge>
                   ) : (
@@ -434,7 +544,7 @@ export default function Dashboard() {
                   variant="primary"
                   onClick={() => setShowGoLiveModal(true)}
                   loading={isProcessing}
-                  disabled={isProcessing || previews.length === 0}
+                  disabled={isProcessing}
                 >
                   Go Live on Storefront
                 </Button>
@@ -461,6 +571,17 @@ export default function Dashboard() {
               >
                 {`Apply All (${previews.length})`}
               </Button>
+              {previews.length === 0 ? (
+                <Tooltip content="Please refresh previews to generate the latest report.">
+                   <span style={{ display: 'inline-block' }}>
+                     <Button disabled>Download Impact Report</Button>
+                   </span>
+                </Tooltip>
+              ) : (
+                <Button onClick={handleDownloadReport} variant="secondary">
+                  Download Impact Report
+                </Button>
+              )}
               <Button
                 onClick={handleApplySelected}
                 disabled={isProcessing || selectedItems.size === 0}
@@ -504,9 +625,10 @@ export default function Dashboard() {
                     <TextField
                       label="Search Products"
                       value={searchQuery}
-                      onChange={setSearchQuery}
+                      onChange={handleSearchChange}
                       autoComplete="off"
                       placeholder="Product title..."
+                      maxLength={100}
                     />
                   </Box>
                   <Box width="200px">
@@ -527,21 +649,25 @@ export default function Dashboard() {
                   <Box width="150px">
                     <TextField
                       label="Min Price"
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={minPrice}
-                      onChange={setMinPrice}
+                      onChange={handleMinPriceChange}
                       autoComplete="off"
                       prefix="$"
+                      maxLength={15}
                     />
                   </Box>
                   <Box width="150px">
                     <TextField
                       label="Max Price"
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={maxPrice}
-                      onChange={setMaxPrice}
+                      onChange={handleMaxPriceChange}
                       autoComplete="off"
                       prefix="$"
+                      maxLength={15}
                     />
                   </Box>
                 </InlineStack>
@@ -564,66 +690,107 @@ export default function Dashboard() {
 
                 <BlockStack gap="200">
                   {paginatedPreviews.map((p) => {
-                    const oldP = parseFloat(p.oldPrice);
-                    const newP = parseFloat(p.newPrice);
-                    const diff = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
-                    const isChanged = oldP !== newP;
+                    const currentPrice = parseFloat(p.oldPrice);
+                    const originalPrice = parseFloat(p.originalBasePrice);
+                    const isManual = p.overriddenPrice !== undefined;
+                    const targetPrice = isManual ? parseFloat(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
+                    
+                    const isPolished = currentPrice !== originalPrice;
+                    const isChanged = currentPrice !== targetPrice;
+                    const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
+                    
                     const isSelected = selectedItems.has(p.variantId);
                     
                     return (
                       <Card key={p.variantId} padding="300">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <InlineStack gap="300" blockAlign="center">
-                            <Checkbox 
-                              label="" 
-                              labelHidden 
-                              checked={isSelected} 
-                              onChange={() => toggleSelection(p.variantId)} 
-                            />
-                            <Thumbnail source={p.image || ""} alt={p.title} size="small" />
-                            <BlockStack gap="100">
-                              <Text as="span" variant="bodyMd" fontWeight="bold">
-                                {p.title}
-                              </Text>
-                              <InlineStack gap="200">
-                                {isChanged ? (
-                                  <Badge tone={newP > oldP ? "success" : "attention"}>
-                                    {newP > oldP ? "Profit Optimized" : "Price Reduced"}
-                                  </Badge>
-                                ) : (
-                                  <Badge tone="info">No change</Badge>
-                                )}
-                                {Math.abs(diff) >= 10 && <Badge tone="warning">High Impact</Badge>}
-                              </InlineStack>
-                            </BlockStack>
-                          </InlineStack>
+                        <Box background={isManual ? "bg-surface-caution" : undefined}>
+                          <InlineStack align="space-between" blockAlign="center">
+                            <InlineStack gap="300" blockAlign="center">
+                              <Checkbox 
+                                label="" 
+                                labelHidden 
+                                checked={isSelected} 
+                                onChange={() => toggleSelection(p.variantId)} 
+                              />
+                              <Thumbnail source={p.image || ""} alt={p.title} size="small" />
+                              <BlockStack gap="100">
+                                <Text as="span" variant="bodyMd" fontWeight="bold">
+                                  {p.title}
+                                </Text>
+                                <InlineStack gap="200">
+                                  {isChanged ? (
+                                    <Badge tone={targetPrice > currentPrice ? "success" : "attention"}>
+                                      {targetPrice > currentPrice ? "Profit Optimized" : "Price Reduced"}
+                                    </Badge>
+                                  ) : (
+                                    <Badge tone="info">No change</Badge>
+                                  )}
+                                  {isPolished && <Badge tone="success">Currently Polished</Badge>}
+                                  {isManual && <Badge tone="attention">Manual Override</Badge>}
+                                  {Math.abs(diffFromOriginal) >= 10 && <Badge tone="warning">High Impact</Badge>}
+                                </InlineStack>
+                              </BlockStack>
+                            </InlineStack>
 
-                          <InlineStack gap="400" blockAlign="center">
-                            <InlineStack gap="200" blockAlign="center">
-                              <Text as="span" tone="subdued" textDecorationLine={isChanged ? "line-through" : undefined}>
-                                {`$${p.oldPrice}`}
-                              </Text>
-                              {isChanged && (
-                                <>
-                                  <Badge tone={newP > oldP ? "success" : "attention"}>{`$${p.newPrice}`}</Badge>
-                                  <Text as="span" tone={newP > oldP ? "success" : "caution"} fontWeight="bold">
-                                    {`${newP > oldP ? '+' : ''}${diff.toFixed(1)}%`}
+                            <InlineStack gap="400" blockAlign="center">
+                              <InlineStack gap="200" blockAlign="center">
+                                <BlockStack gap="0">
+                                  <Text as="span" variant="bodySm" tone="subdued">Original: ${p.originalBasePrice}</Text>
+                                  <Text as="span" tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
+                                    Current: ${p.oldPrice}
                                   </Text>
-                                </>
+                                </BlockStack>
+                                <Box width="100px">
+                                  <TextField
+                                    label=""
+                                    labelHidden
+                                    value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
+                                    onChange={(val) => handlePriceChange(p.variantId, val)}
+                                    autoComplete="off"
+                                    prefix="$"
+                                    size="slim"
+                                    maxLength={15}
+                                  />
+                                </Box>
+                                {(isPolished || isChanged) && (
+                                  <Text as="span" tone={targetPrice > originalPrice ? "success" : "caution"} fontWeight="bold">
+                                    {`${targetPrice > originalPrice ? '+' : ''}${diffFromOriginal.toFixed(1)}%`}
+                                  </Text>
+                                )}
+                                {isManual && (
+                                  <Button size="slim" variant="tertiary" onClick={() => resetOverride(p.variantId)}>
+                                    Reset
+                                  </Button>
+                                )}
+                              </InlineStack>
+                              
+                              {isChanged ? (
+                                <Button 
+                                  size="slim" 
+                                  onClick={() => handleApplySingle(p)}
+                                  loading={updatingItem === p.variantId}
+                                  disabled={!!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
+                                  tone="success"
+                                >
+                                  Apply
+                                </Button>
+                              ) : (
+                                <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                                  <span style={{ display: 'inline-block' }}>
+                                    <Button 
+                                      size="slim" 
+                                      onClick={() => handleApplySingle(p)}
+                                      loading={updatingItem === p.variantId}
+                                      disabled={!!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
+                                    >
+                                      Apply
+                                    </Button>
+                                  </span>
+                                </Tooltip>
                               )}
                             </InlineStack>
-                            
-                            <Button 
-                              size="slim" 
-                              onClick={() => handleApplySingle(p)}
-                              loading={updatingItem === p.variantId}
-                              disabled={!isChanged || !!updatingItem || isProcessing}
-                              tone={isChanged ? "success" : undefined}
-                            >
-                              Apply
-                            </Button>
                           </InlineStack>
-                        </InlineStack>
+                        </Box>
                       </Card>
                     );
                   })}

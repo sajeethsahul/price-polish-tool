@@ -9,7 +9,13 @@ import {
     TextField,
     Checkbox,
     Button,
+    Layout,
+    InlineStack,
+    Divider,
+    Tooltip,
+    Icon,
 } from "@shopify/polaris";
+import { InfoIcon } from "@shopify/polaris-icons";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -137,18 +143,95 @@ export default function RulesPage() {
     const handleMarkupChange = useCallback((value: string) => {
         // Prevent extremely long inputs
         if (value.length > 10) return;
-        // Allow only numbers, one decimal point, and one leading minus
-        if (/^-?\d*\.?\d*$/.test(value)) {
+        // Allow up to 3 digits before decimal (for -99 to 99), and max 2 decimals
+        if (/^-?\d{0,3}(\.\d{0,2})?$/.test(value) || value === "-") {
             setMarkupPercent(value);
         }
     }, []);
 
     const handleRoundingChange = useCallback((value: string) => {
         if (value.length > 10) return;
-        if (/^\d*\.?\d*$/.test(value)) {
+        // Max 6 numbers before decimal, max 2 decimals
+        if (/^\d{0,6}(\.\d{0,2})?$/.test(value)) {
             setRoundingStep(value);
         }
     }, []);
+
+    const preview = (() => {
+        const base = 59.99;
+        const m = parseFloat(markupPercent) || 0;
+        const r = parseFloat(roundingStep) || 0;
+        
+        const afterMarkup = base * (1 + m / 100);
+        let finalPrice = afterMarkup;
+        let roundedValue: number | null = null;
+        let formattedCharm: string | null = null;
+
+        if (charmPricing) {
+             finalPrice = Math.floor(finalPrice) + 0.99;
+             formattedCharm = "0.99";
+        } else if (r > 0) {
+             finalPrice = Math.floor(finalPrice) + r;
+             roundedValue = r;
+        }
+
+        return {
+             base: base.toFixed(2),
+             afterMarkup: afterMarkup.toFixed(2),
+             rounded: roundedValue ? roundedValue.toFixed(2) : null,
+             charm: formattedCharm,
+             final: finalPrice.toFixed(2),
+             r
+        };
+    })();
+
+const receiptStyles = `
+  .live-example-receipt {
+    background: #f9f9fb;
+    border: 1px solid #e1e3e5;
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .live-example-receipt .receipt-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .live-example-receipt .receipt-label {
+    color: #6d7175;
+    font-size: 13px;
+    font-family: sans-serif;
+  }
+  .live-example-receipt .receipt-value {
+    font-family: sans-serif;
+    font-size: 14px;
+    color: #202223;
+  }
+  .live-example-receipt .receipt-markup {
+    color: #008060;
+  }
+  .live-example-receipt .receipt-divider {
+    border-top: 1px solid #e1e3e5;
+    margin: 16px 0;
+  }
+  .live-example-receipt .receipt-final-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .live-example-receipt .receipt-final-label {
+    font-weight: bold;
+    color: #202223;
+    font-size: 15px;
+    font-family: sans-serif;
+  }
+  .live-example-receipt .receipt-final-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #202223;
+    font-family: sans-serif;
+  }
+`;
 
     return (
         <Page title="Pricing Rules" backAction={{ url: "/app" }}>
@@ -163,6 +246,9 @@ export default function RulesPage() {
                         </Text>
                     </BlockStack>
                 </Card>
+
+                <Layout>
+                    <Layout.Section>
 
                 <Card>
                     <Form method="post">
@@ -179,13 +265,22 @@ export default function RulesPage() {
                             />
 
                             <TextField
-                                label="Rounding Step"
+                                label={
+                                  <InlineStack gap="100" blockAlign="center">
+                                    <Text as="span">Rounding (Fixed Decimal)</Text>
+                                    <Tooltip content="Sets the exact decimal ending for every price (e.g., entering 0.88 makes all prices end in .88).">
+                                      <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                                        <Icon source={InfoIcon} tone="subdued" />
+                                      </span>
+                                    </Tooltip>
+                                  </InlineStack>
+                                }
                                 type="text"
                                 name="roundingStep"
                                 value={roundingStep}
                                 onChange={handleRoundingChange}
                                 autoComplete="off"
-                                helpText="Nearest value (0 to 100). E.g., 0.5 or 1.0."
+                                helpText="Sets the decimal ending (e.g., 0.88 for .88 endpoints)."
                                 error={currentRoundingError}
                             />
 
@@ -212,6 +307,48 @@ export default function RulesPage() {
                         </BlockStack>
                     </Form>
                 </Card>
+            </Layout.Section>
+                    
+            <Layout.Section variant="oneThird">
+                        <Card>
+                            <style>{receiptStyles}</style>
+                            <BlockStack gap="400">
+                                <Text as="h3" variant="headingMd">Live Example</Text>
+                                <Text as="p" tone="subdued">See exactly how your rules calculate a regular product:</Text>
+                                
+                                <div className="live-example-receipt">
+                                    <div className="receipt-row">
+                                        <span className="receipt-label">Base Price</span>
+                                        <span className="receipt-value">${preview.base}</span>
+                                    </div>
+                                    <div className="receipt-row">
+                                        <span className="receipt-label">{parseFloat(preview.afterMarkup) >= parseFloat(preview.base) ? '+' : ''}{Math.abs(parseFloat(markupPercent) || 0)}% Markup</span>
+                                        <span className="receipt-value receipt-markup">${preview.afterMarkup}</span>
+                                    </div>
+                                    
+                                    {preview.charm ? (
+                                        <div className="receipt-row">
+                                            <span className="receipt-label">Charm Pricing (Auto .99)</span>
+                                            <span className="receipt-value">to .{preview.charm.split('.')[1]}</span>
+                                        </div>
+                                    ) : preview.rounded ? (
+                                        <div className="receipt-row">
+                                            <span className="receipt-label">Rounding (Fixed Decimal)</span>
+                                            <span className="receipt-value">to .{preview.rounded.split('.')[1] || '00'}</span>
+                                        </div>
+                                    ) : null}
+                                    
+                                    <div className="receipt-divider"></div>
+                                    
+                                    <div className="receipt-final-row">
+                                        <span className="receipt-final-label">Final Storefront Price</span>
+                                        <span className="receipt-final-value">${preview.final}</span>
+                                    </div>
+                                </div>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
             </BlockStack>
         </Page>
     );

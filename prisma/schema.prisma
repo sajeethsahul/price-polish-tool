@@ -48,13 +48,14 @@ model PricingRule {
 }
 
 model PriceHistory {
-  id          String   @id @default(cuid())
-  shop        String
-  variantId   String
-  oldPrice    Float
-  newPrice    Float
-  batchId     String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  shop      String
+  variantId String
+  oldPrice  Float
+  newPrice  Float
+  isManual  Boolean  @default(false) // NEW
+  batchId   String
+  createdAt DateTime @default(now())
 }
 
 model ActivityLog {

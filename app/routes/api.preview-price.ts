@@ -59,32 +59,52 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             };
         }
 
-        const previews = data.data.products.edges.map(
-            (edge: { node: ProductNode }) => {
+        const previews = await Promise.all(data.data.products.edges.map(
+            async (edge: { node: ProductNode }) => {
                 const product = edge.node;
                 const variant = product.variants.edges[0]?.node;
-                const oldPrice = parseFloat(variant?.price ?? "0");
-                const newPrice = calculatePrice(
-                    oldPrice,
-                    markupPercent,
-                    roundingStep,
-                    charmPricing,
-                );
+                const currentPrice = parseFloat(variant?.price ?? "0");
+
+                // Check PriceHistory for the "original" base price
+                // This prevents "Double Markup" if the user has already applied a change
+                const history = await prisma.priceHistory.findFirst({
+                    where: { variantId: variant?.id, shop },
+                    orderBy: { createdAt: "desc" },
+                });
+
+                // Use the oldest available price as the base for calculations
+                const basePrice = history ? history.oldPrice : currentPrice;
+
+                // If the last change was manual, we respect the user's choice as final
+                // and don't suggest a new price based on rules unless the current price
+                // has changed from what we last set.
+                let newPrice;
+                if (history?.isManual && currentPrice === history.newPrice) {
+                    newPrice = currentPrice;
+                } else {
+                    newPrice = calculatePrice(
+                        basePrice,
+                        markupPercent,
+                        roundingStep,
+                        charmPricing,
+                    );
+                }
 
                 return {
                     productId: product.id,
                     title: product.title,
                     image: product.featuredImage?.url ?? "",
                     variantId: variant?.id ?? "",
-                    oldPrice: oldPrice.toFixed(2),
+                    oldPrice: currentPrice.toFixed(2),
                     newPrice: newPrice.toFixed(2),
+                    originalBasePrice: basePrice.toFixed(2), // NEW
                 };
             },
-        );
+        ));
 
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
-        return new Response(JSON.stringify({ previews }), {
+        return new Response(JSON.stringify({ previews, markupPercent }), {
             headers: { "Content-Type": "application/json" },
         });
     } catch (error: any) {

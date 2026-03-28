@@ -16,13 +16,11 @@ export function calculatePrice(
     // Step 1: Apply markup percentage
     let result = price * (1 + markup / 100);
 
-    // Step 2: Round to nearest rounding step (safe rounding)
-    const roundingStep = rounding > 0 ? rounding : 1;
-    result = Math.round(result / roundingStep) * roundingStep;
-
-    // Step 3: If charm pricing, end with .99
+    // Step 2: Apply Price Ending (Fixed Decimal) or Charm Pricing
     if (charm) {
         result = Math.floor(result) + 0.99;
+    } else if (rounding > 0) {
+        result = Math.floor(result) + rounding;
     }
 
     // Ensure two decimal places

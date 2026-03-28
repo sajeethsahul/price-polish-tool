@@ -21,8 +21,6 @@ export default function AppLayout() {
         <NavMenu>
           <Link to="/app" rel="home">Dashboard</Link>
           <Link to="/app/rules">Pricing Rules</Link>
-          <Link to="/app/settings">Settings</Link>
-          <Link to="/app/bulk">Bulk Editor</Link>
           <Link to="/app/help">Help Guide</Link>
         </NavMenu>
         <Outlet />
