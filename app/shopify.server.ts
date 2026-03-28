@@ -15,23 +15,20 @@ const shopify = shopifyApp({
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma) as any,
+
   distribution: AppDistribution.SingleMerchant,
+
   isEmbeddedApp: true,
-  hooks: {
-    afterAuth: async ({ session }) => {
-      console.log(`[Shopify Auth] Session created/updated for shop: ${session.shop}`);
-    },
-  },
+
+  // 🔥 THIS IS THE REAL FIX
   cookies: {
-    secure: true,
     sameSite: "none",
+    secure: true,
   },
+
   future: {
     expiringOfflineAccessTokens: true,
   },
-  ...(process.env.SHOP_CUSTOM_DOMAIN
-    ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
-    : {}),
 });
 
 export default shopify;
