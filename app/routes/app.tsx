@@ -8,12 +8,24 @@ import { authenticate } from "../shopify.server";
 import "@shopify/polaris/build/esm/styles.css";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  const { admin } = await authenticate.admin(request);
+  
+  const response = await admin.graphql(`
+    {
+      shop {
+        currencyCode
+      }
+    }
+  `);
+  
+  const data = await response.json();
+  const currencyCode = data.data.shop.currencyCode || "USD";
+  
+  return { apiKey: process.env.SHOPIFY_API_KEY || "", currencyCode };
 };
 
 export default function AppLayout() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, currencyCode } = useLoaderData<typeof loader>();
 
   return (
     <ShopifyAppProvider apiKey={apiKey} embedded={true}>
@@ -21,9 +33,10 @@ export default function AppLayout() {
         <NavMenu>
           <Link to="/app" rel="home">Dashboard</Link>
           <Link to="/app/rules">Pricing Rules</Link>
+          <Link to="/app/settings">Settings</Link>
           <Link to="/app/help">Help Guide</Link>
         </NavMenu>
-        <Outlet />
+        <Outlet context={{ currencyCode }} />
       </PolarisProvider>
     </ShopifyAppProvider>
   );

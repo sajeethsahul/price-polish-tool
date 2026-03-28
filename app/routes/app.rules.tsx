@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, Form, useNavigation, useActionData } from "react-router";
+import { useLoaderData, Form, useNavigation, useActionData, useOutletContext } from "react-router";
 import {
     Page,
     Card,
@@ -16,6 +16,7 @@ import {
     Icon,
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
+import { formatMoney, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
@@ -102,7 +103,9 @@ export default function RulesPage() {
     const actionData = useActionData<PricingRuleData>();
     const navigation = useNavigation();
     const shopify = useAppBridge();
+    const { currencyCode } = useOutletContext<{ currencyCode: string }>();
     const isSubmitting = navigation.state === "submitting";
+    const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
 
     const initialData = actionData || loaderData;
 
@@ -176,11 +179,11 @@ export default function RulesPage() {
         }
 
         return {
-             base: base.toFixed(2),
-             afterMarkup: afterMarkup.toFixed(2),
+             base: formatMoney(base, currencyCode),
+             afterMarkup: formatMoney(afterMarkup, currencyCode),
              rounded: roundedValue ? roundedValue.toFixed(2) : null,
              charm: formattedCharm,
-             final: finalPrice.toFixed(2),
+             final: formatMoney(finalPrice, currencyCode),
              r
         };
     })();
@@ -280,7 +283,8 @@ const receiptStyles = `
                                 value={roundingStep}
                                 onChange={handleRoundingChange}
                                 autoComplete="off"
-                                helpText="Sets the decimal ending (e.g., 0.88 for .88 endpoints)."
+                                disabled={isZeroDecimal}
+                                helpText={isZeroDecimal ? "Not applicable for zero-decimal currencies." : "Sets the decimal ending (e.g., 0.88 for .88 endpoints)."}
                                 error={currentRoundingError}
                             />
 
@@ -293,7 +297,8 @@ const receiptStyles = `
                                 label="Enable Charm Pricing"
                                 checked={charmPricing}
                                 onChange={setCharmPricing}
-                                helpText="Ends prices in .99 (e.g., $19.99)."
+                                disabled={isZeroDecimal}
+                                helpText={isZeroDecimal ? "Not applicable for zero-decimal currencies." : "Ends prices in .99 (e.g., $19.99)."}
                             />
 
                             <Button
@@ -319,11 +324,11 @@ const receiptStyles = `
                                 <div className="live-example-receipt">
                                     <div className="receipt-row">
                                         <span className="receipt-label">Base Price</span>
-                                        <span className="receipt-value">${preview.base}</span>
+                                        <span className="receipt-value">{preview.base}</span>
                                     </div>
                                     <div className="receipt-row">
-                                        <span className="receipt-label">{parseFloat(preview.afterMarkup) >= parseFloat(preview.base) ? '+' : ''}{Math.abs(parseFloat(markupPercent) || 0)}% Markup</span>
-                                        <span className="receipt-value receipt-markup">${preview.afterMarkup}</span>
+                                        <span className="receipt-label">{parseFloat(preview.afterMarkup.replace(/[^\d.-]/g, '')) >= parseFloat(preview.base.replace(/[^\d.-]/g, '')) ? '+' : ''}{Math.abs(parseFloat(markupPercent) || 0)}% Markup</span>
+                                        <span className="receipt-value receipt-markup">{preview.afterMarkup}</span>
                                     </div>
                                     
                                     {preview.charm ? (
@@ -342,7 +347,7 @@ const receiptStyles = `
                                     
                                     <div className="receipt-final-row">
                                         <span className="receipt-final-label">Final Storefront Price</span>
-                                        <span className="receipt-final-value">${preview.final}</span>
+                                        <span className="receipt-final-value">{preview.final}</span>
                                     </div>
                                 </div>
                             </BlockStack>

@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useOutletContext } from "react-router";
 import {
   Page,
   Card,
@@ -25,6 +25,7 @@ import {
   Icon,
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
+import { formatMoney, getCurrencySymbol } from "../utils/format";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
@@ -71,6 +72,8 @@ export default function Dashboard() {
   
   const shopify = useAppBridge();
   const navigate = useNavigate();
+  const { currencyCode } = useOutletContext<{ currencyCode: string }>();
+  const currencySymbol = getCurrencySymbol(currencyCode);
 
   const handlePreview = useCallback(async () => {
     setLoading(true);
@@ -474,7 +477,7 @@ export default function Dashboard() {
                 <BlockStack gap="100" align="center">
                   <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
                   <Text as="h2" variant="headingLg" tone="success">
-                    {`+$${insights.lift.toFixed(2)}`}
+                    {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
                   </Text>
                 </BlockStack>
               </Card>
@@ -654,7 +657,7 @@ export default function Dashboard() {
                       value={minPrice}
                       onChange={handleMinPriceChange}
                       autoComplete="off"
-                      prefix="$"
+                      prefix={currencySymbol}
                       maxLength={15}
                     />
                   </Box>
@@ -666,7 +669,7 @@ export default function Dashboard() {
                       value={maxPrice}
                       onChange={handleMaxPriceChange}
                       autoComplete="off"
-                      prefix="$"
+                      prefix={currencySymbol}
                       maxLength={15}
                     />
                   </Box>
@@ -735,9 +738,9 @@ export default function Dashboard() {
                             <InlineStack gap="400" blockAlign="center">
                               <InlineStack gap="200" blockAlign="center">
                                 <BlockStack gap="0">
-                                  <Text as="span" variant="bodySm" tone="subdued">Original: ${p.originalBasePrice}</Text>
+                                  <Text as="span" variant="bodySm" tone="subdued">Original: {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}</Text>
                                   <Text as="span" tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
-                                    Current: ${p.oldPrice}
+                                    Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
                                   </Text>
                                 </BlockStack>
                                 <Box width="100px">
@@ -747,7 +750,7 @@ export default function Dashboard() {
                                     value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
                                     onChange={(val) => handlePriceChange(p.variantId, val)}
                                     autoComplete="off"
-                                    prefix="$"
+                                    prefix={currencySymbol}
                                     size="slim"
                                     maxLength={15}
                                   />

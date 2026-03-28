@@ -101,6 +101,26 @@ export default function HelpPage() {
             <Text as="p">✔️ The "Safe Mode" architecture ensures you can preview rules on the Dashboard without fear of permanent errors.</Text>
           </BlockStack>
         </Card>
+
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">5. Profit Audit & Impact Reports</Text>
+            <List>
+              <List.Item>
+                <strong>Download Report:</strong> The "Download Impact Report" button generates a CSV file showing a side-by-side comparison of "Original Price" vs. "Optimized Price."
+              </List.Item>
+              <List.Item>
+                <strong>Audit Trail:</strong> The report includes a breakdown of exactly how much was added via Markup and how much was adjusted by Rounding (Fixed Decimal).
+              </List.Item>
+              <List.Item>
+                <strong>Business Impact:</strong> The "Total Storefront Value Increase" row at the bottom of the report calculates the total potential profit gain across the filtered products.
+              </List.Item>
+            </List>
+            <Text as="p" tone="subdued">
+              <strong>Tip:</strong> We recommend downloading an Impact Report before clicking 'Apply All' to keep a permanent record of your price transitions.
+            </Text>
+          </BlockStack>
+        </Card>
       </BlockStack>
     </Page>
   );
