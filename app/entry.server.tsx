@@ -31,7 +31,11 @@ export default function handleRequest(
   }
 
   // ✅ Shopify headers
-  addDocumentResponseHeaders(safeRequest, responseHeaders);
+  try {
+    addDocumentResponseHeaders(safeRequest, responseHeaders);
+  } catch (e) {
+    console.error("⚠️ Shopify header error skipped:", e);
+  }
 
   const userAgent = request.headers.get("user-agent");
 
