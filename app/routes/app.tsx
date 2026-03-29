@@ -71,21 +71,6 @@ export default function AppLayout() {
 
   const { apiKey, currencyCode, shop, host } = data;
 
-  useEffect(() => {
-    if (window.top === window.self) {
-      return;
-    }
-
-    if (!window.location.search.includes("embedded=1")) {
-      const url = new URL(window.location.href);
-      url.searchParams.set("embedded", "1");
-
-      // ✅ SAFE CHECK
-      if (window.top) {
-        window.top.location.href = url.toString();
-      }
-    }
-  }, []);
 
 
   return (
