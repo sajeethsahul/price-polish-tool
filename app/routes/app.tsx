@@ -58,9 +58,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let finalHost = host;
   if (!finalHost && auth.session) {
     const shop = auth.session.shop;
-    const storeName = shop.split(".")[0];
-    finalHost = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
-  }
+  const storeName = shop.replace(".myshopify.com", "");
+  finalHost = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
+}
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",

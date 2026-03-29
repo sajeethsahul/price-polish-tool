@@ -24,11 +24,7 @@ export default function handleRequest(
     safeRequest = new Request(fallbackUrl, request);
   }
 
-  // ✅ Ensure origin header
-  const url = new URL(safeRequest.url);
-  if (!safeRequest.headers.get("origin")) {
-    responseHeaders.set("origin", url.origin);
-  }
+
 
 
 

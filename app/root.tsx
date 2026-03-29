@@ -71,7 +71,16 @@ export default function App() {
         {/* Shopify CDN preconnect */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
 
-        {/* Shopify App Bridge */}
+        {/* Shopify App Bridge Configuration Injection */}
+        {host && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `window.shopifyConfig = { host: "${host}", apiKey: "${apiKey}" };`,
+            }}
+          />
+        )}
+
+        {/* Shopify App Bridge Script */}
         {host && (
           <script
             src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
