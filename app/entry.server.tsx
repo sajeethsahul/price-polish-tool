@@ -4,17 +4,17 @@ import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import type { EntryContext } from "react-router";
 import { isbot } from "isbot";
-import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
 
-export default async function handleRequest(
+export default function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   reactRouterContext: EntryContext
 ) {
   const userAgent = request.headers.get("user-agent");
+
   const callbackName = isbot(userAgent ?? "")
     ? "onAllReady"
     : "onShellReady";
@@ -29,15 +29,9 @@ export default async function handleRequest(
 
           responseHeaders.set("Content-Type", "text/html");
 
-          // 🔥 CRITICAL FIX (USE RETURN VALUE)
-          const finalHeaders = addDocumentResponseHeaders(
-            request,
-            responseHeaders
-          );
-
           resolve(
             new Response(stream, {
-              headers: finalHeaders,
+              headers: responseHeaders,
               status: responseStatusCode,
             })
           );
@@ -50,7 +44,6 @@ export default async function handleRequest(
         },
 
         onError(error) {
-          responseStatusCode = 500;
           console.error(error);
         },
       }
