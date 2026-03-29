@@ -51,7 +51,7 @@ interface LastUpdateInfo {
 export default function Dashboard() {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null);
@@ -72,29 +72,46 @@ export default function Dashboard() {
   
   const shopify = useAppBridge();
   const navigate = useNavigate();
-  const { currencyCode } = useOutletContext<{ currencyCode: string }>();
+  const { currencyCode = "USD" } = useOutletContext<{ currencyCode?: string }>() || {};
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const handlePreview = useCallback(async () => {
+    console.log("DEBUG: Initializing handlePreview fetch...");
     setLoading(true);
     setMessage(null);
     setCurrentPage(1);
     setSelectedItems(new Set());
+    
+    // Safety check for origin
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    
     try {
-      const res = await fetch("/api/preview-price");
+      const res = await fetch(origin + "/api/preview-price");
+      console.log(`DEBUG: /api/preview-price status: ${res.status}`);
       const data = await res.json();
+      console.log("DEBUG: /api/preview-price data received:", !!data);
+      
       if (res.ok) {
+        console.log(`DEBUG: Previews received. Length: ${data.previews?.length ?? 0}`);
         setPreviews(data.previews ?? []);
         setActiveMarkup(data.markupPercent ?? 0);
+        
         if ((data.previews ?? []).length === 0) {
           setFirstVisit(true);
-          setMessage({ type: "warning", text: "No products found or no rules configured.", details: "Please ensure you have products in your store and pricing rules are set up correctly." });
+          setMessage({ 
+            type: "warning", 
+            text: "No products found or no rules configured.", 
+            details: "Please ensure you have products in your store and pricing rules are set up correctly." 
+          });
         } else {
           setFirstVisit(false);
           // Fetch metrics after preview
-          const metricsRes = await fetch("/api/metrics");
+          const metricsRes = await fetch(origin + "/api/metrics");
+          console.log(`DEBUG: /api/metrics status: ${metricsRes.status}`);
+          
           if (metricsRes.ok) {
             const metricsData = await metricsRes.json();
+            console.log("DEBUG: Metrics data received:", !!metricsData);
             setMetrics(metricsData);
           }
         }
@@ -103,10 +120,11 @@ export default function Dashboard() {
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error("An unknown error occurred.");
-      console.error("Preview Error:", error);
+      console.error("DEBUG: Preview Error detail:", error);
       shopify.toast.show("Network error. Please try again.", { isError: true });
       setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
     } finally {
+      console.log("DEBUG: Finalizing handlePreview loading state.");
       setLoading(false);
     }
   }, [shopify]);
@@ -117,6 +135,7 @@ export default function Dashboard() {
   }, [handlePreview]);
 
   const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
+    console.log(`DEBUG: Initializing handleApplyBatch for ${itemsToUpdate.length} items...`);
     setIsProcessing(true);
     setIsModalOpen(false);
     setMessage(null);
@@ -129,14 +148,19 @@ export default function Dashboard() {
       isManual: item.overriddenPrice !== undefined // Send flag to backend
     }));
 
+    // Safety check for origin
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
     try {
-      const res = await fetch("/api/bulk-price", {
+      const res = await fetch(origin + "/api/bulk-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: itemsWithFinalPrices }),
       });
       
+      console.log(`DEBUG: /api/bulk-price status: ${res.status}`);
       const data = await res.json();
+      console.log("DEBUG: /api/bulk-price data received:", !!data);
       
       if (res.ok) {
         setLastUpdate({
@@ -158,8 +182,10 @@ export default function Dashboard() {
         throw new Error(data.error || "Failed to apply prices.");
       }
     } catch (err) {
+      console.error("DEBUG: ApplyBatch Error detail:", err);
       shopify.toast.show("System error during update", { isError: true });
     } finally {
+      console.log("DEBUG: Finalizing handleApplyBatch processing state.");
       setIsProcessing(false);
       setProgress(0);
     }
@@ -176,15 +202,24 @@ export default function Dashboard() {
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
+    console.log(`DEBUG: Initializing handleUndo for batch: ${lastUpdate.batchId}...`);
     setIsProcessing(true);
     setMessage(null);
+    
+    // Safety check for origin
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
     try {
-      const res = await fetch("/api/undo-price", {
+      const res = await fetch(origin + "/api/undo-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchId: lastUpdate.batchId }),
       });
+      
+      console.log(`DEBUG: /api/undo-price status: ${res.status}`);
       const data = await res.json();
+      console.log("DEBUG: /api/undo-price data received:", !!data);
+
       if (res.ok) {
         setLastUpdate(null);
         shopify.toast.show(`Restored ${data.restoredCount} products`);
@@ -194,8 +229,10 @@ export default function Dashboard() {
         throw new Error(data.error || "Failed to undo changes.");
       }
     } catch (err) {
+      console.error("DEBUG: Undo Error detail:", err);
       shopify.toast.show("Failed to undo changes", { isError: true });
     } finally {
+      console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
     }
   }, [lastUpdate, shopify, handlePreview]);
@@ -271,16 +308,25 @@ export default function Dashboard() {
   }, []);
 
   const handlePushStorefront = useCallback(async (clear = false) => {
+    console.log(`DEBUG: Initializing handlePushStorefront (clear=${clear})...`);
     setIsProcessing(true);
     setShowGoLiveModal(false);
     setShowStopModal(false);
+
+    // Safety check for origin
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+
     try {
-      const res = await fetch("/api/push-storefront", { 
+      const res = await fetch(origin + "/api/push-storefront", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clear })
       });
+      
+      console.log(`DEBUG: /api/push-storefront status: ${res.status}`);
       const data = await res.json();
+      console.log("DEBUG: /api/push-storefront data received:", !!data);
+
       if (res.ok) {
         shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
         setMetrics(prev => ({ ...prev, isLive: !clear }));
@@ -288,8 +334,10 @@ export default function Dashboard() {
         throw new Error(data.error || "Failed to push rules.");
       }
     } catch (err) {
+      console.error("DEBUG: PushStorefront Error detail:", err);
       shopify.toast.show("Failed to update storefront", { isError: true });
     } finally {
+      console.log("DEBUG: Finalizing handlePushStorefront processing state.");
       setIsProcessing(false);
     }
   }, [shopify]);
@@ -558,6 +606,20 @@ export default function Dashboard() {
             </InlineStack>
           </BlockStack>
         </Card>
+
+        {!loading && previews.length === 0 && (
+          <Card>
+            <Box padding="500">
+              <BlockStack gap="400" align="center">
+                <Text as="h2" variant="headingMd">No products to polish yet</Text>
+                <Text as="p" tone="subdued">
+                  We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
+                </Text>
+                <Button variant="primary" onClick={handlePreview}>Refresh Now</Button>
+              </BlockStack>
+            </Box>
+          </Card>
+        )}
 
         <Card>
           <BlockStack gap="400">
