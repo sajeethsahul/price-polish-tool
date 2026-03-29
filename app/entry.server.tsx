@@ -5,6 +5,9 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import type { EntryContext } from "react-router";
 import { isbot } from "isbot";
 
+// 🔥 IMPORT THIS (CRITICAL)
+import { addDocumentResponseHeaders } from "./shopify.server";
+
 export const streamTimeout = 5000;
 
 export default function handleRequest(
@@ -13,6 +16,15 @@ export default function handleRequest(
   responseHeaders: Headers,
   reactRouterContext: EntryContext
 ) {
+  // 🔥 FIX 1: Ensure origin exists (Render issue)
+  const url = new URL(request.url);
+  if (!request.headers.get("origin")) {
+    responseHeaders.set("origin", url.origin);
+  }
+
+  // 🔥 FIX 2: Shopify headers (MANDATORY)
+  addDocumentResponseHeaders(request, responseHeaders);
+
   const userAgent = request.headers.get("user-agent");
 
   const callbackName = isbot(userAgent ?? "")
