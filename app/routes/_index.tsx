@@ -4,16 +4,17 @@ import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
+  const shop = url.searchParams.get("shop");
 
-  // 🔥 Let Shopify handle auth properly
-  const auth = await authenticate.admin(request);
-
-  // ✅ CRITICAL: handle redirect from Shopify
-  if (auth?.redirect) {
-    return auth.redirect;
+  // ✅ If no shop → go to login
+  if (!shop) {
+    return redirect("/auth/login");
   }
 
-  // ✅ If already authenticated → go to app
+  // ✅ Let Shopify handle auth internally (NO redirect logic here)
+  await authenticate.admin(request);
+
+  // ✅ Once authenticated → go to app
   return redirect("/app" + url.search);
 };
 
