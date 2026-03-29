@@ -31,6 +31,8 @@ const shopify = shopifyApp({
   },
 });
 
+console.log("APP URL:", process.env.SHOPIFY_APP_URL);
+
 export default shopify;
 export const apiVersion = ApiVersion.October25;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
