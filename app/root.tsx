@@ -13,11 +13,7 @@ export const links = () => [
   {
     rel: "stylesheet",
     href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://cdn.shopify.com/static/fonts/inter/v4/styles.css",
-  },
+  }
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
