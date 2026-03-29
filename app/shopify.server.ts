@@ -7,49 +7,47 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
-// ✅ Validate ENV properly
+// 🔥 ENV VALIDATION (STRICT)
 const appUrl = process.env.SHOPIFY_APP_URL;
 const apiKey = process.env.SHOPIFY_API_KEY;
 const apiSecret = process.env.SHOPIFY_API_SECRET;
+const scopes = process.env.SCOPES;
 
-if (!appUrl) {
-  throw new Error("SHOPIFY_APP_URL is missing");
+if (!appUrl) throw new Error("SHOPIFY_APP_URL is missing");
+if (!apiKey) throw new Error("SHOPIFY_API_KEY is missing");
+if (!apiSecret) throw new Error("SHOPIFY_API_SECRET is missing");
+
+// 🔥 CRITICAL: Ensure valid URL format
+if (!appUrl.startsWith("https://")) {
+  throw new Error("SHOPIFY_APP_URL must start with https://");
 }
 
-if (!apiKey) {
-  throw new Error("SHOPIFY_API_KEY is missing");
-}
+// 🔍 Debug (keep temporarily)
+console.log("✅ SHOPIFY_APP_URL:", appUrl);
 
-if (!apiSecret) {
-  throw new Error("SHOPIFY_API_SECRET is missing");
-}
-
-// ✅ Debug log (keep for now)
-console.log("APP URL:", appUrl);
-
-// ✅ Shopify App Config
+// 🚀 SHOPIFY APP CONFIG
 const shopify = shopifyApp({
-  apiKey: apiKey,
+  apiKey,
   apiSecretKey: apiSecret,
   apiVersion: ApiVersion.October25,
-  scopes: process.env.SCOPES?.split(",") || [],
-  appUrl: appUrl,
+
+  scopes: scopes ? scopes.split(",") : [],
+
+  appUrl, // ✅ MUST be valid HTTPS URL
   authPathPrefix: "/auth",
 
   sessionStorage: new PrismaSessionStorage(prisma) as any,
 
+  // ✅ MUST for multi-store testing
   distribution: AppDistribution.AppStore,
 
   isEmbeddedApp: true,
 
-  // ✅ Required for iframe cookies (Render + Shopify)
+  // 🔥 REQUIRED for iframe (Render + Shopify)
   cookies: {
     sameSite: "none",
     secure: true,
   },
-
-  // ✅ Prevent URL parsing issues (important fix)
-  customShopDomains: [],
 
   future: {
     expiringOfflineAccessTokens: true,
@@ -58,7 +56,7 @@ const shopify = shopifyApp({
 
 export default shopify;
 
-// ✅ Exports
+// ✅ REQUIRED EXPORTS
 export const apiVersion = ApiVersion.October25;
 export const addDocumentResponseHeaders =
   shopify.addDocumentResponseHeaders;
