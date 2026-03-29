@@ -97,7 +97,6 @@ export default function AppLayout() {
           <Link to="/app/settings">Settings</Link>
           <Link to="/app/help">Help Guide</Link>
         </NavMenu>
-
         <Outlet context={{ currencyCode }} />
       </PolarisProvider>
     </ShopifyAppProvider>
