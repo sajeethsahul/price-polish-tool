@@ -1,8 +1,12 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { cors, handlePreflight } from "../utils/cors";
 import prisma from "../db.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
@@ -40,17 +44,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const isLive = !!(rule?.liveMarkupPercent && rule.liveMarkupPercent !== 0);
 
-        return new Response(JSON.stringify({
+        return cors(new Response(JSON.stringify({
             totalApplied,
             lastUpdate,
             successRate,
             isLive
         }), {
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     } catch (error) {
-        return new Response(JSON.stringify({ totalApplied: 0, lastUpdate: "", successRate: 100 }), {
+        return cors(new Response(JSON.stringify({ totalApplied: 0, lastUpdate: "", successRate: 100 }), {
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     }
 };

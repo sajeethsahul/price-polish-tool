@@ -1,16 +1,23 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
+import { cors, handlePreflight } from "../utils/cors";
 
-export const loader = async () => {
-    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
+    return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
         status: 405,
         headers: { "Content-Type": "application/json" },
-    });
+    }));
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
 
@@ -28,9 +35,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 },
             });
             await logActivity(shop, "CLEAR_STOREFRONT");
-            return new Response(JSON.stringify({ success: true, cleared: true }), {
+            return cors(new Response(JSON.stringify({ success: true, cleared: true }), {
                 headers: { "Content-Type": "application/json" },
-            });
+            }));
         }
 
         const rule = await prisma.pricingRule.findUnique({
@@ -38,10 +45,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         if (!rule) {
-            return new Response(JSON.stringify({ error: "No rules found to push." }), {
+            return cors(new Response(JSON.stringify({ error: "No rules found to push." }), {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
-            });
+            }));
         }
 
         // Push "Working" rules to "Live" storefront settings
@@ -60,14 +67,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             rounding: rule.roundingStep 
         });
 
-        return new Response(JSON.stringify({ success: true }), {
+        return cors(new Response(JSON.stringify({ success: true }), {
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     } catch (error: any) {
         await logActivity(shop, "ERROR", { action: "PUSH_STOREFRONT", message: error.message });
-        return new Response(JSON.stringify({ error: "Failed to push rules to storefront." }), {
+        return cors(new Response(JSON.stringify({ error: "Failed to push rules to storefront." }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     }
 };

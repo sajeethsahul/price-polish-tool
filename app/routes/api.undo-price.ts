@@ -1,16 +1,23 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
+import { cors, handlePreflight } from "../utils/cors";
 
-export const loader = async () => {
-    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
+    return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
         status: 405,
         headers: { "Content-Type": "application/json" },
-    });
+    }));
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
 
@@ -114,7 +121,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         await logActivity(shop, "UNDO_SUCCESS", { successCount, total: history.length });
 
-        return new Response(
+        return cors(new Response(
             JSON.stringify({
                 success: successCount > 0,
                 restoredCount: successCount,
@@ -122,12 +129,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 results,
             }),
             { headers: { "Content-Type": "application/json" } },
-        );
+        ));
     } catch (error: any) {
         await logActivity(shop, "ERROR", { action: "UNDO_PRICE", message: error.message });
-        return new Response(
+        return cors(new Response(
             JSON.stringify({ error: "Something went wrong during undo" }),
             { status: 500, headers: { "Content-Type": "application/json" } },
-        );
+        ));
     }
 };

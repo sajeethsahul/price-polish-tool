@@ -1,10 +1,14 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { cors, handlePreflight } from "../utils/cors";
 import { calculatePrice } from "../utils/pricing";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
 
@@ -104,14 +108,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
-        return new Response(JSON.stringify({ previews, markupPercent }), {
+        return cors(new Response(JSON.stringify({ previews, markupPercent }), {
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     } catch (error: any) {
         await logActivity(shop, "ERROR", { action: "PREVIEW_LOAD", message: error.message });
-        return new Response(JSON.stringify({ error: "Failed to load preview data" }), {
+        return cors(new Response(JSON.stringify({ error: "Failed to load preview data" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
-        });
+        }));
     }
 };

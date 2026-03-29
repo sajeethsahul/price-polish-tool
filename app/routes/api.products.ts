@@ -1,7 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { cors, handlePreflight } from "../utils/cors";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
     const { admin } = await authenticate.admin(request);
 
     const response = await admin.graphql(`
@@ -25,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }),
     );
 
-    return new Response(JSON.stringify({ products }), {
+    return cors(new Response(JSON.stringify({ products }), {
         headers: { "Content-Type": "application/json" },
-    });
+    }));
 };

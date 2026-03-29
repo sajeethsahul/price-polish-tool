@@ -1,7 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router";
+import { cors, handlePreflight } from "../utils/cors";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    return new Response(JSON.stringify({ status: "OK" }), {
+    const preflight = handlePreflight(request);
+    if (preflight) return preflight;
+
+    return cors(new Response(JSON.stringify({ status: "OK" }), {
         headers: { "Content-Type": "application/json" },
-    });
+    }));
 };
