@@ -33,6 +33,25 @@ export default function App() {
         {/* Shopify CDN preconnect */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
 
+        {/* FINAL ENFORCEMENT: Restrict standalone access (Force Iframe) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (window.top === window.self) {
+                const url = new URL(window.location.href);
+                const shop = url.searchParams.get("shop");
+
+                if (shop) {
+                  const store = shop.replace(".myshopify.com", "");
+                  window.location.replace(
+                    "https://admin.shopify.com/store/" + store + "/apps"
+                  );
+                }
+              }
+            `,
+          }}
+        />
+
 
         <Meta />
         <Links />

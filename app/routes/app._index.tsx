@@ -470,6 +470,38 @@ export default function Dashboard() {
       ]}
     >
       <BlockStack gap="500">
+        {/* NEW: Environment & Handshake Diagnostics */}
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h3" variant="headingSm">System Health & Diagnostics</Text>
+            <Divider />
+            <BlockStack gap="200">
+              <InlineStack gap="400" align="space-between">
+                <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
+                <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
+                  {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
+                </Badge>
+              </InlineStack>
+              <InlineStack gap="400" align="space-between">
+                <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
+                <Badge tone={currencyCode ? "success" : "attention"}>
+                  {currencyCode ? "Connected" : "Initializing..."}
+                </Badge>
+              </InlineStack>
+              <InlineStack gap="400" align="space-between">
+                <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
+                <Text as="span" variant="bodyMd">{typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}</Text>
+              </InlineStack>
+            </BlockStack>
+            <Banner tone="info">
+              <p>
+                If <strong>Is Embedded</strong> is NO, the app is running on its own domain instead of <code>admin.shopify.com</code>. This will cause App Bridge origin mismatches.
+              </p>
+            </Banner>
+          </BlockStack>
+        </Card>
+
+        {/* System Status Card (Debug) */}
         <Card>
           <BlockStack gap="200">
             <Text as="h3" variant="headingSm">System Status (Debug)</Text>
