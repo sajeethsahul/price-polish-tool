@@ -6,6 +6,13 @@ import { logActivity } from "../utils/activity.server";
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
 
+export const loader = async () => {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+        status: 405,
+        headers: { "Content-Type": "application/json" },
+    });
+};
+
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
