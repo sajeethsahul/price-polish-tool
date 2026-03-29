@@ -10,7 +10,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 
 import "@shopify/polaris/build/esm/styles.css";
 
-import { addDocumentResponseHeaders } from "../shopify.server";
+//import { addDocumentResponseHeaders } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -61,7 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // export const headers: HeadersFunction = (headersArgs) => {
 //   return boundary.headers(headersArgs);
 // };
-export const headers = addDocumentResponseHeaders;
+//export const headers = addDocumentResponseHeaders;
 
 export default function AppLayout() {
   const data = useLoaderData<typeof loader>();

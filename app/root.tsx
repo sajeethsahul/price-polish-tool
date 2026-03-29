@@ -8,16 +8,22 @@ import {
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-// ✅ ADD THIS
+// ✅ All styles must be here (SSR-safe)
 export const links = () => [
   {
     rel: "stylesheet",
     href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css",
   },
+  {
+    rel: "stylesheet",
+    href: "https://cdn.shopify.com/static/fonts/inter/v4/styles.css",
+  },
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+  };
 };
 
 export default function App() {
@@ -27,18 +33,15 @@ export default function App() {
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
-
-        {/* Shopify CDN */}
-        <link rel="preconnect" href="https://cdn.shopify.com/" />
-
-        {/* Fonts */}
-        <link
-          rel="stylesheet"
-          href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
+        <meta
+          name="viewport"
+          content="width=device-width,initial-scale=1"
         />
 
-        {/* App Bridge */}
+        {/* Shopify CDN preconnect */}
+        <link rel="preconnect" href="https://cdn.shopify.com/" />
+
+        {/* Shopify App Bridge */}
         <script
           src={`https://cdn.shopify.com/shopifycloud/app-bridge.js?apiKey=${apiKey}`}
         ></script>
