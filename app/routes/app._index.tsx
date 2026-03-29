@@ -82,11 +82,8 @@ export default function Dashboard() {
     setCurrentPage(1);
     setSelectedItems(new Set());
     
-    // Safety check for origin
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-    
     try {
-      const res = await fetch(origin + "/api/preview-price");
+      const res = await fetch("/api/preview-price");
       console.log(`DEBUG: /api/preview-price status: ${res.status}`);
       const data = await res.json();
       console.log("DEBUG: /api/preview-price data received:", !!data);
@@ -106,7 +103,7 @@ export default function Dashboard() {
         } else {
           setFirstVisit(false);
           // Fetch metrics after preview
-          const metricsRes = await fetch(origin + "/api/metrics");
+          const metricsRes = await fetch("/api/metrics");
           console.log(`DEBUG: /api/metrics status: ${metricsRes.status}`);
           
           if (metricsRes.ok) {
@@ -131,6 +128,7 @@ export default function Dashboard() {
 
   // Initial Load
   useEffect(() => {
+    console.log("DEBUG: Dashboard mounted, triggered initial handlePreview");
     handlePreview();
   }, [handlePreview]);
 
@@ -148,11 +146,8 @@ export default function Dashboard() {
       isManual: item.overriddenPrice !== undefined // Send flag to backend
     }));
 
-    // Safety check for origin
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-
     try {
-      const res = await fetch(origin + "/api/bulk-price", {
+      const res = await fetch("/api/bulk-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: itemsWithFinalPrices }),
@@ -206,11 +201,8 @@ export default function Dashboard() {
     setIsProcessing(true);
     setMessage(null);
     
-    // Safety check for origin
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-
     try {
-      const res = await fetch(origin + "/api/undo-price", {
+      const res = await fetch("/api/undo-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchId: lastUpdate.batchId }),
@@ -313,11 +305,8 @@ export default function Dashboard() {
     setShowGoLiveModal(false);
     setShowStopModal(false);
 
-    // Safety check for origin
-    const origin = typeof window !== "undefined" ? window.location.origin : "";
-
     try {
-      const res = await fetch(origin + "/api/push-storefront", { 
+      const res = await fetch("/api/push-storefront", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clear })
@@ -382,8 +371,11 @@ export default function Dashboard() {
     return { lift, liftPercent, count };
   }, [previews]);
 
+  console.log(`DEBUG: Render Cycle - previews.length: ${previews.length}, loading: ${loading}`);
+
   // Filtering & Sorting Logic
   const filteredPreviews = useMemo(() => {
+    console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
     let result = previews.filter(p => {
       const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
       const currentNewPrice = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
@@ -478,6 +470,18 @@ export default function Dashboard() {
       ]}
     >
       <BlockStack gap="500">
+        <Card>
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">System Status (Debug)</Text>
+            <InlineStack gap="400">
+               <Text as="p">Previews: <strong>{previews.length}</strong></Text>
+               <Text as="p">Filtered: <strong>{filteredPreviews.length}</strong></Text>
+               <Text as="p">Loading: <strong>{loading ? "YES" : "NO"}</strong></Text>
+               <Text as="p">Currency: <strong>{currencyCode}</strong></Text>
+            </InlineStack>
+          </BlockStack>
+        </Card>
+
         {firstVisit && (
           <Card>
             <BlockStack gap="400">

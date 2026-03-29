@@ -51,9 +51,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", error);
   }
 
+  const url = new URL(request.url);
+  const host = url.searchParams.get("host");
+
+  // Robust host fallback for App Bridge 4+ (unified admin domain)
+  let finalHost = host;
+  if (!finalHost && auth.session) {
+    const shop = auth.session.shop;
+    const storeName = shop.split(".")[0];
+    finalHost = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
+  }
+
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     currencyCode,
+    host: finalHost,
   };
 };
 
@@ -93,10 +105,32 @@ export default function AppLayout() {
     );
   }
 
-  const { apiKey, currencyCode } = data;
+  const { apiKey, currencyCode, host } = data;
+
+  // Strict Guard: Prevent App Bridge context mismatch by ensuring host is present
+  if (!host) {
+    return (
+      <PolarisProvider i18n={{}}>
+        <SkeletonPage title="Price Polish">
+          <Loading />
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <SkeletonDisplayText size="small" />
+                  <SkeletonBodyText lines={3} />
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </SkeletonPage>
+      </PolarisProvider>
+    );
+  }
 
   return (
-    <ShopifyAppProvider apiKey={apiKey} embedded>
+    // @ts-expect-error - host is required for App Bridge 4 but missing from some library versions of AppProviderProps
+    <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
       <PolarisProvider i18n={{}}>
         {/* ✅ Global Loading Bar */}
         {isLoading && <Loading />}

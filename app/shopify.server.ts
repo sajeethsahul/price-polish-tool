@@ -29,7 +29,7 @@ console.log("✅ SHOPIFY_APP_URL:", appUrl);
 const shopify = shopifyApp({
   apiKey,
   apiSecretKey: apiSecret,
-  apiVersion: ApiVersion.October25,
+  apiVersion: ApiVersion.October24,
 
   scopes: scopes ? scopes.split(",") : [],
 

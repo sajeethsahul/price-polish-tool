@@ -11,6 +11,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
+    console.log("DEBUG BACKEND: Authenticated session for shop:", shop);
 
     try {
         const rule = await prisma.pricingRule.findUnique({
@@ -28,6 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               node {
                 id
                 title
+                status
                 featuredImage {
                   url
                 }
@@ -42,10 +44,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               }
             }
           }
+          productsCount {
+            count
+          }
         }
       `);
 
-        const data = await response.json();
+        const data: any = await response.json();
+        
+        console.log(`DEBUG BACKEND: GraphQL response status: ${response.status} for shop: ${shop}`);
+        if (data.errors) {
+            console.error("DEBUG BACKEND ERRORS: Shopify returned GraphQL errors:", JSON.stringify(data.errors, null, 2));
+        }
+
+        const totalCount = data?.data?.productsCount?.count ?? 0;
+        const edges = data?.data?.products?.edges || [];
+        
+        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Total Count in Store: ${totalCount}`);
+        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Accessible Edges: ${edges.length}`);
+        
+        if (totalCount > 0 && edges.length === 0) {
+            console.warn("DEBUG BACKEND: [CRITICAL] Count > 0 but Edges = 0. Products exist but are NOT accessible to this app. Check Sales Channel permissions.");
+            if (data.data.products?.edges) {
+               console.log("DEBUG BACKEND: products block found but empty.");
+            } else {
+               console.error("DEBUG BACKEND: products block is MISSING from response.");
+            }
+        }
 
         interface ProductNode {
             id: string;
@@ -63,7 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             };
         }
 
-        const previews = await Promise.all(data.data.products.edges.map(
+        const previews = await Promise.all(edges.map(
             async (edge: { node: ProductNode }) => {
                 const product = edge.node;
                 const variant = product.variants.edges[0]?.node;

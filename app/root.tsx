@@ -17,13 +17,25 @@ export const links = () => [
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const url = new URL(request.url);
+  let host = url.searchParams.get("host");
+
+  // Fallback if host is missing (e.g. after a redirect)
+  if (!host) {
+    // We can't authenticate.admin(request) here easily without potentially triggering redirects,
+    // so we look for shop in the URL or use a generic loader approach if available.
+    // For now, if host is missing, we try to get it from searchParams or return null.
+    // (Actual auth-based fallback is in app/routes/app.tsx which is the primary route)
+  }
+
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
+    host,
   };
 };
 
 export default function App() {
-  const { apiKey } = useLoaderData<typeof loader>();
+  const { apiKey, host } = useLoaderData<typeof loader>();
 
   return (
     <html lang="en">
@@ -39,7 +51,7 @@ export default function App() {
 
         {/* Shopify App Bridge */}
         <script
-          src={`https://cdn.shopify.com/shopifycloud/app-bridge.js?apiKey=${apiKey}`}
+          src={`https://cdn.shopify.com/shopifycloud/app-bridge.js?apiKey=${apiKey}${host ? `&host=${host}` : ""}`}
         ></script>
 
         <Meta />
