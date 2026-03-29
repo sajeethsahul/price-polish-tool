@@ -4,8 +4,6 @@ import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import type { EntryContext } from "react-router";
 import { isbot } from "isbot";
-
-// 🔥 IMPORT THIS (CRITICAL)
 import { addDocumentResponseHeaders } from "./shopify.server";
 
 export const streamTimeout = 5000;
@@ -16,14 +14,24 @@ export default function handleRequest(
   responseHeaders: Headers,
   reactRouterContext: EntryContext
 ) {
-  // 🔥 FIX 1: Ensure origin exists (Render issue)
-  const url = new URL(request.url);
-  if (!request.headers.get("origin")) {
+  // ✅ SAFE REQUEST FIX
+  let safeRequest = request;
+
+  try {
+    new URL(request.url);
+  } catch {
+    const fallbackUrl = `${process.env.SHOPIFY_APP_URL}/app`;
+    safeRequest = new Request(fallbackUrl, request);
+  }
+
+  // ✅ Ensure origin header
+  const url = new URL(safeRequest.url);
+  if (!safeRequest.headers.get("origin")) {
     responseHeaders.set("origin", url.origin);
   }
 
-  // 🔥 FIX 2: Shopify headers (MANDATORY)
-  addDocumentResponseHeaders(request, responseHeaders);
+  // ✅ Shopify headers
+  addDocumentResponseHeaders(safeRequest, responseHeaders);
 
   const userAgent = request.headers.get("user-agent");
 
@@ -33,7 +41,7 @@ export default function handleRequest(
 
   return new Promise((resolve, reject) => {
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={reactRouterContext} url={request.url} />,
+      <ServerRouter context={reactRouterContext} url={safeRequest.url} />,
       {
         [callbackName]: () => {
           const body = new PassThrough();
