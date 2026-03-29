@@ -49,16 +49,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       console.log("⚠️ Host from URL fallback:", host);
     }
   }
-
-  return {
-    apiKey,
-    host: host || "",
-  };
+  return {};
 };
 
 export default function App() {
-  const { apiKey, host } = useLoaderData<typeof loader>();
-
   return (
     <html lang="en">
       <head>
@@ -71,23 +65,6 @@ export default function App() {
         {/* Shopify CDN preconnect */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
 
-        {/* Shopify App Bridge Configuration Injection */}
-        {host && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `window.shopifyConfig = { host: "${host}", apiKey: "${apiKey}" };`,
-            }}
-          />
-        )}
-
-        {/* Shopify App Bridge Script */}
-        {host && (
-          <script
-            src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
-            data-api-key={apiKey}
-            data-host={host}
-          />
-        )}
 
         <Meta />
         <Links />
