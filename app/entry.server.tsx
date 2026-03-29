@@ -4,7 +4,7 @@ import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import type { EntryContext } from "react-router";
 import { isbot } from "isbot";
-import { addDocumentResponseHeaders } from "./shopify.server";
+
 
 export const streamTimeout = 5000;
 
@@ -30,12 +30,7 @@ export default function handleRequest(
     responseHeaders.set("origin", url.origin);
   }
 
-  // ✅ Shopify headers
-  try {
-    addDocumentResponseHeaders(safeRequest, responseHeaders);
-  } catch (e) {
-    console.error("⚠️ Shopify header error skipped:", e);
-  }
+
 
   const userAgent = request.headers.get("user-agent");
 

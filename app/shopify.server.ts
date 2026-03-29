@@ -58,8 +58,6 @@ export default shopify;
 
 // ✅ REQUIRED EXPORTS
 export const apiVersion = ApiVersion.October25;
-export const addDocumentResponseHeaders =
-  shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
