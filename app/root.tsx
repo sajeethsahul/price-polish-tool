@@ -16,39 +16,7 @@ export const links = () => [
   }
 ];
 
-import { authenticate } from "./shopify.server";
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
-
-  let host = url.searchParams.get("host");
-  let apiKey = process.env.SHOPIFY_API_KEY || "";
-
-  // ✅ ONLY for embedded app routes to avoid OAuth loops in root
-  if (url.pathname.startsWith("/app")) {
-    try {
-      const auth = await authenticate.admin(request);
-      const shop = auth?.session?.shop;
-
-      if (shop) {
-        const storeName = shop.replace(".myshopify.com", "");
-        host = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
-        console.log("✅ Host from session:", host);
-      }
-    } catch (err) {
-      console.log("⚠️ Auth skipped in root:", err);
-    }
-  }
-
-  // 🔥 fallback (for non-auth routes or missing session)
-  if (!host) {
-    const shop = url.searchParams.get("shop");
-    if (shop) {
-      const storeName = shop.replace(".myshopify.com", "");
-      host = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
-      console.log("⚠️ Host from URL fallback:", host);
-    }
-  }
   return {};
 };
 

@@ -1,13 +1,13 @@
 import { Outlet, Link, useLoaderData, useNavigation } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
-import { 
-  AppProvider as PolarisProvider, 
-  SkeletonPage, 
-  Layout, 
-  Card, 
-  SkeletonBodyText, 
-  SkeletonDisplayText, 
+import {
+  AppProvider as PolarisProvider,
+  SkeletonPage,
+  Layout,
+  Card,
+  SkeletonBodyText,
+  SkeletonDisplayText,
   Loading,
   Box,
   BlockStack
@@ -22,7 +22,6 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const auth = await authenticate.admin(request);
 
-  // ✅ Shopify handles OAuth redirect
   if (auth?.redirect) {
     return auth.redirect;
   }
@@ -31,9 +30,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Response("Unauthorized", { status: 401 });
   }
 
-  const { admin } = auth;
+  const { admin, session } = auth;
 
-  // ✅ Keep your original currency logic
   let currencyCode = "USD";
 
   try {
@@ -51,21 +49,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", error);
   }
 
-  const url = new URL(request.url);
-  const host = url.searchParams.get("host");
+  // ✅ ONLY SOURCE OF TRUTH
+  const storeName = session.shop.replace(".myshopify.com", "");
 
-  // Robust host fallback for App Bridge 4+ (unified admin domain)
-  let finalHost = host;
-  if (!finalHost && auth.session) {
-    const shop = auth.session.shop;
-  const storeName = shop.replace(".myshopify.com", "");
-  finalHost = Buffer.from(`admin.shopify.com/store/${storeName}`).toString("base64");
-}
+  const host = Buffer.from(
+    `admin.shopify.com/store/${storeName}`
+  ).toString("base64");
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     currencyCode,
-    host: finalHost,
+    host,
   };
 };
 
@@ -94,8 +88,8 @@ export default function AppLayout() {
             <Layout.Section variant="oneThird">
               <Card>
                 <BlockStack gap="400">
-                   <SkeletonDisplayText size="small" />
-                   <SkeletonBodyText lines={2} />
+                  <SkeletonDisplayText size="small" />
+                  <SkeletonBodyText lines={2} />
                 </BlockStack>
               </Card>
             </Layout.Section>
@@ -134,7 +128,7 @@ export default function AppLayout() {
       <PolarisProvider i18n={{}}>
         {/* ✅ Global Loading Bar */}
         {isLoading && <Loading />}
-        
+
         <NavMenu>
           <Link to="/app" rel="home">Dashboard</Link>
           <Link to="/app/rules">Pricing Rules</Link>
