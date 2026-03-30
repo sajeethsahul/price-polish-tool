@@ -24,53 +24,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
+  let auth;
+
   try {
-    const auth = await authenticate.admin(request);
-
-    if (auth?.redirect) return auth.redirect;
-    if (!auth) throw new Response("Unauthorized", { status: 401 });
-
-    const { admin, session } = auth;
-
-    let currencyCode = "USD";
-
-    try {
-      const response = await admin.graphql(`
-        {
-          shop {
-            currencyCode
-          }
-        }
-      `);
-
-      const data = await response.json();
-      currencyCode = data?.data?.shop?.currencyCode || "USD";
-    } catch (err) {
-      console.error("Currency fetch failed:", err);
-    }
-
-    const storeName = session.shop.replace(".myshopify.com", "");
-
-    const host = Buffer.from(
-      `admin.shopify.com/store/${storeName}`
-    ).toString("base64");
-
-    return {
-      apiKey: process.env.SHOPIFY_API_KEY || "",
-      currencyCode,
-      host,
-      isBypass: false,
-    };
-  } catch (error) {
+    auth = await authenticate.admin(request);
+  } catch (error: any) {
     console.error("AUTH FAILED:", error);
 
     if (isBypass) {
       console.warn("⚠️ BYPASS MODE ACTIVE");
-
       return {
         apiKey: process.env.SHOPIFY_API_KEY || "mock-api-key",
         currencyCode: "USD",
-        host: null, // 🔥 critical
+        host: null,
         isBypass: true,
       };
     }
@@ -79,6 +45,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       status: 503,
     });
   }
+
+  // ✅ HANDLE REDIRECT ONLY WHEN NOT BYPASS
+  if (auth?.redirect && !isBypass) {
+    return auth.redirect;
+  }
+
+  const { admin, session } = auth;
+
+  let currencyCode = "USD";
+
+  try {
+    const response = await admin.graphql(`
+        {
+          shop {
+            currencyCode
+          }
+        }
+      `);
+
+    const data = await response.json();
+    currencyCode = data?.data?.shop?.currencyCode || "USD";
+  } catch (err) {
+    console.error("Currency fetch failed:", err);
+  }
+
+  const storeName = session.shop.replace(".myshopify.com", "");
+
+  const host = Buffer.from(
+    `admin.shopify.com/store/${storeName}`
+  ).toString("base64");
+
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    currencyCode,
+    host,
+    isBypass: false,
+  };
 };
 
 // ================= COMPONENT =================
