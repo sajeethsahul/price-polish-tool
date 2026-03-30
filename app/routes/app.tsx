@@ -64,6 +64,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       apiKey: process.env.SHOPIFY_API_KEY || "",
       currencyCode,
       host,
+      isBypass: false,
     };
   } catch (error) {
     if (isBypass) {
@@ -124,7 +125,7 @@ export default function AppLayout() {
     );
   }
 
-  const { apiKey, currencyCode, host } = data;
+  const { apiKey, currencyCode, host, isBypass } = data as any;
 
   // Strict Guard: Prevent App Bridge context mismatch by ensuring host is present
   if (!host) {
@@ -147,23 +148,33 @@ export default function AppLayout() {
     );
   }
 
-  return (
-    // @ts-expect-error - host is required for App Bridge 4 but missing from some library versions of AppProviderProps
-    <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
-      <PolarisProvider i18n={{}}>
-        {/* ✅ Global Loading Bar */}
-        {isLoading && <Loading />}
+  const components = (
+    <PolarisProvider i18n={{}}>
+      {/* ✅ Global Loading Bar */}
+      {isLoading && <Loading />}
 
+      {!isBypass && (
         <NavMenu>
           <Link to="/app" rel="home">Dashboard</Link>
           <Link to="/app/rules">Pricing Rules</Link>
           <Link to="/app/settings">Settings</Link>
           <Link to="/app/help">Help Guide</Link>
         </NavMenu>
+      )}
 
-        {/* ✅ Your app content (UNCHANGED) */}
-        <Outlet context={{ currencyCode }} />
-      </PolarisProvider>
+      {/* ✅ Your app content (UNCHANGED) */}
+      <Outlet context={{ currencyCode }} />
+    </PolarisProvider>
+  );
+
+  if (isBypass) {
+    return components;
+  }
+
+  return (
+    // @ts-expect-error - host is required for App Bridge 4 but missing from some library versions of AppProviderProps
+    <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
+      {components}
     </ShopifyAppProvider>
   );
 }
