@@ -23,6 +23,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
+  console.log("BYPASS PARAM:", new URL(request.url).searchParams.get("bypass"));
+
   try {
     const auth = await authenticate.admin(request);
 

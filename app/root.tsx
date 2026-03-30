@@ -17,10 +17,18 @@ export const links = () => [
 ];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  return {};
+  const url = new URL(request.url);
+  const host = url.searchParams.get("host");
+
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    host,
+  };
 };
 
 export default function App() {
+  const { apiKey, host } = useLoaderData<typeof loader>();
+
   return (
     <html lang="en">
       <head>
@@ -50,8 +58,13 @@ export default function App() {
               }
             `,
           }}
-        />
-
+        />        {/* App Bridge 4 Initialization (Conditional) */}
+        {host && (
+          <>
+            <meta name="shopify-api-key" content={apiKey} />
+            <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+          </>
+        )}
 
         <Meta />
         <Links />
