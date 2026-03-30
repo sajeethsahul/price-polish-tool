@@ -69,19 +69,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     if (isBypass) {
       console.warn("⚠️ BYPASS MODE ACTIVE: Authentication failed, returning mock data.");
-      
+
       const shop = url.searchParams.get("shop") || "mock-store.myshopify.com";
       const storeName = shop.replace(".myshopify.com", "");
-      const host = url.searchParams.get("host") || Buffer.from(
-        `admin.shopify.com/store/${storeName}`
-      ).toString("base64");
+      // const host = url.searchParams.get("host") || Buffer.from(
+      //   `admin.shopify.com/store/${storeName}`
+      // ).toString("base64");
 
-      return {
-        apiKey: process.env.SHOPIFY_API_KEY || "mock-api-key",
-        currencyCode: "USD",
-        host,
-        isBypass: true,
-      };
+      const host = null;
+
+      if (isBypass) {
+        console.warn("⚠️ BYPASS MODE ACTIVE");
+
+        return {
+          apiKey: process.env.SHOPIFY_API_KEY || "mock-api-key",
+          currencyCode: "USD",
+          host: null, // 🔥 CRITICAL FIX
+          isBypass: true,
+        };
+      }
     }
 
     console.error("❌ Root loader failed:", error);
@@ -125,7 +131,12 @@ export default function AppLayout() {
     );
   }
 
-  const { apiKey, currencyCode, host, isBypass } = data as any;
+  const { apiKey, currencyCode, host, isBypass } = data as {
+    apiKey: string;
+    currencyCode: string;
+    host: string | null;
+    isBypass: boolean;
+  };
 
   // Strict Guard: Prevent App Bridge context mismatch by ensuring host is present
   if (!host) {
