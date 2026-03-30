@@ -62,7 +62,11 @@ export default function App() {
         {host && (
           <>
             <meta name="shopify-api-key" content={apiKey} />
-            <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+            <script
+              src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+              data-api-key={apiKey}
+              data-host={host}
+            ></script>
           </>
         )}
 
