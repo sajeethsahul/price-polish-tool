@@ -70,6 +70,31 @@ export default function App() {
         <Links />
       </head>
 
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+      console.log("=== DEBUG START ===");
+
+      console.log("URL:", window.location.href);
+
+      console.log("BYPASS:",
+        new URL(window.location.href).searchParams.get("bypass")
+      );
+
+      console.log("IFRAME:",
+        window.top === window.self ? "NO (standalone)" : "YES (embedded)"
+      );
+
+      console.log("APP BRIDGE SCRIPT:",
+        !!document.querySelector('script[src*="app-bridge"]')
+      );
+
+      setTimeout(() => {
+        console.log("BODY CONTENT:", document.body.innerText);
+      }, 2000);
+    `,
+        }}
+      />
       <body>
         <Outlet />
         <ScrollRestoration />
