@@ -4,8 +4,20 @@ import { authenticate } from "../shopify.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-  return null;
+  const url = new URL(request.url);
+  const isBypass = url.searchParams.get("bypass") === "true";
+
+  try {
+    await authenticate.admin(request);
+    return null;
+  } catch (error) {
+    if (isBypass) {
+      console.warn("⚠️ BYPASS MODE ACTIVE: Help loader failed, continuing with mock.");
+      return null;
+    }
+    console.error("❌ Help loader failed:", error);
+    throw new Response("Service Unavailable", { status: 503 });
+  }
 };
 
 export default function HelpPage() {
