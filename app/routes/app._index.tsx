@@ -24,9 +24,14 @@ import {
   Tooltip,
   Icon,
 } from "@shopify/polaris";
-import { InfoIcon } from "@shopify/polaris-icons";
-import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
+import { InfoIcon, SearchIcon } from "@shopify/polaris-icons";
+import { 
+  formatMoney, 
+  getCurrencySymbol, 
+  ZERO_DECIMAL_CURRENCIES 
+} from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
+import { EmptyState, Layout as PolarisLayout } from "@shopify/polaris";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
@@ -654,15 +659,23 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
         {!loading && previews.length === 0 && (
           <Card>
-            <Box padding="500">
-              <BlockStack gap="400" align="center">
-                <Text as="h2" variant="headingMd">No products to polish yet</Text>
-                <Text as="p" tone="subdued">
-                  We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
-                </Text>
-                <Button variant="primary" onClick={handlePreview}>Refresh Now</Button>
-              </BlockStack>
-            </Box>
+            <EmptyState
+              heading="No products found to polish"
+              action={{
+                content: 'Configure Pricing Rules',
+                onAction: () => navigate("/app/rules"),
+              }}
+              secondaryAction={{
+                content: 'Refresh Data',
+                onAction: handlePreview,
+                loading: loading
+              }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>
+                We couldn't find any products matching your current rules. Adjust your markup or rounding settings to see potential price optimizations.
+              </p>
+            </EmptyState>
           </Card>
         )}
 

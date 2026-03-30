@@ -6,9 +6,11 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "react-router";
+import { isRouteErrorResponse, useRouteError } from "react-router";
+import { Page, Card, BlockStack, Text, Button, AppProvider } from "@shopify/polaris";
 import type { LoaderFunctionArgs } from "react-router";
 
-// ✅ All styles must be here (SSR-safe)
+// ✅ POLARIS STYLES ARE REQUIRED IN HEAD
 export const links = () => [
   {
     rel: "stylesheet",
@@ -70,3 +72,51 @@ export default function App() {
     </html>
   );
 }
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+
+  let errorMessage = "An unknown error has occurred. Please try again.";
+  if (isRouteErrorResponse(error)) {
+    errorMessage = `${error.status} ${error.statusText}`;
+  } else if (error instanceof Error) {
+    errorMessage = error.message;
+  }
+
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        <AppProvider i18n={{}}>
+          <Page title="Something went wrong">
+            <BlockStack gap="400">
+               <Card>
+                  <BlockStack gap="400">
+                    <Text as="p" variant="bodyMd">
+                      The application encountered an unexpected error. This might be due to a session timeout or a temporary connection issue.
+                    </Text>
+                    <Text as="p" tone="subdued">
+                      Error Detail: {errorMessage}
+                    </Text>
+                    <Box paddingBlockStart="400">
+                       <Button variant="primary" onClick={() => window.location.reload()}>
+                         Refresh Page
+                       </Button>
+                    </Box>
+                  </BlockStack>
+                </Card>
+            </BlockStack>
+          </Page>
+        </AppProvider>
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+import { Box } from "@shopify/polaris";

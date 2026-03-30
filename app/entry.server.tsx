@@ -43,6 +43,12 @@ export default function handleRequest(
           const stream = createReadableStreamFromReadable(body);
 
           responseHeaders.set("Content-Type", "text/html");
+          
+          // 🔥 MANDATORY SHOPIFY CSP
+          responseHeaders.set(
+            "Content-Security-Policy",
+            "frame-ancestors https://admin.shopify.com https://admin.shopify.com/store/* https://*.myshopify.com https://*.shopify.com;"
+          );
 
           resolve(
             new Response(stream, {

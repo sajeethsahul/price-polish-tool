@@ -117,18 +117,33 @@ export default function AppLayout() {
   // ================= COMMON UI =================
   const AppContent = (
     <PolarisProvider i18n={{}}>
-      {isLoading && <Loading />}
-
-      {!isBypass && (
-        <NavMenu>
-          <Link to="/app" rel="home">Dashboard</Link>
-          <Link to="/app/rules">Pricing Rules</Link>
-          <Link to="/app/settings">Settings</Link>
-          <Link to="/app/help">Help Guide</Link>
-        </NavMenu>
+      {isLoading ? (
+        <SkeletonPage title="Price Polish">
+          <Loading />
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <SkeletonDisplayText size="small" />
+                  <SkeletonBodyText lines={3} />
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </SkeletonPage>
+      ) : (
+        <>
+          {!isBypass && (
+            <NavMenu>
+              <Link to="/app" rel="home">Dashboard</Link>
+              <Link to="/app/rules">Pricing Rules</Link>
+              <Link to="/app/settings">Settings</Link>
+              <Link to="/app/help">Help Guide</Link>
+            </NavMenu>
+          )}
+          <Outlet context={{ currencyCode, isBypass }} />
+        </>
       )}
-
-      <Outlet context={{ currencyCode, isBypass }} />
     </PolarisProvider>
   );
 
