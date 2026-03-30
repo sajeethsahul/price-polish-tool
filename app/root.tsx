@@ -58,17 +58,7 @@ export default function App() {
               }
             `,
           }}
-        />        {/* App Bridge 4 Initialization (Conditional) */}
-        {host && (
-          <>
-            <meta name="shopify-api-key" content={apiKey} />
-            <script
-              src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
-              data-api-key={apiKey}
-              data-host={host}
-            ></script>
-          </>
-        )}
+        />
 
         <Meta />
         <Links />
