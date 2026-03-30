@@ -115,14 +115,16 @@ export default function AppLayout() {
     <PolarisProvider i18n={{}}>
       {isLoading && <Loading />}
 
-      <NavMenu>
-        <Link to="/app" rel="home">Dashboard</Link>
-        <Link to="/app/rules">Pricing Rules</Link>
-        <Link to="/app/settings">Settings</Link>
-        <Link to="/app/help">Help Guide</Link>
-      </NavMenu>
+      {!isBypass && (
+        <NavMenu>
+          <Link to="/app" rel="home">Dashboard</Link>
+          <Link to="/app/rules">Pricing Rules</Link>
+          <Link to="/app/settings">Settings</Link>
+          <Link to="/app/help">Help Guide</Link>
+        </NavMenu>
+      )}
 
-      <Outlet context={{ currencyCode }} />
+      <Outlet context={{ currencyCode, isBypass }} />
     </PolarisProvider>
   );
 

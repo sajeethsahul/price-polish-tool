@@ -118,9 +118,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function RulesPage() {
     const loaderData = useLoaderData<PricingRuleData>();
     const actionData = useActionData<PricingRuleData>();
-    const navigation = useNavigation();
+    const { currencyCode, isBypass } = useOutletContext<{ currencyCode: string, isBypass?: boolean }>();
+
+    if (isBypass) {
+        return <RulesPageContent isBypass={true} loaderData={loaderData} actionData={actionData} currencyCode={currencyCode} />;
+    }
+
+    return <RulesPageWithBridge loaderData={loaderData} actionData={actionData} currencyCode={currencyCode} />;
+}
+
+function RulesPageWithBridge({ loaderData, actionData, currencyCode }: { loaderData: any, actionData: any, currencyCode: string }) {
     const shopify = useAppBridge();
-    const { currencyCode } = useOutletContext<{ currencyCode: string }>();
+    return <RulesPageContent shopify={shopify} loaderData={loaderData} actionData={actionData} currencyCode={currencyCode} />;
+}
+
+function RulesPageContent({ shopify, isBypass, loaderData, actionData, currencyCode }: { shopify?: any, isBypass?: boolean, loaderData: any, actionData: any, currencyCode: string }) {
+    const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting";
     const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
 
@@ -154,9 +167,11 @@ export default function RulesPage() {
 
     useEffect(() => {
         if (actionData?.saved) {
-            shopify.toast.show("Pricing rules saved successfully.");
+            if (shopify) shopify.toast.show("Pricing rules saved successfully.");
+            else console.log("BYPASS: Pricing rules saved successfully.");
         } else if (actionData?.error) {
-            shopify.toast.show(actionData.error, { isError: true });
+            if (shopify) shopify.toast.show(actionData.error, { isError: true });
+            else console.error("BYPASS:", actionData.error);
         }
     }, [actionData, shopify]);
 

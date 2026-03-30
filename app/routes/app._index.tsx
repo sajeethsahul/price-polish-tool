@@ -49,6 +49,21 @@ interface LastUpdateInfo {
 }
 
 export default function Dashboard() {
+  const { currencyCode = "USD", isBypass } = useOutletContext<{ currencyCode?: string, isBypass?: boolean }>() || {};
+  
+  if (isBypass) {
+    return <DashboardContent isBypass={true} currencyCode={currencyCode} />;
+  }
+
+  return <DashboardWithBridge currencyCode={currencyCode} />;
+}
+
+function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
+  const shopify = useAppBridge();
+  return <DashboardContent shopify={shopify} currencyCode={currencyCode} />;
+}
+
+function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, isBypass?: boolean, currencyCode: string }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -70,9 +85,7 @@ export default function Dashboard() {
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false });
   
-  const shopify = useAppBridge();
   const navigate = useNavigate();
-  const { currencyCode = "USD" } = useOutletContext<{ currencyCode?: string }>() || {};
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const handlePreview = useCallback(async () => {
@@ -118,7 +131,8 @@ export default function Dashboard() {
     } catch (err) {
       const error = err instanceof Error ? err : new Error("An unknown error occurred.");
       console.error("DEBUG: Preview Error detail:", error);
-      shopify.toast.show("Network error. Please try again.", { isError: true });
+      if (shopify) shopify.toast.show("Network error. Please try again.", { isError: true });
+      else console.warn("BYPASS: Network error. Please try again.");
       setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
     } finally {
       console.log("DEBUG: Finalizing handlePreview loading state.");
@@ -167,18 +181,21 @@ export default function Dashboard() {
         setProgress(100);
 
         if (data.failedCount === 0) {
-          shopify.toast.show("Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
+        if (shopify) shopify.toast.show("Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
+        else console.log("BYPASS: Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
           handlePreview(); // Auto-refresh the list
           setSelectedItems(new Set());
         } else {
-          shopify.toast.show("Some products failed to update", { isError: true });
+          if (shopify) shopify.toast.show("Some products failed to update", { isError: true });
+          else console.warn("BYPASS: Some products failed to update");
         }
       } else {
         throw new Error(data.error || "Failed to apply prices.");
       }
     } catch (err) {
       console.error("DEBUG: ApplyBatch Error detail:", err);
-      shopify.toast.show("System error during update", { isError: true });
+      if (shopify) shopify.toast.show("System error during update", { isError: true });
+      else console.error("BYPASS: System error during update");
     } finally {
       console.log("DEBUG: Finalizing handleApplyBatch processing state.");
       setIsProcessing(false);
@@ -214,7 +231,8 @@ export default function Dashboard() {
 
       if (res.ok) {
         setLastUpdate(null);
-        shopify.toast.show(`Restored ${data.restoredCount} products`);
+        if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
+        else console.log(`BYPASS: Restored ${data.restoredCount} products`);
         handlePreview(); // Auto-refresh the list
         setSelectedItems(new Set());
       } else {
@@ -222,7 +240,8 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("DEBUG: Undo Error detail:", err);
-      shopify.toast.show("Failed to undo changes", { isError: true });
+      if (shopify) shopify.toast.show("Failed to undo changes", { isError: true });
+      else console.error("BYPASS: Failed to undo changes");
     } finally {
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
@@ -317,14 +336,16 @@ export default function Dashboard() {
       console.log("DEBUG: /api/push-storefront data received:", !!data);
 
       if (res.ok) {
-        shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
+        if (shopify) shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
+        else console.log(`BYPASS: ${clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront"}`);
         setMetrics(prev => ({ ...prev, isLive: !clear }));
       } else {
         throw new Error(data.error || "Failed to push rules.");
       }
     } catch (err) {
       console.error("DEBUG: PushStorefront Error detail:", err);
-      shopify.toast.show("Failed to update storefront", { isError: true });
+      if (shopify) shopify.toast.show("Failed to update storefront", { isError: true });
+      else console.error("BYPASS: Failed to update storefront");
     } finally {
       console.log("DEBUG: Finalizing handlePushStorefront processing state.");
       setIsProcessing(false);
