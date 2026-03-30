@@ -26,6 +26,7 @@ import {
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
+import { useAppFetch } from "../utils/fetch";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
@@ -86,6 +87,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false });
   
   const navigate = useNavigate();
+  const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
 
   const handlePreview = useCallback(async () => {
@@ -96,37 +98,29 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setSelectedItems(new Set());
     
     try {
-      const res = await fetch("/api/preview-price");
-      console.log(`DEBUG: /api/preview-price status: ${res.status}`);
-      const data = await res.json();
-      console.log("DEBUG: /api/preview-price data received:", !!data);
+      const fetcher = await appFetch;
       
-      if (res.ok) {
-        console.log(`DEBUG: Previews received. Length: ${data.previews?.length ?? 0}`);
-        setPreviews(data.previews ?? []);
-        setActiveMarkup(data.markupPercent ?? 0);
+      // 🚀 OPTIMIZATION: Load metrics and preview in parallel
+      const [data, metricsData] = await Promise.all([
+        fetcher("/api/preview-price"),
+        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false }))
+      ]);
+      
+      console.log("DEBUG: Data received from parallel fetch");
+      
+      setPreviews(data.previews ?? []);
+      setActiveMarkup(data.markupPercent ?? 0);
+      setMetrics(metricsData);
         
-        if ((data.previews ?? []).length === 0) {
-          setFirstVisit(true);
-          setMessage({ 
-            type: "warning", 
-            text: "No products found or no rules configured.", 
-            details: "Please ensure you have products in your store and pricing rules are set up correctly." 
-          });
-        } else {
-          setFirstVisit(false);
-          // Fetch metrics after preview
-          const metricsRes = await fetch("/api/metrics");
-          console.log(`DEBUG: /api/metrics status: ${metricsRes.status}`);
-          
-          if (metricsRes.ok) {
-            const metricsData = await metricsRes.json();
-            console.log("DEBUG: Metrics data received:", !!metricsData);
-            setMetrics(metricsData);
-          }
-        }
+      if ((data.previews ?? []).length === 0) {
+        setFirstVisit(true);
+        setMessage({ 
+          type: "warning", 
+          text: "No products found or no rules configured.", 
+          details: "Please ensure you have products in your store and pricing rules are set up correctly." 
+        });
       } else {
-        throw new Error(data.error || "Failed to load preview data.");
+        setFirstVisit(false);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error("An unknown error occurred.");
@@ -154,43 +148,37 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setProgress(0);
 
     const itemsWithFinalPrices = itemsToUpdate.map(item => ({
+      productId: item.productId,
       variantId: item.variantId,
       oldPrice: item.oldPrice,
       newPrice: item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice,
-      isManual: item.overriddenPrice !== undefined // Send flag to backend
+      isManual: item.overriddenPrice !== undefined 
     }));
 
     try {
-      const res = await fetch("/api/bulk-price", {
+      const fetcher = await appFetch;
+      const data = await fetcher("/api/bulk-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: itemsWithFinalPrices }),
       });
       
-      console.log(`DEBUG: /api/bulk-price status: ${res.status}`);
-      const data = await res.json();
-      console.log("DEBUG: /api/bulk-price data received:", !!data);
-      
-      if (res.ok) {
-        setLastUpdate({
-          batchId: data.batchId,
-          updatedAt: data.updatedAt,
-          successCount: data.successCount,
-          failedCount: data.failedCount,
-        });
-        setProgress(100);
+      setLastUpdate({
+        batchId: data.batchId,
+        updatedAt: data.updatedAt,
+        successCount: data.successCount,
+        failedCount: data.failedCount,
+      });
+      setProgress(100);
 
-        if (data.failedCount === 0) {
+      if (data.failedCount === 0) {
         if (shopify) shopify.toast.show("Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
         else console.log("BYPASS: Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
-          handlePreview(); // Auto-refresh the list
-          setSelectedItems(new Set());
-        } else {
-          if (shopify) shopify.toast.show("Some products failed to update", { isError: true });
-          else console.warn("BYPASS: Some products failed to update");
-        }
+        handlePreview(); // Auto-refresh the list
+        setSelectedItems(new Set());
       } else {
-        throw new Error(data.error || "Failed to apply prices.");
+        if (shopify) shopify.toast.show("Some products failed to update", { isError: true });
+        else console.warn("BYPASS: Some products failed to update");
       }
     } catch (err) {
       console.error("DEBUG: ApplyBatch Error detail:", err);
@@ -201,7 +189,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setIsProcessing(false);
       setProgress(0);
     }
-  }, [shopify, handlePreview]);
+  }, [shopify, handlePreview, appFetch]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     handleApplyBatch([item]);

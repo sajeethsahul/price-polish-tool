@@ -51,10 +51,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return auth.redirect;
   }
 
+  // ✅ SESSION IS THE SOURCE OF TRUTH
   const { admin, session } = auth;
 
-  let currencyCode = "USD";
+  // ✅ COMPUTE HOST (CRITICAL FOR APP BRIDGE 4)
+  let finalHost = url.searchParams.get("host");
+  if (!finalHost && session.shop) {
+    const store = session.shop.replace(".myshopify.com", "");
+    finalHost = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+  }
 
+  let currencyCode = "USD";
   try {
     const response = await admin.graphql(`
         {
@@ -70,16 +77,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  const storeName = session.shop.replace(".myshopify.com", "");
-
-  const host = Buffer.from(
-    `admin.shopify.com/store/${storeName}`
-  ).toString("base64");
-
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     currencyCode,
-    host,
+    host: finalHost,
     isBypass: false,
   };
 };
@@ -137,12 +138,22 @@ export default function AppLayout() {
     return AppContent;
   }
 
-  // ================= NORMAL MODE =================
-  if (!host) {
+  // ================= NORMAL MODE GUARD =================
+  if (!host && !isBypass) {
     return (
       <PolarisProvider i18n={{}}>
         <SkeletonPage title="Price Polish">
           <Loading />
+          <Layout>
+            <Layout.Section>
+               <Card>
+                 <BlockStack gap="400">
+                    <SkeletonDisplayText size="small" />
+                    <SkeletonBodyText lines={3} />
+                 </BlockStack>
+               </Card>
+            </Layout.Section>
+          </Layout>
         </SkeletonPage>
       </PolarisProvider>
     );

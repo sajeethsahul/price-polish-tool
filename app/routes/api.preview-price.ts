@@ -25,21 +25,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const response = await admin.graphql(`
         {
           products(first: 250) {
-            edges {
-              node {
-                id
-                title
-                status
-                featuredImage {
-                  url
-                }
-                variants(first: 1) {
-                  edges {
-                    node {
-                      id
-                      price
-                    }
-                  }
+            nodes {
+              id
+              title
+              status
+              featuredImage {
+                url
+              }
+              variants(first: 1) {
+                nodes {
+                  id
+                  price
                 }
               }
             }
@@ -58,78 +54,64 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
 
         const totalCount = data?.data?.productsCount?.count ?? 0;
-        const edges = data?.data?.products?.edges || [];
+        const nodes = data?.data?.products?.nodes || [];
         
         console.log(`DEBUG BACKEND: [DIAGNOSTIC] Total Count in Store: ${totalCount}`);
-        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Accessible Edges: ${edges.length}`);
+        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Accessible Nodes: ${nodes.length}`);
         
-        if (totalCount > 0 && edges.length === 0) {
-            console.warn("DEBUG BACKEND: [CRITICAL] Count > 0 but Edges = 0. Products exist but are NOT accessible to this app. Check Sales Channel permissions.");
-            if (data.data.products?.edges) {
-               console.log("DEBUG BACKEND: products block found but empty.");
-            } else {
-               console.error("DEBUG BACKEND: products block is MISSING from response.");
+        if (totalCount > 0 && nodes.length === 0) {
+            console.warn("DEBUG BACKEND: [CRITICAL] Count > 0 but Nodes = 0. Products exist but are NOT accessible to this app.");
+        }
+
+        // ✅ REPLACED: Promise.all with N+1 queries. 
+        // 🚀 OPTIMIZATION: Fetch history in bulk
+        const variantIds = nodes
+            .map((p: any) => p.variants.nodes[0]?.id)
+            .filter(Boolean);
+
+        const histories = await prisma.priceHistory.findMany({
+            where: { variantId: { in: variantIds }, shop },
+            orderBy: { createdAt: "desc" },
+        });
+
+        // Create a map for the LATEST history per variant
+        const latestHistoryMap: Record<string, any> = {};
+        histories.forEach((h: any) => {
+            if (!latestHistoryMap[h.variantId]) {
+                latestHistoryMap[h.variantId] = h;
             }
-        }
+        });
 
-        interface ProductNode {
-            id: string;
-            title: string;
-            featuredImage?: {
-                url: string;
+        const previews = nodes.map((product: any) => {
+            const variant = product.variants.nodes[0];
+            const variantId = variant?.id || "";
+            const currentPrice = parseFloat(variant?.price ?? "0");
+
+            const history = latestHistoryMap[variantId];
+            const basePrice = history ? history.oldPrice : currentPrice;
+
+            let newPrice;
+            if (history?.isManual && currentPrice === history.newPrice) {
+                newPrice = currentPrice;
+            } else {
+                newPrice = calculatePrice(
+                    basePrice,
+                    markupPercent,
+                    roundingStep,
+                    charmPricing,
+                );
+            }
+
+            return {
+                productId: product.id,
+                title: product.title,
+                image: product.featuredImage?.url ?? "",
+                variantId: variantId,
+                oldPrice: currentPrice.toFixed(2),
+                newPrice: newPrice.toFixed(2),
+                originalBasePrice: basePrice.toFixed(2),
             };
-            variants: {
-                edges: Array<{
-                    node: {
-                        id: string;
-                        price: string;
-                    };
-                }>;
-            };
-        }
-
-        const previews = await Promise.all(edges.map(
-            async (edge: { node: ProductNode }) => {
-                const product = edge.node;
-                const variant = product.variants.edges[0]?.node;
-                const currentPrice = parseFloat(variant?.price ?? "0");
-
-                // Check PriceHistory for the "original" base price
-                // This prevents "Double Markup" if the user has already applied a change
-                const history = await prisma.priceHistory.findFirst({
-                    where: { variantId: variant?.id, shop },
-                    orderBy: { createdAt: "desc" },
-                });
-
-                // Use the oldest available price as the base for calculations
-                const basePrice = history ? history.oldPrice : currentPrice;
-
-                // If the last change was manual, we respect the user's choice as final
-                // and don't suggest a new price based on rules unless the current price
-                // has changed from what we last set.
-                let newPrice;
-                if (history?.isManual && currentPrice === history.newPrice) {
-                    newPrice = currentPrice;
-                } else {
-                    newPrice = calculatePrice(
-                        basePrice,
-                        markupPercent,
-                        roundingStep,
-                        charmPricing,
-                    );
-                }
-
-                return {
-                    productId: product.id,
-                    title: product.title,
-                    image: product.featuredImage?.url ?? "",
-                    variantId: variant?.id ?? "",
-                    oldPrice: currentPrice.toFixed(2),
-                    newPrice: newPrice.toFixed(2),
-                    originalBasePrice: basePrice.toFixed(2), // NEW
-                };
-            },
-        ));
+        });
 
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 

@@ -26,23 +26,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         const body = await request.json();
-        const items: Array<{ variantId: string; oldPrice: string; newPrice: string; isManual?: boolean }> = body.items;
-        const isAll = body.isAll || false;
+        interface UpdateItem { productId: string; variantId: string; oldPrice: string; newPrice: string; isManual?: boolean };
+        const items: UpdateItem[] = body.items;
 
         if (!items || !Array.isArray(items) || items.length === 0) {
-            return new Response(
+            return cors(new Response(
                 JSON.stringify({ success: false, error: "No items provided" }),
                 { status: 400, headers: { "Content-Type": "application/json" } },
-            );
+            ));
         }
 
-        await logActivity(shop, isAll ? "APPLY_ALL" : "APPLY_SELECTED", { count: items.length });
-
         const batchId = crypto.randomUUID();
-        const results: Array<{ variantId: string; success: boolean; error?: string }> = [];
         let successCount = 0;
         let failedCount = 0;
-        const failedItems: Array<{ variantId: string; error: string }> = [];
+        const failedItems: any[] = [];
 
         // 1. Save to PriceHistory (Bulk creation)
         await prisma.priceHistory.createMany({
@@ -51,78 +48,59 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 variantId: item.variantId,
                 oldPrice: parseFloat(item.oldPrice),
                 newPrice: parseFloat(item.newPrice),
-                isManual: item.isManual || false, // NEW
+                isManual: item.isManual || false,
                 batchId,
             })),
         });
 
+        // 🚀 OPTIMIZATION: Group by productId
+        const productGroups: Record<string, typeof items> = {};
+        items.forEach((item) => {
+            if (!item.productId) return;
+            if (!productGroups[item.productId]) productGroups[item.productId] = [];
+            productGroups[item.productId].push(item);
+        });
+
         const mutation = `
-    mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `;
+            mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                    userErrors { field message }
+                }
+            }
+        `;
 
-        // 2. Process in batches to handle rate limits and timeouts
-        for (let i = 0; i < items.length; i += BATCH_SIZE) {
-            const batch = items.slice(i, i + BATCH_SIZE);
-
-            for (const item of batch) {
+        // 2. Process each product group
+        const groupEntries = Object.entries(productGroups);
+        for (let i = 0; i < groupEntries.length; i += 10) { // Cluster groups for rate limit safety
+            const currentBatch = groupEntries.slice(i, i + 10);
+            
+            await Promise.all(currentBatch.map(async ([productId, variants]) => {
                 try {
-                    const variantQuery = await admin.graphql(`
-                    {
-                      productVariant(id: "${item.variantId}") {
-                        product {
-                          id
-                        }
-                      }
-                    }
-                `);
-
-                    const variantData = await variantQuery.json();
-                    const productId = variantData.data?.productVariant?.product?.id;
-
-                    if (!productId) {
-                        throw new Error("Product ID not found for variant");
-                    }
-
                     const response = await admin.graphql(mutation, {
                         variables: {
                             productId,
-                            variants: [{ id: item.variantId, price: item.newPrice }],
+                            variants: variants.map(v => ({ id: v.variantId, price: v.newPrice })),
                         },
                     });
 
-                    const data = await response.json();
-                    const userErrors = data.data?.productVariantsBulkUpdate?.userErrors;
+                    const data: any = await response.json();
+                    const userErrors = data.data?.productVariantsBulkUpdate?.userErrors || [];
 
-                    if (userErrors && userErrors.length > 0) {
-                        failedCount++;
-                        failedItems.push({ variantId: item.variantId, error: userErrors[0].message });
-                        results.push({ variantId: item.variantId, success: false, error: userErrors[0].message });
+                    if (userErrors.length > 0) {
+                        failedCount += variants.length;
+                        failedItems.push(...variants.map(v => ({ variantId: v.variantId, error: userErrors[0].message })));
                     } else {
-                        successCount++;
-                        results.push({ variantId: item.variantId, success: true });
+                        successCount += variants.length;
                     }
-                } catch (error) {
-                    failedCount++;
-                    const errorMsg = error instanceof Error ? error.message : "Unknown error";
-                    failedItems.push({ variantId: item.variantId, error: errorMsg });
-                    results.push({ variantId: item.variantId, success: false, error: errorMsg });
+                } catch (error: any) {
+                    failedCount += variants.length;
+                    failedItems.push(...variants.map(v => ({ variantId: v.variantId, error: error.message })));
                 }
-            }
+            }));
 
-            // Delay between batches to stay safe with rate limits
-            if (i + BATCH_SIZE < items.length) {
-                await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
+            // Throttle between batches of products
+            if (i + 10 < groupEntries.length) {
+                await new Promise((resolve) => setTimeout(resolve, 200));
             }
         }
 

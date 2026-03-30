@@ -41,7 +41,7 @@ export default function App() {
         {/* Shopify CDN preconnect */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
 
-        {/* FINAL ENFORCEMENT: Restrict standalone access (Force Iframe) */}
+        {/* ENFORCE IFRAME (App Bridge Requirement) */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -52,7 +52,7 @@ export default function App() {
                 if (shop) {
                   const store = shop.replace(".myshopify.com", "");
                   window.location.replace(
-                    "https://admin.shopify.com/store/" + store + "/apps"
+                    "https://admin.shopify.com/store/" + store + "/apps/price-polish-tool"
                   );
                 }
               }
@@ -62,34 +62,7 @@ export default function App() {
 
         <Meta />
         <Links />
-      </head>
-
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-      console.log("=== DEBUG START ===");
-
-      console.log("URL:", window.location.href);
-
-      console.log("BYPASS:",
-        new URL(window.location.href).searchParams.get("bypass")
-      );
-
-      console.log("IFRAME:",
-        window.top === window.self ? "NO (standalone)" : "YES (embedded)"
-      );
-
-      console.log("APP BRIDGE SCRIPT:",
-        !!document.querySelector('script[src*="app-bridge"]')
-      );
-
-      setTimeout(() => {
-        console.log("BODY CONTENT:", document.body.innerText);
-      }, 2000);
-    `,
-        }}
-      />
-      <body>
+      </head>      <body>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
