@@ -6,7 +6,8 @@ import {
   ScrollRestoration,
   useLoaderData,
 } from "react-router";
-import { isRouteErrorResponse, useRouteError } from "react-router";
+//import { isRouteErrorResponse, useRouteError } from "react-router";
+import { isRouteErrorResponse, useRouteError } from "@remix-run/react";
 import type { LoaderFunctionArgs } from "react-router";
 
 import {
