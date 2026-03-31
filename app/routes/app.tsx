@@ -78,7 +78,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   return {
-    apiKey: process.env.SHOPIFY_API_KEY || "",
+    apiKey: process.env.SHOPIFY_API_KEY,
     currencyCode,
     host: finalHost,
     isBypass: false,
@@ -87,12 +87,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // ================= COMPONENT =================
 export default function AppLayout() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>() || {};
+  const apiKey = data.apiKey;
+  const host = data.host;
+  const currencyCode = data.currencyCode;
+  const isBypass = data.isBypass;
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
-
-  const { apiKey, currencyCode, host, isBypass } = data;
 
   // ================= COMMON UI =================
   const AppContent = (
@@ -133,9 +135,13 @@ export default function AppLayout() {
     return AppContent;
   }
 
-  if (!host) {
-    console.error("Missing host param; rendering without App Bridge");
-    return AppContent;
+  if (!apiKey || !host) {
+    console.warn("App Bridge not ready yet:", { apiKey, host });
+    return (
+      <PolarisProvider i18n={{}}>
+        <SkeletonPage title="Loading..." />
+      </PolarisProvider>
+    );
   }
 
   return (
