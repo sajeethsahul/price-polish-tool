@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { apiKey, host } = useLoaderData<typeof loader>();
+  useLoaderData<typeof loader>();
 
   return (
     <html lang="en">
@@ -42,25 +42,6 @@ export default function App() {
 
         {/* Shopify CDN preconnect */}
         <link rel="preconnect" href="https://cdn.shopify.com/" />
-
-        {/* ENFORCE IFRAME (App Bridge Requirement) */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (window.top === window.self) {
-                const url = new URL(window.location.href);
-                const shop = url.searchParams.get("shop");
-
-                if (shop) {
-                  const store = shop.replace(".myshopify.com", "");
-                  window.location.replace(
-                    "https://admin.shopify.com/store/" + store + "/apps/price-polish-tool"
-                  );
-                }
-              }
-            `,
-          }}
-        />
 
         <Meta />
         <Links />

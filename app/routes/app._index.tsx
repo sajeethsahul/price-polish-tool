@@ -3,6 +3,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate, useOutletContext } from "react-router";
 import {
   Page,
+  SkeletonPage,
   Card,
   Text,
   BlockStack,
@@ -95,7 +96,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
 
-  const handlePreview = useCallback(async () => {
+  const handlePreview = async () => {
     console.log("DEBUG: Initializing handlePreview fetch...");
     setLoading(true);
     setMessage(null);
@@ -124,18 +125,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       } else {
         setFirstVisit(false);
       }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error("An unknown error occurred.");
-      console.error("DEBUG: Preview Error detail:", error);
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error("An unknown error occurred.");
+      console.error(e);
       if (shopify) shopify.toast.show("Network error. Please try again.", { isError: true });
       else console.warn("BYPASS: Network error. Please try again.");
       setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
-      setPreviews([]); // 🔥 FAIL SAFE: Clear data on error
+      setPreviews([]); // fail-safe
     } finally {
-      console.log("DEBUG: Finalizing handlePreview loading state.");
+      console.log("DEBUG: Finalizing loading");
       setLoading(false);
     }
-  }, [shopify]);
+  };
 
   useEffect(() => {
     console.log("loading:", loading);
@@ -146,7 +147,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   useEffect(() => {
     console.log("DEBUG: Dashboard mounted, triggered initial handlePreview");
     handlePreview();
-  }, [handlePreview]);
+  }, []); // 🔥 IMPORTANT
 
   const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
     console.log(`DEBUG: Initializing handleApplyBatch for ${itemsToUpdate.length} items...`);
@@ -196,7 +197,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setIsProcessing(false);
       setProgress(0);
     }
-  }, [shopify, handlePreview, appFetch]);
+  }, [shopify, appFetch]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     handleApplyBatch([item]);
@@ -239,7 +240,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
     }
-  }, [lastUpdate, shopify, handlePreview]);
+  }, [lastUpdate, shopify]);
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
     // Prevent typing excessively long strings
@@ -471,6 +472,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     return `${minutes}m ago`;
   };
 
+  console.log("RENDER STATE:", {
+    loading,
+    previews: previews.length,
+  });
+
+  if (loading) {
+    return <SkeletonPage />;
+  }
+
+  if (!loading && previews.length === 0) {
+    return <EmptyState heading="No products found" />;
+  }
+
   return (
     <Page 
       title="Price Polish Dashboard"
@@ -489,12 +503,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             <Divider />
             <BlockStack gap="200">
               <InlineStack gap="400" align="space-between">
-                <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
-                <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
-                  {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
-                </Badge>
-              </InlineStack>
-              <InlineStack gap="400" align="space-between">
                 <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
                 <Badge tone={currencyCode ? "success" : "attention"}>
                   {currencyCode ? "Connected" : "Initializing..."}
@@ -505,11 +513,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                 <Text as="span" variant="bodyMd">{typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}</Text>
               </InlineStack>
             </BlockStack>
-            <Banner tone="info">
-              <p>
-                If <strong>Is Embedded</strong> is NO, the app is running on its own domain instead of <code>admin.shopify.com</code>. This will cause App Bridge origin mismatches.
-              </p>
-            </Banner>
           </BlockStack>
         </Card>
 

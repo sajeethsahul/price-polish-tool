@@ -16,9 +16,8 @@ import {
   AppProvider as ShopifyAppProvider,
 } from "@shopify/shopify-app-react-router/react";
 
-import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
+import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { useEffect } from "react";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -86,42 +85,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-function AppBridgeInitializer() {
-  const shopify = useAppBridge();
-  useEffect(() => {
-    if (shopify) {
-      (window as any).app = shopify;
-    }
-  }, [shopify]);
-  return null;
-}
-
 // ================= COMPONENT =================
 export default function AppLayout() {
   const data = useLoaderData<typeof loader>();
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
-
-  if (!data || typeof data !== "object" || !("apiKey" in data)) {
-    return (
-      <PolarisProvider i18n={{}}>
-        <SkeletonPage title="Price Polish">
-          {isLoading && <Loading />}
-          <Layout>
-            <Layout.Section>
-              <Card>
-                <BlockStack gap="400">
-                  <SkeletonDisplayText size="small" />
-                  <SkeletonBodyText lines={3} />
-                </BlockStack>
-              </Card>
-            </Layout.Section>
-          </Layout>
-        </SkeletonPage>
-      </PolarisProvider>
-    );
-  }
 
   const { apiKey, currencyCode, host, isBypass } = data;
 
@@ -164,31 +133,14 @@ export default function AppLayout() {
     return AppContent;
   }
 
-  // ================= NORMAL MODE GUARD =================
-  if (!host && !isBypass) {
-    return (
-      <PolarisProvider i18n={{}}>
-        <SkeletonPage title="Price Polish">
-          <Loading />
-          <Layout>
-            <Layout.Section>
-               <Card>
-                 <BlockStack gap="400">
-                    <SkeletonDisplayText size="small" />
-                    <SkeletonBodyText lines={3} />
-                 </BlockStack>
-               </Card>
-            </Layout.Section>
-          </Layout>
-        </SkeletonPage>
-      </PolarisProvider>
-    );
+  if (!host) {
+    console.error("Missing host param; rendering without App Bridge");
+    return AppContent;
   }
 
   return (
     // @ts-expect-error host required for App Bridge v4
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
-      <AppBridgeInitializer />
       {AppContent}
     </ShopifyAppProvider>
   );
