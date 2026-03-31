@@ -77,21 +77,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  return {
-    apiKey: process.env.SHOPIFY_API_KEY,
+  // TEMP: loader diagnostics (remove after issue is resolved)
+  console.log("APP LOADER RETURN:", {
+    isBypass,
+    apiKeyPresent: Boolean(process.env.SHOPIFY_API_KEY),
+    hostFromQuery: url.searchParams.get("host"),
+    sessionShopPresent: Boolean(session?.shop),
+    finalHostPresent: Boolean(finalHost),
     currencyCode,
-    host: finalHost,
+  });
+
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    currencyCode,
+    host: finalHost || "",
     isBypass: false,
   };
 };
 
 // ================= COMPONENT =================
 export default function AppLayout() {
-  const data = useLoaderData<typeof loader>() || {};
-  const apiKey = data.apiKey;
-  const host = data.host;
-  const currencyCode = data.currencyCode;
-  const isBypass = data.isBypass;
+  const data = useLoaderData<typeof loader>();
+  const obj = data && typeof data === "object" ? (data as any) : {};
+  const apiKey = obj.apiKey as string | undefined;
+  const host = obj.host as string | undefined;
+  const currencyCode = obj.currencyCode as string | undefined;
+  const isBypass = obj.isBypass as boolean | undefined;
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
