@@ -17,7 +17,7 @@ import {
 } from "@shopify/shopify-app-react-router/react";
 
 import { NavMenu } from "@shopify/app-bridge-react";
-import { authenticate, shopifyApiKey } from "../shopify.server";
+import { authenticate } from "../shopify.server";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -28,48 +28,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   try {
     auth = await authenticate.admin(request);
-  } catch (error: any) {
+  } catch (error) {
     console.error("AUTH FAILED:", error);
 
+    // ✅ BYPASS SAFE MODE
     if (isBypass) {
-      console.warn("⚠️ BYPASS MODE ACTIVE");
       return {
-        apiKey: shopifyApiKey || "mock-api-key",
+        apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
         currencyCode: "USD",
         host: null,
         isBypass: true,
       };
     }
 
-    throw new Response("Service Unavailable (Database Issue)", {
-      status: 503,
-    });
+    throw new Response("Service Unavailable", { status: 503 });
   }
 
-  // ✅ HANDLE REDIRECT ONLY WHEN NOT BYPASS
+  // ✅ Shopify redirect handling
   if (auth?.redirect && !isBypass) {
-    return auth.redirect;
+    throw auth.redirect;
   }
 
-  // ✅ SESSION IS THE SOURCE OF TRUTH
   const { admin, session } = auth;
 
-  // ✅ COMPUTE HOST (CRITICAL FOR APP BRIDGE 4)
+  // ================= HOST FIX (CRITICAL) =================
   let host = url.searchParams.get("host");
-  if (!host && session.shop) {
+  const shop = url.searchParams.get("shop");
+
+  // 🔥 1. FROM URL shop param
+  if (!host && shop) {
+    const store = shop.replace(".myshopify.com", "");
+    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+  }
+
+  // 🔥 2. FROM SESSION (fallback)
+  if (!host && session?.shop) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
+  // ================= SHOP DATA =================
   let currencyCode = "USD";
+
   try {
     const response = await admin.graphql(`
-        {
-          shop {
-            currencyCode
-          }
+      {
+        shop {
+          currencyCode
         }
-      `);
+      }
+    `);
 
     const data = await response.json();
     currencyCode = data?.data?.shop?.currencyCode || "USD";
@@ -77,11 +85,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  // TEMP: loader diagnostics (remove after issue is resolved)
-  console.log("LOADER ENV:", shopifyApiKey);
+  // ================= DEBUG =================
+  console.log("LOADER RESULT:", {
+    apiKey: process.env.SHOPIFY_API_KEY,
+    host,
+    shop,
+  });
 
   return {
-    apiKey: shopifyApiKey ?? null,
+    apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,
     host: host ?? null,
     isBypass: false,
@@ -90,17 +102,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // ================= COMPONENT =================
 export default function AppLayout() {
-  const data = useLoaderData<typeof loader>();
-  const obj = data && typeof data === "object" ? (data as any) : {};
-  const apiKey = obj.apiKey as string | null | undefined;
-  const host = obj.host as string | null | undefined;
-  const currencyCode = obj.currencyCode as string | undefined;
-  const isBypass = obj.isBypass as boolean | undefined;
+  type LoaderData = {
+    apiKey: string | null;
+    currencyCode: string;
+    host: string | null;
+    isBypass: boolean;
+  };
+
+  const data = useLoaderData() as LoaderData;
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
 
-  // ================= COMMON UI =================
+  // 🔥 SAFE EXTRACTION (NO CRASH)
+  const apiKey = data.apiKey;
+  const host = data.host;
+  const currencyCode = data.currencyCode;
+  const isBypass = data.isBypass;
+
+  // ================= MAIN UI =================
   const AppContent = (
     <PolarisProvider i18n={{}}>
       {isLoading ? (
@@ -133,23 +153,28 @@ export default function AppLayout() {
     </PolarisProvider>
   );
 
-  // ================= BYPASS MODE =================
+  // ================= BYPASS =================
   if (isBypass) {
-    console.warn("⚠️ Rendering WITHOUT App Bridge (BYPASS)");
+    console.warn("⚠️ BYPASS MODE ACTIVE");
     return AppContent;
   }
 
+  // ================= SAFE INIT =================
   if (!apiKey || !host) {
-    console.warn("App Bridge not ready yet:", { apiKey, host });
+    console.warn("App Bridge not ready:", { apiKey, host });
+
     return (
       <PolarisProvider i18n={{}}>
-        <div style={{ padding: 20 }}>Initializing app...</div>
+        <div style={{ padding: 20 }}>
+          Initializing App Bridge...
+        </div>
       </PolarisProvider>
     );
   }
 
+  // ================= APP BRIDGE =================
   return (
-    // @ts-expect-error host required for App Bridge v4
+    // @ts-expect-error host required
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
       {AppContent}
     </ShopifyAppProvider>
