@@ -17,7 +17,7 @@ import {
 } from "@shopify/shopify-app-react-router/react";
 
 import { NavMenu } from "@shopify/app-bridge-react";
-import { authenticate } from "../shopify.server";
+import { authenticate, shopifyApiKey } from "../shopify.server";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -34,7 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (isBypass) {
       console.warn("⚠️ BYPASS MODE ACTIVE");
       return {
-        apiKey: process.env.SHOPIFY_API_KEY || "mock-api-key",
+        apiKey: shopifyApiKey || "mock-api-key",
         currencyCode: "USD",
         host: null,
         isBypass: true,
@@ -55,10 +55,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = auth;
 
   // ✅ COMPUTE HOST (CRITICAL FOR APP BRIDGE 4)
-  let finalHost = url.searchParams.get("host");
-  if (!finalHost && session.shop) {
+  let host = url.searchParams.get("host");
+  if (!host && session.shop) {
     const store = session.shop.replace(".myshopify.com", "");
-    finalHost = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
   let currencyCode = "USD";
@@ -78,19 +78,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   // TEMP: loader diagnostics (remove after issue is resolved)
-  console.log("APP LOADER RETURN:", {
-    isBypass,
-    apiKeyPresent: Boolean(process.env.SHOPIFY_API_KEY),
-    hostFromQuery: url.searchParams.get("host"),
-    sessionShopPresent: Boolean(session?.shop),
-    finalHostPresent: Boolean(finalHost),
-    currencyCode,
-  });
+  console.log("LOADER ENV:", shopifyApiKey);
 
   return {
-    apiKey: process.env.SHOPIFY_API_KEY || "",
+    apiKey: shopifyApiKey ?? null,
     currencyCode,
-    host: finalHost || "",
+    host: host ?? null,
     isBypass: false,
   };
 };
@@ -99,8 +92,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppLayout() {
   const data = useLoaderData<typeof loader>();
   const obj = data && typeof data === "object" ? (data as any) : {};
-  const apiKey = obj.apiKey as string | undefined;
-  const host = obj.host as string | undefined;
+  const apiKey = obj.apiKey as string | null | undefined;
+  const host = obj.host as string | null | undefined;
   const currencyCode = obj.currencyCode as string | undefined;
   const isBypass = obj.isBypass as boolean | undefined;
   const navigation = useNavigation();
@@ -150,7 +143,7 @@ export default function AppLayout() {
     console.warn("App Bridge not ready yet:", { apiKey, host });
     return (
       <PolarisProvider i18n={{}}>
-        <SkeletonPage title="Loading..." />
+        <div style={{ padding: 20 }}>Initializing app...</div>
       </PolarisProvider>
     );
   }

@@ -9,12 +9,12 @@ import prisma from "./db.server";
 
 // 🔥 ENV VALIDATION (STRICT)
 const appUrl = process.env.SHOPIFY_APP_URL;
-const apiKey = process.env.SHOPIFY_API_KEY;
+export const shopifyApiKey = process.env.SHOPIFY_API_KEY;
 const apiSecret = process.env.SHOPIFY_API_SECRET;
 const scopes = process.env.SCOPES;
 
 if (!appUrl) throw new Error("SHOPIFY_APP_URL is missing");
-if (!apiKey) throw new Error("SHOPIFY_API_KEY is missing");
+if (!shopifyApiKey) throw new Error("SHOPIFY_API_KEY is missing");
 if (!apiSecret) throw new Error("SHOPIFY_API_SECRET is missing");
 
 // 🔥 CRITICAL: Ensure valid URL format
@@ -27,7 +27,7 @@ console.log("✅ SHOPIFY_APP_URL:", appUrl);
 
 // 🚀 SHOPIFY APP CONFIG
 const shopify = shopifyApp({
-  apiKey,
+  apiKey: shopifyApiKey,
   apiSecretKey: apiSecret,
   apiVersion: ApiVersion.October24,
 
