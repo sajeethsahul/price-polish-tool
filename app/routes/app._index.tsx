@@ -103,16 +103,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setSelectedItems(new Set());
     
     try {
-      const fetcher = await appFetch;
-      
       // 🚀 OPTIMIZATION: Load metrics and preview in parallel
       const [data, metricsData] = await Promise.all([
-        fetcher("/api/preview-price"),
-        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false }))
+        appFetch("/api/preview-price"),
+        appFetch("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false }))
       ]);
       
-      console.log("DEBUG: Data received from parallel fetch");
-      
+      console.log("DATA RECEIVED:", data);
       setPreviews(data.previews ?? []);
       setActiveMarkup(data.markupPercent ?? 0);
       setMetrics(metricsData);
@@ -133,11 +130,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       if (shopify) shopify.toast.show("Network error. Please try again.", { isError: true });
       else console.warn("BYPASS: Network error. Please try again.");
       setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
+      setPreviews([]); // 🔥 FAIL SAFE: Clear data on error
     } finally {
       console.log("DEBUG: Finalizing handlePreview loading state.");
       setLoading(false);
     }
   }, [shopify]);
+
+  useEffect(() => {
+    console.log("loading:", loading);
+    console.log("previews:", previews.length);
+  }, [loading, previews.length]);
 
   // Initial Load
   useEffect(() => {
@@ -161,8 +164,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }));
 
     try {
-      const fetcher = await appFetch;
-      const data = await fetcher("/api/bulk-price", {
+      const data = await appFetch("/api/bulk-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: itemsWithFinalPrices }),
@@ -212,17 +214,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setMessage(null);
     
     try {
-      const res = await fetch("/api/undo-price", {
+      const data = await appFetch("/api/undo-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchId: lastUpdate.batchId }),
       });
       
-      console.log(`DEBUG: /api/undo-price status: ${res.status}`);
-      const data = await res.json();
       console.log("DEBUG: /api/undo-price data received:", !!data);
 
-      if (res.ok) {
+      if (data) {
         setLastUpdate(null);
         if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
@@ -318,17 +318,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setShowStopModal(false);
 
     try {
-      const res = await fetch("/api/push-storefront", { 
+      const data = await appFetch("/api/push-storefront", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clear })
       });
       
-      console.log(`DEBUG: /api/push-storefront status: ${res.status}`);
-      const data = await res.json();
       console.log("DEBUG: /api/push-storefront data received:", !!data);
 
-      if (res.ok) {
+      if (data) {
         if (shopify) shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
         else console.log(`BYPASS: ${clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront"}`);
         setMetrics(prev => ({ ...prev, isLive: !clear }));

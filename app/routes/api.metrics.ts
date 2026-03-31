@@ -7,8 +7,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
-    const { session } = await authenticate.admin(request);
+    const auth = await authenticate.admin(request);
+    
+    if (!auth?.session) {
+        console.error("NO SESSION FOUND IN REQUEST (METRICS)");
+        throw new Response("Unauthorized", { status: 401 });
+    }
+
+    const { session } = auth;
     const shop = session.shop;
+    console.log("SESSION SHOP (METRICS):", shop);
 
     try {
         const logs = await prisma.activityLog.findMany({

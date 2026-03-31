@@ -21,8 +21,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
-    const { admin, session } = await authenticate.admin(request);
+    const auth = await authenticate.admin(request);
+
+    if (!auth?.session) {
+        console.error("NO SESSION FOUND IN REQUEST (BULK)");
+        throw new Response("Unauthorized", { status: 401 });
+    }
+
+    const { admin, session } = auth;
     const shop = session.shop;
+    console.log("SESSION SHOP (BULK):", shop);
 
     try {
         const body = await request.json();

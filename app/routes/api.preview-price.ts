@@ -9,9 +9,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
-    const { admin, session } = await authenticate.admin(request);
+    const auth = await authenticate.admin(request);
+
+    if (!auth?.session) {
+        console.error("NO SESSION FOUND IN REQUEST");
+        throw new Response("Unauthorized", { status: 401 });
+    }
+
+    const { admin, session } = auth;
     const shop = session.shop;
-    console.log("DEBUG BACKEND: Authenticated session for shop:", shop);
+    console.log("SESSION SHOP:", shop);
 
     try {
         const rule = await prisma.pricingRule.findUnique({
@@ -113,6 +120,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             };
         });
 
+        console.log("RETURNING PRODUCTS:", previews.length);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
         return cors(new Response(JSON.stringify({ previews, markupPercent }), {

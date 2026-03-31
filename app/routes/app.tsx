@@ -16,8 +16,9 @@ import {
   AppProvider as ShopifyAppProvider,
 } from "@shopify/shopify-app-react-router/react";
 
-import { NavMenu } from "@shopify/app-bridge-react";
+import { NavMenu, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { useEffect } from "react";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -84,6 +85,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     isBypass: false,
   };
 };
+
+function AppBridgeInitializer() {
+  const shopify = useAppBridge();
+  useEffect(() => {
+    if (shopify) {
+      (window as any).app = shopify;
+    }
+  }, [shopify]);
+  return null;
+}
 
 // ================= COMPONENT =================
 export default function AppLayout() {
@@ -177,6 +188,7 @@ export default function AppLayout() {
   return (
     // @ts-expect-error host required for App Bridge v4
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
+      <AppBridgeInitializer />
       {AppContent}
     </ShopifyAppProvider>
   );
