@@ -4,23 +4,9 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
-  useLoaderData,
-  isRouteErrorResponse,
-  useRouteError,
 } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { isRouteErrorResponse, useRouteError } from "react-router";
 
-import {
-  Page,
-  Card,
-  BlockStack,
-  Text,
-  Button,
-  AppProvider,
-  Box,
-} from "@shopify/polaris";
-
-// ✅ POLARIS STYLES
 export const links = () => [
   {
     rel: "stylesheet",
@@ -28,19 +14,7 @@ export const links = () => [
   },
 ];
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
-  const host = url.searchParams.get("host");
-
-  return {
-    apiKey: process.env.SHOPIFY_API_KEY || "",
-    host,
-  };
-};
-
 export default function App() {
-  useLoaderData<typeof loader>();
-
   return (
     <html lang="en">
       <head>
@@ -64,36 +38,19 @@ export function ErrorBoundary() {
 
   console.error("ROOT ERROR:", error);
 
-  let errorMessage = "An unknown error has occurred.";
+  let message = "Unexpected error";
 
   if (isRouteErrorResponse(error)) {
-    errorMessage = `${error.status} ${error.statusText}`;
+    message = `${error.status} ${error.statusText}`;
   } else if (error instanceof Error) {
-    errorMessage = error.message;
+    message = error.message;
   }
 
   return (
-    <html lang="en">
-      <head>
-        <Meta />
-        <Links />
-      </head>
+    <html>
       <body>
-        <AppProvider i18n={{}}>
-          <Page title="Something went wrong">
-            <Card>
-              <BlockStack gap="400">
-                <Text as="p">{errorMessage}</Text>
-                <Box>
-                  <Button onClick={() => window.location.reload()}>
-                    Refresh
-                  </Button>
-                </Box>
-              </BlockStack>
-            </Card>
-          </Page>
-        </AppProvider>
-        <Scripts />
+        <h1>App Error</h1>
+        <p>{message}</p>
       </body>
     </html>
   );

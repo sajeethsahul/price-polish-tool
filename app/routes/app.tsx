@@ -31,7 +31,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (error) {
     console.error("AUTH FAILED:", error);
 
-    // ✅ BYPASS SAFE MODE
     if (isBypass) {
       return {
         apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -44,24 +43,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Response("Service Unavailable", { status: 503 });
   }
 
-  // ✅ Shopify redirect handling
+  // ✅ CRITICAL FIX (DO NOT RETURN)
   if (auth?.redirect && !isBypass) {
     throw auth.redirect;
   }
 
   const { admin, session } = auth;
 
-  // ================= HOST FIX (CRITICAL) =================
+  // ================= HOST FIX =================
   let host = url.searchParams.get("host");
   const shop = url.searchParams.get("shop");
 
-  // 🔥 1. FROM URL shop param
+  // from URL
   if (!host && shop) {
     const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // 🔥 2. FROM SESSION (fallback)
+  // from session
   if (!host && session?.shop) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
@@ -102,23 +101,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // ================= COMPONENT =================
 export default function AppLayout() {
-  type LoaderData = {
-    apiKey: string | null;
-    currencyCode: string;
-    host: string | null;
-    isBypass: boolean;
-  };
-
-  const data = useLoaderData() as LoaderData;
+  const raw = useLoaderData() as any;
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
 
-  // 🔥 SAFE EXTRACTION (NO CRASH)
-  const apiKey = data.apiKey;
-  const host = data.host;
-  const currencyCode = data.currencyCode;
-  const isBypass = data.isBypass;
+  // ✅ SAFE EXTRACTION
+  const apiKey = raw?.apiKey ?? null;
+  const host = raw?.host ?? null;
+  const currencyCode = raw?.currencyCode ?? "USD";
+  const isBypass = raw?.isBypass ?? false;
 
   // ================= MAIN UI =================
   const AppContent = (
@@ -159,17 +151,12 @@ export default function AppLayout() {
     return AppContent;
   }
 
-  // ================= SAFE INIT =================
+  // ================= CRITICAL CHANGE =================
+  // ❌ DO NOT BLOCK UI (this was your biggest issue)
   if (!apiKey || !host) {
     console.warn("App Bridge not ready:", { apiKey, host });
 
-    return (
-      <PolarisProvider i18n={{}}>
-        <div style={{ padding: 20 }}>
-          Initializing App Bridge...
-        </div>
-      </PolarisProvider>
-    );
+    return AppContent; // 🔥 IMPORTANT FIX
   }
 
   // ================= APP BRIDGE =================
