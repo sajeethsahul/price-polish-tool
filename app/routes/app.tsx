@@ -24,24 +24,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
-  let auth;
-
-try {
-  auth = await authenticate.admin(request);
-} catch (error: any) {
-  console.error("AUTH ERROR:", error);
-
-  // ✅ HANDLE SHOPIFY REDIRECT (CRITICAL FIX)
-  if (error?.status === 302 || error?.headers?.get?.("Location")) {
-    throw error; // rethrow redirect properly
-  }
-
-  // ✅ ALSO HANDLE FUNCTION TYPE (YOUR CURRENT ISSUE)
-  if (typeof error === "function") {
-    throw error;
-  }
-
-  // ✅ BYPASS MODE
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -51,33 +33,23 @@ try {
     };
   }
 
-  throw new Response("Service Unavailable", { status: 503 });
-}
+  // ✅ DO NOT WRAP THIS
+  const auth = await authenticate.admin(request);
 
-  // ✅ CRITICAL FIX (DO NOT RETURN)
-  if (auth?.redirect && !isBypass) {
-    throw auth.redirect;
+  // ✅ HANDLE REDIRECT PROPERLY
+  if (auth?.redirect) {
+    return auth.redirect;
   }
 
   const { admin, session } = auth;
 
-  // ================= HOST FIX =================
   let host = url.searchParams.get("host");
-  const shop = url.searchParams.get("shop");
 
-  // from URL
-  if (!host && shop) {
-    const store = shop.replace(".myshopify.com", "");
-    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
-  }
-
-  // from session
   if (!host && session?.shop) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= SHOP DATA =================
   let currencyCode = "USD";
 
   try {
@@ -94,13 +66,6 @@ try {
   } catch (err) {
     console.error("Currency fetch failed:", err);
   }
-
-  // ================= DEBUG =================
-  console.log("LOADER RESULT:", {
-    apiKey: process.env.SHOPIFY_API_KEY,
-    host,
-    shop,
-  });
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
