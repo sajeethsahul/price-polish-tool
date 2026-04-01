@@ -26,22 +26,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   let auth;
 
-  try {
-    auth = await authenticate.admin(request);
-  } catch (error) {
-    console.error("AUTH FAILED:", error);
+ try {
+  auth = await authenticate.admin(request);
+} catch (error: any) {
+  console.error("AUTH ERROR:", error);
 
-    if (isBypass) {
-      return {
-        apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
-        currencyCode: "USD",
-        host: null,
-        isBypass: true,
-      };
-    }
-
-    throw new Response("Service Unavailable", { status: 503 });
+  // ✅ THIS IS THE FIX
+  if (error instanceof Response) {
+    throw error; // 🔥 RE-THROW redirect (DO NOT CHANGE IT)
   }
+
+  // Optional: only fallback for bypass
+  if (isBypass) {
+    return {
+      apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
+      currencyCode: "USD",
+      host: null,
+      isBypass: true,
+    };
+  }
+
+  throw new Response("Service Unavailable", { status: 503 });
+}
 
   // ✅ CRITICAL FIX (DO NOT RETURN)
   if (auth?.redirect && !isBypass) {
