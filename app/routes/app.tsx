@@ -26,17 +26,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   let auth;
 
- try {
+try {
   auth = await authenticate.admin(request);
 } catch (error: any) {
   console.error("AUTH ERROR:", error);
 
-  // ✅ THIS IS THE FIX
-  if (error instanceof Response) {
-    throw error; // 🔥 RE-THROW redirect (DO NOT CHANGE IT)
+  // ✅ HANDLE SHOPIFY REDIRECT (CRITICAL FIX)
+  if (error?.status === 302 || error?.headers?.get?.("Location")) {
+    throw error; // rethrow redirect properly
   }
 
-  // Optional: only fallback for bypass
+  // ✅ ALSO HANDLE FUNCTION TYPE (YOUR CURRENT ISSUE)
+  if (typeof error === "function") {
+    throw error;
+  }
+
+  // ✅ BYPASS MODE
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
