@@ -24,6 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
+  // ================= BYPASS =================
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -33,23 +34,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   }
 
-  // ✅ DO NOT WRAP THIS
+  // ================= AUTH =================
   const auth = await authenticate.admin(request);
 
-  // ✅ HANDLE REDIRECT PROPERLY
+  // 🔥 CRITICAL FIX → THROW redirect (NOT return)
   if (auth?.redirect) {
-    return auth.redirect;
+    throw auth.redirect;
   }
 
   const { admin, session } = auth;
 
+  // ================= HOST =================
   let host = url.searchParams.get("host");
+  const shop = url.searchParams.get("shop");
 
+  // ✅ priority 1: URL host
+  if (!host && shop) {
+    const store = shop.replace(".myshopify.com", "");
+    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+  }
+
+  // ✅ priority 2: session fallback
   if (!host && session?.shop) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
+  // ================= SHOP DATA =================
   let currencyCode = "USD";
 
   try {
@@ -67,6 +78,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
+  // ================= DEBUG =================
+  console.log("LOADER RESULT:", {
+    apiKey: process.env.SHOPIFY_API_KEY,
+    host,
+    shop,
+  });
+
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,
@@ -82,7 +100,6 @@ export default function AppLayout() {
 
   const isLoading = navigation.state === "loading";
 
-  // ✅ SAFE EXTRACTION
   const apiKey = raw?.apiKey ?? null;
   const host = raw?.host ?? null;
   const currencyCode = raw?.currencyCode ?? "USD";
@@ -123,16 +140,15 @@ export default function AppLayout() {
 
   // ================= BYPASS =================
   if (isBypass) {
-    console.warn("⚠️ BYPASS MODE ACTIVE");
     return AppContent;
   }
 
-  // ================= CRITICAL CHANGE =================
-  // ❌ DO NOT BLOCK UI (this was your biggest issue)
+  // ================= SAFE GUARD =================
+  // 🔥 DO NOT BLOCK UI EVER
   if (!apiKey || !host) {
     console.warn("App Bridge not ready:", { apiKey, host });
 
-    return AppContent; // 🔥 IMPORTANT FIX
+    return AppContent; // ✅ NEVER return Skeleton here
   }
 
   // ================= APP BRIDGE =================
