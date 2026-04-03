@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router";
 import { useSafeAppBridge } from "../utils/useSafeAppBridge";
 
@@ -10,9 +10,10 @@ import {
   BlockStack,
   Button,
   Banner,
+  DataTable,
+  EmptyState,
 } from "@shopify/polaris";
 
-import { EmptyState } from "@shopify/polaris";
 import { useAppFetch } from "../utils/fetch";
 
 interface PreviewItem {
@@ -26,7 +27,7 @@ export default function Dashboard() {
   const { currencyCode = "USD", isBypass } =
     useOutletContext<{ currencyCode?: string; isBypass?: boolean }>() || {};
 
-  const shopify = useSafeAppBridge(); // ✅ SAFE
+  const shopify = useSafeAppBridge();
   const appFetch = useAppFetch();
   const navigate = useNavigate();
 
@@ -45,9 +46,10 @@ export default function Dashboard() {
 
       console.log("DATA:", data);
 
-      setPreviews(data?.previews ?? []);
+      const items = data?.previews ?? [];
+      setPreviews(items);
 
-      if ((data?.previews ?? []).length === 0) {
+      if (items.length === 0) {
         setMessage({
           type: "warning",
           text: "No products found",
@@ -73,9 +75,9 @@ export default function Dashboard() {
   // ================= INITIAL LOAD =================
   useEffect(() => {
     handlePreview();
-  }, []);
+  }, [handlePreview]);
 
-  // ================= RENDER DEBUG =================
+  // ================= DEBUG =================
   console.log("RENDER STATE:", {
     loading,
     previews: previews.length,
@@ -103,11 +105,17 @@ export default function Dashboard() {
     );
   }
 
+  // ================= TABLE DATA =================
+  const rows = previews.map((item) => [
+    item.title,
+    `${item.oldPrice} ${currencyCode}`,
+    `${item.newPrice} ${currencyCode}`,
+  ]);
+
   // ================= MAIN UI =================
   return (
     <Page title="Price Polish Dashboard">
       <BlockStack gap="400">
-
         {message && (
           <Banner tone={message.type}>
             {message.text}
@@ -125,6 +133,14 @@ export default function Dashboard() {
           </BlockStack>
         </Card>
 
+        {/* 🔥 THIS WAS MISSING */}
+        <Card>
+          <DataTable
+            columnContentTypes={["text", "text", "text"]}
+            headings={["Product", "Old Price", "New Price"]}
+            rows={rows}
+          />
+        </Card>
       </BlockStack>
     </Page>
   );
