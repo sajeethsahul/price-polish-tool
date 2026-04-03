@@ -47,7 +47,18 @@ export default function handleRequest(
           // 🔥 MANDATORY SHOPIFY CSP
           responseHeaders.set(
             "Content-Security-Policy",
-            "frame-ancestors https://admin.shopify.com https://admin.shopify.com/store/* https://*.myshopify.com https://*.shopify.com;"
+            [
+              // ✅ Allow Shopify Admin to embed this app in an iframe
+              "frame-ancestors https://admin.shopify.com https://admin.shopify.com/store/* https://*.myshopify.com https://*.shopify.com",
+              // ✅ Allow App Bridge CDN script + inline scripts React needs
+              "script-src 'self' 'unsafe-inline' https://cdn.shopify.com",
+              // ✅ Allow fetch/GraphQL calls to Shopify APIs + your own app
+              `connect-src 'self' https://*.shopify.com https://*.myshopify.com ${process.env.SHOPIFY_APP_URL ?? ""}`,
+              // ✅ Allow images from Shopify CDN
+              "img-src 'self' data: https://cdn.shopify.com",
+              // ✅ Allow styles from Shopify CDN (Polaris)
+              "style-src 'self' 'unsafe-inline' https://cdn.shopify.com https://unpkg.com",
+            ].join("; ")
           );
 
           resolve(
