@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useOutletContext } from "react-router";
 import { useSafeAppBridge } from "../utils/useSafeAppBridge";
+import { useRef } from "react";
 
 import {
   Page,
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const shopify = useSafeAppBridge();
   const appFetch = useAppFetch();
   const navigate = useNavigate();
+  const isFetching = useRef(false);
 
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +39,10 @@ export default function Dashboard() {
 
   // ================= FETCH =================
   const handlePreview = useCallback(async () => {
+    if (isFetching.current) return; // 🔥 PREVENT DUPLICATE CALLS
+
+    isFetching.current = true;
+
     console.log("FETCH START");
     setLoading(true);
     setMessage(null);
@@ -44,38 +50,20 @@ export default function Dashboard() {
     try {
       const data = await appFetch("/api/preview-price");
 
-      console.log("DATA:", data);
-
-      const items = data?.previews ?? [];
-      setPreviews(items);
-
-      if (items.length === 0) {
-        setMessage({
-          type: "warning",
-          text: "No products found",
-        });
-      }
+      setPreviews(data?.previews ?? []);
     } catch (e) {
       console.error(e);
-
-      if (shopify) {
-        shopify.toast.show("Failed to load data", { isError: true });
-      }
-
       setPreviews([]);
-      setMessage({
-        type: "critical",
-        text: "API failed",
-      });
     } finally {
       setLoading(false);
+      isFetching.current = false; // 🔥 RELEASE LOCK
     }
-  }, [appFetch, shopify]);
+  }, [appFetch]);
 
   // ================= INITIAL LOAD =================
   useEffect(() => {
     handlePreview();
-  }, [handlePreview]);
+  }, []);
 
   // ================= DEBUG =================
   console.log("RENDER STATE:", {

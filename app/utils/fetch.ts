@@ -8,14 +8,14 @@ export function useAppFetch() {
   return async (url: string, options: RequestInit = {}) => {
     const requestId = crypto.randomUUID().split("-")[0];
     const isBypass = new URL(url, "http://dummy.com").searchParams.get("bypass") === "true";
-    
+
     // 1. Prepare headers
     const headers = new Headers(options.headers);
-    
+
     // 2. 🔥 SESSION TOKEN INJECTION (with window.app guard)
     if (
-      typeof window !== "undefined" && 
-      (window as any).app && 
+      typeof window !== "undefined" &&
+      (window as any).app &&
       !isBypass
     ) {
       try {
@@ -33,13 +33,13 @@ export function useAppFetch() {
 
     const executeRequest = async (): Promise<any> => {
       attempt++;
-      
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       try {
         console.log(`[API ${requestId}] ${options.method || "GET"} ${url} (Attempt ${attempt})`);
-        
+
         const response = await fetch(url, {
           ...options,
           headers,
@@ -74,14 +74,14 @@ export function useAppFetch() {
         return response.json();
       } catch (err: any) {
         clearTimeout(timeoutId);
-        
+
         if (err.name === "AbortError") {
           throw new Error("Request timed out after 8s");
         }
-        
+
         if (attempt <= maxRetries && !(err instanceof TypeError) && err.message !== "Unauthorized (401). Reloading...") {
-           await new Promise(r => setTimeout(r, 500));
-           return executeRequest();
+          await new Promise(r => setTimeout(r, 500));
+          return executeRequest();
         }
         throw err;
       }
