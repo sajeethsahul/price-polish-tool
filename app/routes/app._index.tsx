@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<any>(null);
+  const hasLoaded = useRef(false);
 
   // ================= FETCH =================
   const handlePreview = useCallback(async () => {
@@ -48,7 +49,9 @@ export default function Dashboard() {
     setMessage(null);
 
     try {
-      const data = await appFetch("/api/preview-price");
+      const res = await appFetch("/api/preview-price");
+      const data = await res.json();
+      console.log("DATA:", data);
 
       setPreviews(data?.previews ?? []);
     } catch (e) {
@@ -62,6 +65,9 @@ export default function Dashboard() {
 
   // ================= INITIAL LOAD =================
   useEffect(() => {
+    if (hasLoaded.current) return;
+
+    hasLoaded.current = true;
     handlePreview();
   }, []);
 
