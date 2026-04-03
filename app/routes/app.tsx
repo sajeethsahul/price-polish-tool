@@ -24,7 +24,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
-  // ================= BYPASS =================
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -34,33 +33,49 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   }
 
-  // ================= AUTH =================
-  const auth = await authenticate.admin(request);
+  let auth;
 
-  // 🔥 CRITICAL FIX → THROW redirect (NOT return)
-  if (auth?.redirect) {
-    throw auth.redirect;
+  try {
+    auth = await authenticate.admin(request);
+  } catch (err: any) {
+    console.error("AUTH ERROR:", err);
+
+    // 🔥 HANDLE REDIRECT MANUALLY
+    if (err?.headers?.get("Location")) {
+      throw new Response(null, {
+        status: 302,
+        headers: {
+          Location: err.headers.get("Location"),
+        },
+      });
+    }
+
+    throw err;
   }
 
   const { admin, session } = auth;
 
-  // ================= HOST =================
-  let host = url.searchParams.get("host");
-  const shop = url.searchParams.get("shop");
+  // 🔥 SAFETY CHECK
+  if (!session?.shop) {
+    console.warn("NO SESSION → forcing auth");
 
-  // ✅ priority 1: URL host
-  if (!host && shop) {
-    const store = shop.replace(".myshopify.com", "");
-    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+    throw new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/auth?shop=${url.searchParams.get("shop")}`,
+      },
+    });
   }
 
-  // ✅ priority 2: session fallback
-  if (!host && session?.shop) {
+  // ================= HOST =================
+  let host = url.searchParams.get("host");
+
+  if (!host) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= SHOP DATA =================
+  // ================= DATA =================
   let currencyCode = "USD";
 
   try {
@@ -78,17 +93,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  // ================= DEBUG =================
-  console.log("LOADER RESULT:", {
-    apiKey: process.env.SHOPIFY_API_KEY,
-    host,
-    shop,
-  });
-
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,
-    host: host ?? null,
+    host,
     isBypass: false,
   };
 };

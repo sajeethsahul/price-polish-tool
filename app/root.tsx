@@ -16,7 +16,6 @@ import {
   Button,
 } from "@shopify/polaris";
 
-// ================= STYLES =================
 export const links = () => [
   {
     rel: "stylesheet",
@@ -24,7 +23,6 @@ export const links = () => [
   },
 ];
 
-// ================= ROOT =================
 export default function App() {
   return (
     <html lang="en">
@@ -33,6 +31,12 @@ export default function App() {
         <meta name="viewport" content="width=device-width,initial-scale=1" />
 
         <link rel="preconnect" href="https://cdn.shopify.com/" />
+
+        {/* ✅ CRITICAL FIX */}
+        <script
+          src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+          defer
+        ></script>
 
         <Meta />
         <Links />
@@ -46,7 +50,6 @@ export default function App() {
   );
 }
 
-// ================= ERROR BOUNDARY =================
 export function ErrorBoundary() {
   const error = useRouteError();
 
@@ -59,7 +62,6 @@ export function ErrorBoundary() {
   } else if (error instanceof Error) {
     message = error.message;
 
-    // ✅ SAFE App Bridge recovery
     if (
       typeof window !== "undefined" &&
       error.message.includes("shopify global")
