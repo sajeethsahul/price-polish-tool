@@ -6,49 +6,57 @@
  */
 export function useAppFetch() {
   return async (url: string, options: RequestInit = {}) => {
-    const requestId = crypto.randomUUID().split("-")[0];
+    const headers = new Headers(options.headers);
 
-    const maxRetries = 1;
-    let attempt = 0;
-
-    const executeRequest = async (): Promise<any> => {
-      attempt++;
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
+    if (
+      typeof window !== "undefined" &&
+      (window as any).app
+    ) {
       try {
-        console.log(`[API ${requestId}] ${options.method || "GET"} ${url}`);
-
-        const response = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-          credentials: "same-origin", // 🔥 IMPORTANT
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text);
-        }
-
-        return response.json();
-      } catch (err: any) {
-        clearTimeout(timeoutId);
-
-        if (err.name === "AbortError") {
-          throw new Error("Request timeout");
-        }
-
-        if (attempt <= maxRetries) {
-          return executeRequest();
-        }
-
-        throw err;
+        const token = await (window as any).app.idToken();
+        headers.set("Authorization", `Bearer ${token}`);
+      } catch (e) {
+        console.warn("Token fetch failed");
       }
-    };
+    }
 
-    return executeRequest();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+        credentials: "same-origin",
+      });
+
+      clearTimeout(timeout);
+
+      // 🔥 ALWAYS PARSE HERE
+      const text = await response.text();
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error("Invalid JSON response");
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Request failed");
+      }
+
+      return data; // ✅ ALWAYS JSON
+
+    } catch (err: any) {
+      clearTimeout(timeout);
+
+      if (err.name === "AbortError") {
+        throw new Error("Request timeout");
+      }
+
+      throw err;
+    }
   };
 }

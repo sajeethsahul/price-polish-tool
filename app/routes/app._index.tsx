@@ -32,15 +32,14 @@ export default function Dashboard() {
   const appFetch = useAppFetch();
   const navigate = useNavigate();
   const isFetching = useRef(false);
+  const hasLoaded = useRef(false);
 
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<any>(null);
-  const hasLoaded = useRef(false);
 
-  // ================= FETCH =================
   const handlePreview = useCallback(async () => {
-    if (isFetching.current) return; // 🔥 PREVENT DUPLICATE CALLS
+    if (isFetching.current) return;
 
     isFetching.current = true;
 
@@ -49,41 +48,46 @@ export default function Dashboard() {
     setMessage(null);
 
     try {
-      const res = await appFetch("/api/preview-price");
-      const data = await res.json();
+      const data = await appFetch("/api/preview-price");
+
       console.log("DATA:", data);
 
       setPreviews(data?.previews ?? []);
     } catch (e) {
       console.error(e);
+
       setPreviews([]);
+      setMessage({
+        type: "critical",
+        text: "Failed to load preview",
+      });
+
+      if (shopify) {
+        shopify.toast.show("Failed to load data", { isError: true });
+      }
     } finally {
       setLoading(false);
-      isFetching.current = false; // 🔥 RELEASE LOCK
+      isFetching.current = false;
     }
-  }, [appFetch]);
+  }, [appFetch, shopify]);
 
-  // ================= INITIAL LOAD =================
   useEffect(() => {
     if (hasLoaded.current) return;
 
     hasLoaded.current = true;
     handlePreview();
-  }, []);
+  }, [handlePreview]);
 
-  // ================= DEBUG =================
   console.log("RENDER STATE:", {
     loading,
     previews: previews.length,
     hasShopify: !!shopify,
   });
 
-  // ================= LOADING =================
   if (loading) {
     return <SkeletonPage title="Loading..." />;
   }
 
-  // ================= EMPTY =================
   if (!loading && previews.length === 0) {
     return (
       <EmptyState
@@ -99,35 +103,26 @@ export default function Dashboard() {
     );
   }
 
-  // ================= TABLE DATA =================
   const rows = previews.map((item) => [
     item.title,
     `${item.oldPrice} ${currencyCode}`,
     `${item.newPrice} ${currencyCode}`,
   ]);
 
-  // ================= MAIN UI =================
   return (
     <Page title="Price Polish Dashboard">
       <BlockStack gap="400">
-        {message && (
-          <Banner tone={message.type}>
-            {message.text}
-          </Banner>
-        )}
+        {message && <Banner tone={message.type}>{message.text}</Banner>}
 
         <Card>
           <BlockStack gap="200">
             <Text as="h3">Products Preview</Text>
             <Text as="p">Total: {previews.length}</Text>
 
-            <Button onClick={handlePreview}>
-              Refresh
-            </Button>
+            <Button onClick={handlePreview}>Refresh</Button>
           </BlockStack>
         </Card>
 
-        {/* 🔥 THIS WAS MISSING */}
         <Card>
           <DataTable
             columnContentTypes={["text", "text", "text"]}
