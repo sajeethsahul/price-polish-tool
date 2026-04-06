@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate, useOutletContext } from "react-router";
+import { useSafeAppBridge } from "../utils/useSafeAppBridge";
+import { useAppFetch } from "../utils/fetch";
 
 import {
   Page,
@@ -11,6 +12,7 @@ import {
   Button,
   Badge,
   Banner,
+  Spinner,
   Divider,
   Thumbnail,
   Modal,
@@ -26,11 +28,16 @@ import {
 } from "@shopify/polaris";
 
 import { InfoIcon } from "@shopify/polaris-icons";
-import { formatMoney, getCurrencySymbol } from "../utils/format";
-import { useAppFetch } from "../utils/fetch";
+import {
+  formatMoney,
+  getCurrencySymbol,
+  ZERO_DECIMAL_CURRENCIES,
+} from "../utils/format";
 
+// ================= CONFIG =================
 const PAGE_SIZE = 15;
 
+// ================= TYPES =================
 interface PreviewItem {
   productId: string;
   title: string;
@@ -42,75 +49,70 @@ interface PreviewItem {
   overriddenPrice?: string;
 }
 
+interface Metrics {
+  totalApplied: number;
+  lastUpdate: string;
+  successRate: number;
+  isLive: boolean;
+}
+
+// ================= COMPONENT =================
 export default function Dashboard() {
   const { currencyCode = "USD", isBypass } =
     useOutletContext<{ currencyCode?: string; isBypass?: boolean }>() || {};
 
-  if (isBypass) {
-    return <DashboardContent currencyCode={currencyCode} />;
-  }
-
-  return <DashboardWithBridge currencyCode={currencyCode} />;
-}
-
-function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
-  const shopify = useAppBridge();
-  return <DashboardContent shopify={shopify} currencyCode={currencyCode} />;
-}
-
-function DashboardContent({
-  shopify,
-  currencyCode,
-}: {
-  shopify?: any;
-  currencyCode: string;
-}) {
-  const navigate = useNavigate();
+  const shopify = useSafeAppBridge();
   const appFetch = useAppFetch();
-  const currencySymbol = getCurrencySymbol(currencyCode);
+  const navigate = useNavigate();
 
   const isFetching = useRef(false);
   const hasLoaded = useRef(false);
 
+  // ================= STATE =================
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const [metrics, setMetrics] = useState<Metrics>({
+    totalApplied: 0,
+    lastUpdate: "",
+    successRate: 100,
+    isLive: false,
+  });
+
   const [message, setMessage] = useState<any>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   // ================= FETCH =================
   const handlePreview = useCallback(async () => {
     if (isFetching.current) return;
-
     isFetching.current = true;
+
     setLoading(true);
     setMessage(null);
 
     try {
-      const data = await appFetch("/api/preview-price");
-
-      console.log("DATA:", data);
+      const [data, metricsData] = await Promise.all([
+        appFetch("/api/preview-price"),
+        appFetch("/api/metrics").catch(() => null),
+      ]);
 
       setPreviews(data?.previews ?? []);
-
-      if ((data?.previews ?? []).length === 0) {
-        setMessage({
-          type: "warning",
-          text: "No products found",
-        });
-      }
+      setMetrics(metricsData ?? metrics);
     } catch (err) {
       console.error(err);
+      shopify?.toast.show("Failed to load preview", { isError: true });
 
-      if (shopify) {
-        shopify.toast.show("Failed to load data", { isError: true });
-      }
-
-      setPreviews([]);
       setMessage({
         type: "critical",
-        text: "API failed",
+        text: "Failed to load data",
       });
     } finally {
       setLoading(false);
@@ -118,45 +120,71 @@ function DashboardContent({
     }
   }, [appFetch, shopify]);
 
-  // ================= INITIAL LOAD =================
+  // ================= INIT =================
   useEffect(() => {
     if (hasLoaded.current) return;
-
     hasLoaded.current = true;
     handlePreview();
-  }, [handlePreview]);
+  }, []);
+
+  // ================= APPLY =================
+  const handleApplySingle = useCallback(async (item: PreviewItem) => {
+    setIsProcessing(true);
+
+    try {
+      await appFetch("/api/bulk-price", {
+        method: "POST",
+        body: JSON.stringify({
+          items: [
+            {
+              productId: item.productId,
+              variantId: item.variantId,
+              newPrice: item.overriddenPrice ?? item.newPrice,
+            },
+          ],
+        }),
+      });
+
+      shopify?.toast.show("Updated successfully");
+      handlePreview();
+    } catch {
+      shopify?.toast.show("Failed to update", { isError: true });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [appFetch, handlePreview, shopify]);
 
   // ================= FILTER =================
-  const filteredPreviews = useMemo(() => {
+  const filtered = useMemo(() => {
     return previews.filter((p) =>
       p.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [previews, searchQuery]);
 
   // ================= PAGINATION =================
-  const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
 
   const paginated = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
-    return filteredPreviews.slice(start, start + PAGE_SIZE);
-  }, [filteredPreviews, currentPage]);
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
 
   // ================= LOADING =================
   if (loading) {
-    return <Page title="Loading..." />;
+    return (
+      <Page title="Dashboard">
+        <Spinner accessibilityLabel="Loading" size="large" />
+      </Page>
+    );
   }
 
   // ================= EMPTY =================
-  if (!loading && previews.length === 0) {
+  if (previews.length === 0) {
     return (
-      <Page title="Price Polish Dashboard">
+      <Page title="Dashboard">
         <Card>
-          <BlockStack gap="400" align="center">
-            <Text as="h2">No products found</Text>
-            <Button onClick={() => navigate("/app/rules")}>
-              Go to Rules
-            </Button>
-          </BlockStack>
+          <Text as="p">No products found</Text>
+          <Button onClick={handlePreview}>Refresh</Button>
         </Card>
       </Page>
     );
@@ -165,63 +193,75 @@ function DashboardContent({
   // ================= MAIN =================
   return (
     <Page title="Price Polish Dashboard">
-      <BlockStack gap="400">
+      <BlockStack gap="500">
 
-        {message && (
-          <Banner tone={message.type}>
-            {message.text}
-          </Banner>
-        )}
+        {/* METRICS */}
+        <Grid>
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+            <Card>
+              <Text as='p'>Total Optimized</Text>
+              <Text as='p' variant="headingLg">{metrics.totalApplied}</Text>
+            </Card>
+          </Grid.Cell>
+
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+            <Card>
+              <Text as='p'>Success Rate</Text>
+              <Text as='p' variant="headingLg">{metrics.successRate}%</Text>
+            </Card>
+          </Grid.Cell>
+
+          <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+            <Card>
+              <Text as='p'>Live Status</Text>
+              <Badge tone={metrics.isLive ? "success" : "critical"}>
+                {metrics.isLive ? "LIVE" : "OFF"}
+              </Badge>
+            </Card>
+          </Grid.Cell>
+        </Grid>
+
+        {/* ACTIONS */}
+        <InlineStack gap="300">
+          <Button onClick={handlePreview}>Refresh</Button>
+          <Button variant="primary" onClick={() => navigate("/app/rules")}>
+            Rules
+          </Button>
+        </InlineStack>
 
         {/* SEARCH */}
-        <Card>
-          <TextField
-            label="Search"
-            value={searchQuery}
-            onChange={setSearchQuery}
-            autoComplete="off"
-          />
-        </Card>
-
-        {/* HEADER */}
-        <Card>
-          <InlineStack align="space-between">
-            <Text as="h3">Products ({filteredPreviews.length})</Text>
-
-            <Button onClick={handlePreview}>
-              Refresh
-            </Button>
-          </InlineStack>
-        </Card>
+        <TextField
+          label="Search"
+          value={searchQuery}
+          onChange={setSearchQuery}
+          autoComplete="off"
+        />
 
         {/* LIST */}
         <BlockStack gap="200">
-          {paginated.map((p) => {
-            const newPrice = p.overriddenPrice ?? p.newPrice;
-
-            return (
-              <Card key={p.variantId}>
-                <InlineStack align="space-between" blockAlign="center">
-
-                  <InlineStack gap="300" blockAlign="center">
-                    <Thumbnail source={p.image} alt={p.title} />
-                    <BlockStack gap="100">
-                      <Text as="span" fontWeight="bold">
-                        {p.title}
-                      </Text>
-
-                      <Text as="span">
-                        {p.oldPrice} → {newPrice} {currencyCode}
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
-
-                  <Badge tone="success">Preview</Badge>
-
+          {paginated.map((p) => (
+            <Card key={p.variantId}>
+              <InlineStack align="space-between">
+                <InlineStack gap="300">
+                  <Thumbnail source={p.image} alt="" />
+                  <Text as='p'>{p.title}</Text>
                 </InlineStack>
-              </Card>
-            );
-          })}
+
+                <InlineStack gap="200">
+                  <Text as='p'>{p.oldPrice}</Text>
+                  <Text as='p'>→</Text>
+                  <Text as='p'>{p.newPrice}</Text>
+
+                  <Button
+                    size="slim"
+                    onClick={() => handleApplySingle(p)}
+                  >
+                    Apply
+                  </Button>
+                </InlineStack>
+              </InlineStack>
+            </Card>
+          ))}
         </BlockStack>
 
         {/* PAGINATION */}
