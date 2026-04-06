@@ -155,10 +155,12 @@ export default function AppLayout() {
   // ================= SAFE GUARD =================
   // 🔥 DO NOT BLOCK UI EVER
   if (!apiKey || !host) {
+
     console.warn("App Bridge not ready:", { apiKey, host });
 
     return AppContent; // ✅ NEVER return Skeleton here
   }
+
 
   // ================= APP BRIDGE =================
   return (
