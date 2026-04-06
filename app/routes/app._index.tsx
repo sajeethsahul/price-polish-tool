@@ -25,46 +25,37 @@ interface PreviewItem {
 }
 
 export default function Dashboard() {
-  const { currencyCode = "USD", isBypass } =
-    useOutletContext<{ currencyCode?: string; isBypass?: boolean }>() || {};
+  const { currencyCode = "USD" } =
+    useOutletContext<{ currencyCode?: string }>() || {};
 
   const shopify = useSafeAppBridge();
   const appFetch = useAppFetch();
   const navigate = useNavigate();
+
   const isFetching = useRef(false);
   const hasLoaded = useRef(false);
 
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<any>(null);
 
   const handlePreview = useCallback(async () => {
     if (isFetching.current) return;
 
     isFetching.current = true;
-
-    console.log("FETCH START");
     setLoading(true);
-    setMessage(null);
 
     try {
       const data = await appFetch("/api/preview-price");
-
-      console.log("DATA:", data);
 
       setPreviews(data?.previews ?? []);
     } catch (e) {
       console.error(e);
 
-      setPreviews([]);
-      setMessage({
-        type: "critical",
-        text: "Failed to load preview",
-      });
-
       if (shopify) {
-        shopify.toast.show("Failed to load data", { isError: true });
+        shopify.toast.show("Failed to load preview", { isError: true });
       }
+
+      setPreviews([]);
     } finally {
       setLoading(false);
       isFetching.current = false;
@@ -78,17 +69,11 @@ export default function Dashboard() {
     handlePreview();
   }, [handlePreview]);
 
-  console.log("RENDER STATE:", {
-    loading,
-    previews: previews.length,
-    hasShopify: !!shopify,
-  });
-
   if (loading) {
-    return <SkeletonPage title="Loading..." />;
+    return <SkeletonPage title="Price Polish Dashboard" />;
   }
 
-  if (!loading && previews.length === 0) {
+  if (previews.length === 0) {
     return (
       <EmptyState
         heading="No products found"
@@ -103,17 +88,9 @@ export default function Dashboard() {
     );
   }
 
-  const rows = previews.map((item) => [
-    item.title,
-    `${item.oldPrice} ${currencyCode}`,
-    `${item.newPrice} ${currencyCode}`,
-  ]);
-
   return (
     <Page title="Price Polish Dashboard">
       <BlockStack gap="400">
-        {message && <Banner tone={message.type}>{message.text}</Banner>}
-
         <Card>
           <BlockStack gap="200">
             <Text as="h3">Products Preview</Text>
@@ -127,7 +104,11 @@ export default function Dashboard() {
           <DataTable
             columnContentTypes={["text", "text", "text"]}
             headings={["Product", "Old Price", "New Price"]}
-            rows={rows}
+            rows={previews.map((p) => [
+              p.title,
+              `${p.oldPrice} ${currencyCode}`,
+              `${p.newPrice} ${currencyCode}`,
+            ])}
           />
         </Card>
       </BlockStack>
