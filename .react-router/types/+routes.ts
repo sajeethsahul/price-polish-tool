@@ -23,6 +23,9 @@ type Pages = {
   "/api/push-storefront": {
     params: {};
   };
+  "/api/proxy/settings": {
+    params: {};
+  };
   "/auth/session-token": {
     params: {};
   };
@@ -35,10 +38,10 @@ type Pages = {
   "/api/undo-price": {
     params: {};
   };
-  "/proxy/settings": {
+  "/api/products": {
     params: {};
   };
-  "/api/products": {
+  "/api/billing": {
     params: {};
   };
   "/api/metrics": {
@@ -81,7 +84,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/auth/session-token" | "/api/preview-price" | "/api/bulk-price" | "/api/undo-price" | "/proxy/settings" | "/api/products" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -94,6 +97,10 @@ type RouteFiles = {
   "routes/api.push-storefront.ts": {
     id: "routes/api.push-storefront";
     page: "/api/push-storefront";
+  };
+  "routes/api.proxy.settings.ts": {
+    id: "routes/api.proxy.settings";
+    page: "/api/proxy/settings";
   };
   "routes/auth.session-token.ts": {
     id: "routes/auth.session-token";
@@ -111,13 +118,13 @@ type RouteFiles = {
     id: "routes/api.undo-price";
     page: "/api/undo-price";
   };
-  "routes/proxy.settings.ts": {
-    id: "routes/proxy.settings";
-    page: "/proxy/settings";
-  };
   "routes/api.products.ts": {
     id: "routes/api.products";
     page: "/api/products";
+  };
+  "routes/api.billing.ts": {
+    id: "routes/api.billing";
+    page: "/api/billing";
   };
   "routes/api.metrics.ts": {
     id: "routes/api.metrics";
@@ -178,12 +185,13 @@ type RouteModules = {
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.tsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.tsx");
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");
+  "routes/api.proxy.settings": typeof import("./app/routes/api.proxy.settings.ts");
   "routes/auth.session-token": typeof import("./app/routes/auth.session-token.ts");
   "routes/api.preview-price": typeof import("./app/routes/api.preview-price.ts");
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
-  "routes/proxy.settings": typeof import("./app/routes/api.proxy.settings.js");
   "routes/api.products": typeof import("./app/routes/api.products.ts");
+  "routes/api.billing": typeof import("./app/routes/api.billing.ts");
   "routes/api.metrics": typeof import("./app/routes/api.metrics.ts");
   "routes/api.test-db": typeof import("./app/routes/api.test-db.ts");
   "routes/api.health": typeof import("./app/routes/api.health.ts");

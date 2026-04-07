@@ -134,22 +134,21 @@ export default function AppLayout() {
   const raw = useLoaderData() as any;
   const navigation = useNavigation();
   const hasActivePlan = raw?.hasActivePlan ?? false;
+  const host = raw?.host ?? null;
 
 const handleUpgrade = async () => {
   try {
-    const res = await fetch("/api/billing", {
+    const res = await fetch(`/api/billing?host=${host}`, {
       method: "GET",
       credentials: "include",
     });
 
     if (res.redirected) {
       if (window.top) {
-        window.top.location.href = res.url; // ✅ safe
+        window.top.location.href = res.url;
       } else {
-        window.location.href = res.url; // fallback
+        window.location.href = res.url;
       }
-    } else {
-      console.error("Billing did not redirect properly");
     }
 
   } catch (err) {
@@ -159,8 +158,7 @@ const handleUpgrade = async () => {
 
   const isLoading = navigation.state === "loading";
 
-  const apiKey = raw?.apiKey ?? null;
-  const host = raw?.host ?? null;
+  const apiKey = raw?.apiKey ?? null; 
   const currencyCode = raw?.currencyCode ?? "USD";
   const isBypass = raw?.isBypass ?? false;
 
