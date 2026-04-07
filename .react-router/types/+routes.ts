@@ -182,7 +182,7 @@ type RouteModules = {
   "routes/api.preview-price": typeof import("./app/routes/api.preview-price.ts");
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
-  "routes/proxy.settings": typeof import("./app/routes/proxy.settings.ts");
+  "routes/proxy.settings": typeof import("./app/routes/api.proxy.settings.js");
   "routes/api.products": typeof import("./app/routes/api.products.ts");
   "routes/api.metrics": typeof import("./app/routes/api.metrics.ts");
   "routes/api.test-db": typeof import("./app/routes/api.test-db.ts");
