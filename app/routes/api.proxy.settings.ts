@@ -23,17 +23,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   // ================= VALIDATION =================
-  if (!shop) {
-    console.error("[PROXY] ❌ MISSING SHOP PARAM");
+      if (!shop) {
+      const shop = url.searchParams.get("shop");
 
-    return new Response(
-      JSON.stringify({ error: "Missing shop parameter" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
+        console.warn("[PROXY] Missing shop param — returning safe empty response");
+
+        return new Response(JSON.stringify({
+          markup: 0,
+          charm: false,
+          rounding: 0,
+          manualIds: [],
+          appliedPrices: []
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
       }
-    );
-  }
+  
 
   try {
     console.log("[PROXY] FETCH START", { shop });
