@@ -6,6 +6,7 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { BillingInterval } from "@shopify/shopify-api";
 
 // 🔥 ENV VALIDATION (STRICT)
 const appUrl = process.env.SHOPIFY_APP_URL;
@@ -42,6 +43,14 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
 
   isEmbeddedApp: true,
+
+  billing: {
+  basic: {
+    amount: 7.99,
+    currencyCode: "USD",
+    interval: BillingInterval.Every30Days as any
+  },
+},
 
   // 🔥 REQUIRED for iframe (Render + Shopify)
   cookies: {
