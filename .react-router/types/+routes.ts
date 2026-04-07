@@ -23,6 +23,9 @@ type Pages = {
   "/api/push-storefront": {
     params: {};
   };
+  "/auth/session-token": {
+    params: {};
+  };
   "/api/preview-price": {
     params: {};
   };
@@ -39,6 +42,12 @@ type Pages = {
     params: {};
   };
   "/api/metrics": {
+    params: {};
+  };
+  "/api/test-db": {
+    params: {};
+  };
+  "/api/health": {
     params: {};
   };
   "/auth/login": {
@@ -72,7 +81,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/api/preview-price" | "/api/bulk-price" | "/api/undo-price" | "/proxy/settings" | "/api/products" | "/api/metrics" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/auth/session-token" | "/api/preview-price" | "/api/bulk-price" | "/api/undo-price" | "/proxy/settings" | "/api/products" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -85,6 +94,10 @@ type RouteFiles = {
   "routes/api.push-storefront.ts": {
     id: "routes/api.push-storefront";
     page: "/api/push-storefront";
+  };
+  "routes/auth.session-token.ts": {
+    id: "routes/auth.session-token";
+    page: "/auth/session-token";
   };
   "routes/api.preview-price.ts": {
     id: "routes/api.preview-price";
@@ -109,6 +122,14 @@ type RouteFiles = {
   "routes/api.metrics.ts": {
     id: "routes/api.metrics";
     page: "/api/metrics";
+  };
+  "routes/api.test-db.ts": {
+    id: "routes/api.test-db";
+    page: "/api/test-db";
+  };
+  "routes/api.health.ts": {
+    id: "routes/api.health";
+    page: "/api/health";
   };
   "routes/auth.login/route.tsx": {
     id: "routes/auth.login";
@@ -157,12 +178,15 @@ type RouteModules = {
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.tsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.tsx");
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");
+  "routes/auth.session-token": typeof import("./app/routes/auth.session-token.ts");
   "routes/api.preview-price": typeof import("./app/routes/api.preview-price.ts");
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
   "routes/proxy.settings": typeof import("./app/routes/proxy.settings.ts");
   "routes/api.products": typeof import("./app/routes/api.products.ts");
   "routes/api.metrics": typeof import("./app/routes/api.metrics.ts");
+  "routes/api.test-db": typeof import("./app/routes/api.test-db.ts");
+  "routes/api.health": typeof import("./app/routes/api.health.ts");
   "routes/auth.login": typeof import("./app/routes/auth.login/route.tsx");
   "routes/auth.$": typeof import("./app/routes/auth.$.tsx");
   "routes/_index": typeof import("./app/routes/_index/route.tsx");
