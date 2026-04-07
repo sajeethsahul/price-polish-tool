@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, Form, useNavigation, useActionData, useOutletContext } from "react-router";
+import { useLoaderData, Form, useNavigation, useActionData, useOutletContext, useNavigate } from "react-router";
 import {
     Page,
     Card,
@@ -133,6 +133,7 @@ function RulesPageWithBridge({ loaderData, actionData, currencyCode }: { loaderD
 }
 
 function RulesPageContent({ shopify, isBypass, loaderData, actionData, currencyCode }: { shopify?: any, isBypass?: boolean, loaderData: any, actionData: any, currencyCode: string }) {
+    const navigate = useNavigate();
     const navigation = useNavigation();
     const isSubmitting = navigation.state === "submitting";
     const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
@@ -269,7 +270,7 @@ const receiptStyles = `
 `;
 
     return (
-        <Page title="Pricing Rules" backAction={{ url: "/app" }}>
+        <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }}>
             <BlockStack gap="500">
                 <Card>
                     <BlockStack gap="400">

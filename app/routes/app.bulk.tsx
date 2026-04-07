@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
 import {
     Page,
     Card,
@@ -44,9 +44,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function BulkEditorPage() {
     const { hasRules, error } = useLoaderData<BulkEditorData>();
+    const navigate = useNavigate();
 
     return (
-        <Page title="Bulk Editor" backAction={{ url: "/app" }}>
+        <Page title="Bulk Editor" backAction={{ onAction: () => navigate("/app") }}>
             <BlockStack gap="500">
                 {error && (
                     <Banner tone="critical">
