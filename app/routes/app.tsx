@@ -134,8 +134,27 @@ export default function AppLayout() {
   const raw = useLoaderData() as any;
   const navigation = useNavigation();
   const hasActivePlan = raw?.hasActivePlan ?? false;
-  const handleUpgrade = () => {
-  window.location.href = "/api/billing";
+
+const handleUpgrade = async () => {
+  try {
+    const res = await fetch("/api/billing", {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (res.redirected) {
+      if (window.top) {
+        window.top.location.href = res.url; // ✅ safe
+      } else {
+        window.location.href = res.url; // fallback
+      }
+    } else {
+      console.error("Billing did not redirect properly");
+    }
+
+  } catch (err) {
+    console.error("Upgrade failed:", err);
+  }
 };
 
   const isLoading = navigation.state === "loading";
