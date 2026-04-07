@@ -19,6 +19,8 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 
 // ================= LOADER =================
+
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
@@ -29,6 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       currencyCode: "USD",
       host: null,
       isBypass: true,
+      hasActivePlan: false, // 👈 important
     };
   }
 
@@ -39,7 +42,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } catch (err: any) {
     console.error("AUTH ERROR:", err);
 
-    // 🔥 HANDLE REDIRECT MANUALLY
     if (err?.headers?.get("Location")) {
       throw new Response(null, {
         status: 302,
@@ -52,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw err;
   }
 
-  const { admin, session } = auth;
+  const { admin, session, billing: billingApi } = auth;
 
   // 🔥 SAFETY CHECK
   if (!session?.shop) {
@@ -65,6 +67,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
     });
   }
+
+  // ================= BILLING CHECK (NEW) =================
+  console.log("[BILLING] Checking plan...");
+  
+    let hasActivePlan = false;
+
+    try {
+      const billingCheck = await billingApi.check({
+        plans: ["basic"], // ✅ match your config
+        isTest: true,
+      });
+
+      hasActivePlan = billingCheck?.hasActivePayment || false;
+
+      if (!hasActivePlan) {
+        console.log("[BILLING] FREE MODE");
+      } else {
+        console.log("[BILLING] PAID USER");
+      }
+
+    } catch (err) {
+      console.error("[BILLING] CHECK ERROR:", err);
+      hasActivePlan = false;
+    }
+
+  console.log("[BILLING] STATUS:", hasActivePlan ? "PAID" : "FREE");
 
   // ================= HOST =================
   let host = url.searchParams.get("host");
@@ -97,6 +125,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCode,
     host,
     isBypass: false,
+    hasActivePlan, // 👈 IMPORTANT (used in UI)
   };
 };
 
@@ -104,6 +133,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppLayout() {
   const raw = useLoaderData() as any;
   const navigation = useNavigation();
+  const hasActivePlan = raw?.hasActivePlan ?? false;
+  const handleUpgrade = () => {
+  window.location.href = "/api/billing";
+};
 
   const isLoading = navigation.state === "loading";
 
@@ -140,6 +173,35 @@ export default function AppLayout() {
                 <Link to="/app/help">Help Guide</Link>
               </NavMenu>
             )}
+
+          {!hasActivePlan && (
+            <div style={{
+              background: "#fff4e5",
+              padding: "12px",
+              borderRadius: "8px",
+              marginBottom: "12px",
+              border: "1px solid #ffd79d"
+            }}>
+              <p style={{ margin: 0 }}>
+                 Unlock full pricing automation with Pro plan
+              </p>
+
+              <button
+                onClick={handleUpgrade}
+                style={{
+                  marginTop: "8px",
+                  padding: "8px 12px",
+                  background: "#008060",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer"
+                }}
+              >
+                Upgrade Now
+              </button>
+            </div>
+          )}
             <Outlet context={{ currencyCode, isBypass }} />
           </>
         )}
