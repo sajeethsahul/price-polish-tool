@@ -4,21 +4,48 @@ import prisma from "../db.server";
 // Handles: /api/proxy/settings
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  let shop = url.searchParams.get("shop");
 
-  console.log("🔁 PROXY HIT:", request.url);
+  console.log("[PROXY] HIT", {
+    url: request.url,
+  });
+
+  // ================= FALLBACK SHOP DETECTION =================
+  if (!shop) {
+    const referer = request.headers.get("referer");
+
+    if (referer) {
+      const match = referer.match(/https:\/\/(.*?)\//);
+      if (match) {
+        shop = match[1];
+      }
+    }
+  }
 
   // ================= VALIDATION =================
   if (!shop) {
-    console.error("❌ PROXY ERROR: Missing shop parameter");
-    return new Response("Missing shop parameter", { status: 400 });
+    console.error("[PROXY] ❌ MISSING SHOP PARAM");
+
+    return new Response(
+      JSON.stringify({ error: "Missing shop parameter" }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   try {
+    console.log("[PROXY] FETCH START", { shop });
+
     // ================= FETCH RULE =================
     const rule = await prisma.pricingRule.findUnique({
       where: { shop },
     });
+
+    if (!rule) {
+      console.warn("[PROXY] ⚠️ NO RULE FOUND", { shop });
+    }
 
     // ================= FETCH LATEST APPLIED PRICES =================
     const polishedProducts = await prisma.priceHistory.findMany({
@@ -34,6 +61,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ],
     });
 
+    console.log("[PROXY] DATA FETCHED", {
+      shop,
+      productsCount: polishedProducts.length,
+    });
+
     // ================= RESPONSE =================
     const settings = {
       markup: rule?.liveMarkupPercent ?? 0,
@@ -43,9 +75,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       appliedPrices: polishedProducts.map((p) => p.newPrice),
     };
 
-    console.log("✅ PROXY SUCCESS:", {
+    console.log("[PROXY] SUCCESS", {
       shop,
       products: polishedProducts.length,
+      hasRule: !!rule,
     });
 
     return new Response(JSON.stringify(settings), {
@@ -56,11 +89,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
     });
-  } catch (error) {
-    console.error("❌ PROXY ERROR: Failed to fetch settings:", error);
 
-    return new Response("Error fetching settings", {
-      status: 500,
+  } catch (error: any) {
+    console.error("[PROXY] ❌ ERROR", {
+      shop,
+      message: error.message,
     });
+
+    return new Response(
+      JSON.stringify({ error: "Error fetching settings" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 };
