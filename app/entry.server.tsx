@@ -42,13 +42,16 @@ export default function handleRequest(
           const body = new PassThrough();
           const stream = createReadableStreamFromReadable(body);
 
-          responseHeaders.set("Content-Type", "text/html");
-          
-          // 🔥 MANDATORY SHOPIFY CSP
-          responseHeaders.set(
-            "Content-Security-Policy",
-            "frame-ancestors https://admin.shopify.com https://admin.shopify.com/store/* https://*.myshopify.com https://*.shopify.com;"
-          );
+            responseHeaders.set("Content-Type", "text/html");
+
+            // ✅ FIXED CSP (CRITICAL)
+            responseHeaders.set(
+              "Content-Security-Policy",
+              "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
+            );
+
+            // ✅ REMOVE BLOCKING HEADER
+            responseHeaders.delete("X-Frame-Options");
 
           resolve(
             new Response(stream, {
