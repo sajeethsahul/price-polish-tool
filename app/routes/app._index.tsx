@@ -84,7 +84,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [sortOrder, setSortOrder] = useState<string>("name_asc");
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
-  const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false });
+  const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
+  
+  // Billing placeholders - Set to true by default to allow usage
+  const handleUpgrade = useCallback(() => {
+    if (shopify) shopify.toast.show("Billing implementation coming soon!");
+    else console.log("BYPASS: Upgrade triggered");
+  }, [shopify]);
+  
+  const hasActivePlan = metrics.hasActivePlan;
   
   const navigate = useNavigate();
   const appFetch = useAppFetch();
@@ -103,14 +111,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       // 🚀 OPTIMIZATION: Load metrics and preview in parallel
       const [data, metricsData] = await Promise.all([
         fetcher("/api/preview-price"),
-        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false }))
+        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true }))
       ]);
       
       console.log("DEBUG: Data received from parallel fetch");
       
       setPreviews(data.previews ?? []);
       setActiveMarkup(data.markupPercent ?? 0);
-      setMetrics(metricsData);
+      setMetrics(prev => ({
+        ...prev,
+        ...metricsData,
+        // Fallback to true if hasActivePlan is missing
+        hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true
+      }));
         
       if ((data.previews ?? []).length === 0) {
         setFirstVisit(true);
@@ -139,6 +152,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     console.log("DEBUG: Dashboard mounted, triggered initial handlePreview");
     handlePreview();
   }, [handlePreview]);
+
+    useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.has("charge_id")) {
+        console.log("[BILLING] Payment completed → refreshing");
+
+        window.location.href = window.location.pathname;
+      }
+    }
+  }, []);
 
   const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
     console.log(`DEBUG: Initializing handleApplyBatch for ${itemsToUpdate.length} items...`);
@@ -541,6 +566,34 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           </Card>
         )}
 
+        {!hasActivePlan && (
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h3" variant="headingMd">
+                 Start Your 7-Day Free Trial
+              </Text>
+
+              <Text as="p">
+                Apply smart pricing, increase profits, and manage bulk updates safely.
+              </Text>
+
+              <InlineStack gap="200">
+                <Badge tone="success">Bulk Pricing</Badge>
+                <Badge tone="success">Undo Anytime</Badge>
+                <Badge tone="success">Live Store Sync</Badge>
+              </InlineStack>
+
+              <Button variant="primary" onClick={handleUpgrade}>
+                Start Free Trial
+              </Button>
+
+              <Text as="p" variant="bodySm" tone="subdued">
+                No charge today • Cancel anytime
+              </Text>
+            </BlockStack>
+          </Card>
+        )}
+
         <Banner tone="info">
           <BlockStack gap="200">
             <Text as="p">✔️ Safe to use — all changes can be undone anytime</Text>
@@ -681,7 +734,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               </Button>
               <Button
                 onClick={() => setIsModalOpen(true)}
-                disabled={isProcessing || previews.length === 0}
+                disabled={!hasActivePlan ||isProcessing || previews.length === 0}
                 tone="success"
               >
                 {`Apply All (${previews.length})`}
@@ -699,7 +752,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               )}
               <Button
                 onClick={handleApplySelected}
-                disabled={isProcessing || selectedItems.size === 0}
+                disabled={!hasActivePlan ||isProcessing || selectedItems.size === 0}
                 variant="secondary"
               >
                 {`Apply Selected (${selectedItems.size})`}
@@ -884,7 +937,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                   size="slim" 
                                   onClick={() => handleApplySingle(p)}
                                   loading={updatingItem === p.variantId}
-                                  disabled={!!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
+                                  disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
                                   tone="success"
                                 >
                                   Apply
@@ -896,7 +949,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       size="slim" 
                                       onClick={() => handleApplySingle(p)}
                                       loading={updatingItem === p.variantId}
-                                      disabled={!!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
+                                      disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
                                     >
                                       Apply
                                     </Button>
@@ -921,8 +974,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   />
                 </InlineStack>
               </BlockStack>
+              
             )}
           </BlockStack>
+        {!hasActivePlan && (
+            <Text as="p" tone="critical">
+              🔒 Start your free trial to apply pricing changes
+            </Text>
+          )}
         </Card>
       </BlockStack>
 
