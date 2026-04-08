@@ -44,17 +44,18 @@ export default function handleRequest(
 
           responseHeaders.set("Content-Type", "text/html");
 
-          // ✅ FORCE REMOVE (important)
+          // ✅ Step 3 & 7 — Fix Frame Headers for Shopify (Render/Iframe)
           responseHeaders.delete("X-Frame-Options");
+          responseHeaders.set("X-Frame-Options", ""); // Force blank for sameorigin issues
 
-          // ✅ FORCE OVERRIDE (some environments ignore delete)
-          responseHeaders.set("X-Frame-Options", "");
-
-          // ✅ SHOPIFY EMBED CSP (correct format)
+          // REQUIRED CSP FOR SHOPIFY (Exact Requirement)
           responseHeaders.set(
             "Content-Security-Policy",
             "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
           );
+
+          // Log headers for debugging (Step 7)
+          console.log("FINAL RESPONSE HEADERS:", Object.fromEntries(responseHeaders.entries()));
 
           resolve(
             new Response(stream, {
