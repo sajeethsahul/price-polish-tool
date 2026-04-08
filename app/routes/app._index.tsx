@@ -147,23 +147,32 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [shopify]);
 
-  // Initial Load
-  useEffect(() => {
-    console.log("DEBUG: Dashboard mounted, triggered initial handlePreview");
-    handlePreview();
-  }, [handlePreview]);
+ useEffect(() => {
+  if (typeof window === "undefined") return;
 
-    useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.search);
+  const shop = params.get("shop");
+  const hasChargeId = params.has("charge_id");
 
-      if (params.has("charge_id")) {
-        console.log("[BILLING] Payment completed → refreshing");
+  // ✅ Store shop
+  if (shop) {
+    localStorage.setItem("shop", shop);
+    console.log("[SHOP STORED]", shop);
+  }
 
-        window.location.href = window.location.pathname;
-      }
-    }
-  }, []);
+  // 🔥 Billing return — handle FIRST
+  if (hasChargeId) {
+    console.log("[BILLING] Payment completed → cleaning URL");
+
+    window.location.replace(window.location.pathname);
+    return; // 🚨 stop further execution
+  }
+
+  // ✅ Normal flow
+  console.log("DEBUG: Dashboard mounted → fetching preview");
+  handlePreview();
+
+}, [handlePreview]);
 
   const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
     console.log(`DEBUG: Initializing handleApplyBatch for ${itemsToUpdate.length} items...`);

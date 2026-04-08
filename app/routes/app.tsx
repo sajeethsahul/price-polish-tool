@@ -57,42 +57,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session, billing: billingApi } = auth;
 
   // 🔥 SAFETY CHECK
-    if (!session?.shop) {
-      const shopFromUrl = url.searchParams.get("shop");
-      const hasChargeId = url.searchParams.has("charge_id");
+      if (!session?.shop) {
+          const shopFromUrl = url.searchParams.get("shop");
+          const hasChargeId = url.searchParams.has("charge_id");
 
-      console.warn("NO SESSION → handling recovery", {
-        shopFromUrl,
-        hasChargeId,
-      });
+          console.warn("NO SESSION → handling recovery", {
+            shopFromUrl,
+            hasChargeId,
+          });
 
-      // ✅ CASE 1: Normal auth flow (shop exists)
-      if (shopFromUrl) {
-        throw new Response(null, {
-          status: 302,
-          headers: {
-            Location: `/auth?shop=${shopFromUrl}`,
-          },
-        });
-      }
+          // ✅ NORMAL FLOW (first load / navigation)
+          if (shopFromUrl) {
+            throw new Response(null, {
+              status: 302,
+              headers: {
+                Location: `/auth?shop=${shopFromUrl}`,
+              },
+            });
+          }
 
-      // 🔥 CASE 2: Billing return (NO shop, but charge_id present)
-      if (hasChargeId) {
-        console.log("Billing return detected → allowing app to load");
+          // 🔥 BILLING RETURN FLOW (CRITICAL FIX)
+          if (hasChargeId) {
+            console.log("Billing return → waiting for frontend reload");
 
-        return {
-          apiKey: process.env.SHOPIFY_API_KEY ?? null,
-          currencyCode: "USD",
-          host: null,
-          isBypass: true, // 🔥 prevents auth loop
-        };
-      }
+            // 👉 DO NOT redirect here
+            // 👉 Let frontend handle reload using charge_id
 
-      // ❌ FALLBACK (rare case)
-      console.error("No session and no shop → forcing safe fallback");
+            return {
+              apiKey: process.env.SHOPIFY_API_KEY ?? null,
+              currencyCode: "USD",
+              host: null,
+              isBypass: true,
+            };
+          }
 
-      throw new Response("Unauthorized", { status: 401 });
-    }
+          // ❌ fallback
+          throw new Response("Unauthorized", { status: 401 });
+        }
 
   // ================= BILLING CHECK (NEW) =================
   console.log("[BILLING] Checking plan...");
