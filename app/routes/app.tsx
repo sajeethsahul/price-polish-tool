@@ -24,8 +24,9 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
+  const pathname = url.pathname;
 
-  // ================= BYPASS (SAFE MODE) =================
+  // ================= BYPASS =================
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -47,9 +48,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (err?.headers?.get("Location")) {
       throw new Response(null, {
         status: 302,
-        headers: {
-          Location: err.headers.get("Location"),
-        },
+        headers: { Location: err.headers.get("Location") },
       });
     }
 
@@ -58,46 +57,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { admin, session, billing: billingApi } = auth;
 
-  const pathname = url.pathname;
-
   // ================= SESSION RECOVERY =================
   if (!session?.shop && !pathname.includes("/auth/session-token")) {
     const shopFromUrl = url.searchParams.get("shop");
 
-    console.warn("⚠️ NO SESSION → recovering", {
-      shopFromUrl,
-      pathname,
-    });
+    console.warn("⚠️ NO SESSION → recovering", { shopFromUrl });
 
     if (shopFromUrl) {
       throw new Response(null, {
         status: 302,
-        headers: {
-          Location: `/auth?shop=${shopFromUrl}`,
-        },
+        headers: { Location: `/auth?shop=${shopFromUrl}` },
       });
     }
 
     throw new Response("Unauthorized", { status: 401 });
-  }
-
-  // ================= BILLING CHECK =================
-  console.log("[BILLING] Checking plan...");
-
-  let hasActivePlan = false;
-
-  try {
-    const billingCheck = await billingApi.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    hasActivePlan = billingCheck?.hasActivePayment || false;
-
-    console.log("[BILLING] STATUS:", hasActivePlan ? "PAID" : "FREE");
-  } catch (err) {
-    console.error("[BILLING] CHECK ERROR:", err);
-    hasActivePlan = false;
   }
 
   // ================= HOST =================
@@ -108,16 +81,46 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // 🚨 HARD GUARD (IMPORTANT)
   if (!host) {
-    console.error("❌ HOST MISSING — forcing reload");
+    console.error("❌ HOST MISSING — forcing auth");
 
     throw new Response(null, {
       status: 302,
-      headers: {
-        Location: `/auth?shop=${session.shop}`,
-      },
+      headers: { Location: `/auth?shop=${session.shop}` },
     });
+  }
+
+  // ================= BILLING CHECK =================
+  let hasActivePlan = false;
+
+  try {
+    const billingCheck = await billingApi.check({
+      plans: ["basic"],
+      isTest: true,
+    });
+
+    hasActivePlan = billingCheck?.hasActivePayment || false;
+
+    console.log("[BILLING STATUS]", hasActivePlan ? "ACTIVE" : "INACTIVE");
+
+    // 🔥 ONLY trigger billing IF:
+    // - no plan
+    // - NOT returning from billing (VERY IMPORTANT FIX)
+    const hasChargeId = url.searchParams.has("charge_id");
+
+    if (!hasActivePlan && !hasChargeId) {
+      console.log("[BILLING] Triggering request...");
+
+      return billingApi.request({
+        plan: "basic",
+        isTest: true,
+        returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${session.shop}&host=${host}&embedded=1`,
+      });
+    }
+
+  } catch (err) {
+    console.error("[BILLING ERROR]", err);
+    hasActivePlan = false;
   }
 
   // ================= DATA =================
@@ -138,7 +141,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  // ================= FINAL RESPONSE =================
+  // ================= FINAL =================
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,

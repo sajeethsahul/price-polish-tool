@@ -31,5 +31,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     plan: "basic", // or "pro" based on your config
     isTest: true,
     returnUrl: `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`,
+    trialDays: 7
   });
 };
