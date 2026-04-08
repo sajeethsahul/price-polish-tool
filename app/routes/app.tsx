@@ -56,16 +56,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { admin, session, billing: billingApi } = auth;
 
- // 🔥 SAFETY CHECK (FINAL)
-if (!session?.shop) {
-  const shopFromUrl = url.searchParams.get("shop");
+//const url = new URL(request.url);
+const pathname = url.pathname;
 
-  console.warn("⚠️ NO SESSION — attempting recovery", {
+if (!session?.shop && !pathname.includes("/auth/session-token")) {
+  const shopFromUrl = url.searchParams.get("shop");
+  const hasChargeId = url.searchParams.has("charge_id");
+
+  console.warn("NO SESSION → handling recovery", {
     shopFromUrl,
-    url: request.url,
+    hasChargeId,
+    pathname,
   });
 
-  // ✅ Recover session via auth if shop is present
+  // ✅ Normal auth
   if (shopFromUrl) {
     throw new Response(null, {
       status: 302,
@@ -75,7 +79,16 @@ if (!session?.shop) {
     });
   }
 
-  // ❌ No shop → cannot recover
+  // 🔥 Billing return
+  if (hasChargeId) {
+    return {
+      apiKey: process.env.SHOPIFY_API_KEY ?? null,
+      currencyCode: "USD",
+      host: null,
+      isBypass: true,
+    };
+  }
+
   throw new Response("Unauthorized", { status: 401 });
 }
 
