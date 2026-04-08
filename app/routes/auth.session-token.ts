@@ -4,8 +4,18 @@ import type { LoaderFunctionArgs } from "react-router";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
+  // ================= AUTH =================
+  // 🔥 MUST authenticate FIRST (Shopify expects this)
+  const auth = await authenticate.admin(request);
+
+  // ================= REDIRECT HANDLING =================
+  // 🔥 If Shopify returns redirect → return it (never throw)
+  if ((auth as any)?.redirect) {
+    return (auth as any).redirect;
+  }
+
   // ================= SHOPIFY RELOAD HANDLER =================
-  // 🔥 MUST be BEFORE authenticate (prevents infinite loop)
+  // 🔥 Handle AFTER auth to avoid broken session context
   const reload = url.searchParams.get("shopify-reload");
 
   if (reload) {
@@ -19,17 +29,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  // ================= AUTH =================
-  const auth = await authenticate.admin(request);
-
-  // ================= REDIRECT HANDLING =================
-  // 🔥 NEVER throw → always return
-  if ((auth as any)?.redirect) {
-    return (auth as any).redirect;
-  }
-
   // ================= SUCCESS =================
-  // 🔥 KEEP RESPONSE MINIMAL (IMPORTANT)
+  // 🔥 Minimal safe response (DO NOT return full auth)
   return new Response(
     JSON.stringify({ ok: true }),
     {
