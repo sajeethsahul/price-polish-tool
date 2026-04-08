@@ -10,6 +10,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return billing.request({
     plan: BILLING_PLANS.BASIC.name as any,    
     isTest: true,
-    returnUrl: `https://price-polish-tool.onrender.com/app?shop=${session.shop}`,
+    returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${session.shop}&host=${Buffer.from(`admin.shopify.com/store/${session.shop.replace(".myshopify.com", "")}`).toString("base64")}&embedded=1`,
   });
 };

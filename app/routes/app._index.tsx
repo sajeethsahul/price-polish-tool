@@ -147,24 +147,31 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [shopify]);
 
- useEffect(() => {
+useEffect(() => {
   if (typeof window === "undefined") return;
 
-  const params = new URLSearchParams(window.location.search);
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+
   const shop = params.get("shop");
+  const host = params.get("host");
   const hasChargeId = params.has("charge_id");
 
-  // ✅ Store shop
+  // ✅ Store shop (safe)
   if (shop) {
     localStorage.setItem("shop", shop);
     console.log("[SHOP STORED]", shop);
   }
 
-  // 🔥 Billing return — handle FIRST
+  // 🔥 Billing return — CLEAN ONLY charge_id (KEEP host + shop)
   if (hasChargeId) {
-    console.log("[BILLING] Payment completed → cleaning URL");
+    console.log("[BILLING] Payment completed → cleaning URL safely");
 
-    window.location.replace(window.location.pathname);
+    params.delete("charge_id");
+
+    const newUrl = `${url.pathname}?${params.toString()}`;
+    window.location.replace(newUrl);
+
     return; // 🚨 stop further execution
   }
 
