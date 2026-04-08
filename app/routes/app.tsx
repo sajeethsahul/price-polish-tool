@@ -58,42 +58,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // 🔥 SAFETY CHECK
       if (!session?.shop) {
-          const shopFromUrl = url.searchParams.get("shop");
-          const hasChargeId = url.searchParams.has("charge_id");
+  const shopFromUrl = url.searchParams.get("shop");
+  const hasChargeId = url.searchParams.has("charge_id");
 
-          console.warn("NO SESSION → handling recovery", {
-            shopFromUrl,
-            hasChargeId,
-          });
+  if (shopFromUrl) {
+    throw new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/auth?shop=${shopFromUrl}`,
+      },
+    });
+  }
 
-          // ✅ NORMAL FLOW (first load / navigation)
-          if (shopFromUrl) {
-            throw new Response(null, {
-              status: 302,
-              headers: {
-                Location: `/auth?shop=${shopFromUrl}`,
-              },
-            });
-          }
+  if (hasChargeId) {
+    // ✅ DO NOTHING (critical)
+    return {
+      apiKey: process.env.SHOPIFY_API_KEY ?? null,
+      currencyCode: "USD",
+      host: null,
+      isBypass: true,
+    };
+  }
 
-          // 🔥 BILLING RETURN FLOW (CRITICAL FIX)
-          if (hasChargeId) {
-            console.log("Billing return → waiting for frontend reload");
-
-            // 👉 DO NOT redirect here
-            // 👉 Let frontend handle reload using charge_id
-
-            return {
-              apiKey: process.env.SHOPIFY_API_KEY ?? null,
-              currencyCode: "USD",
-              host: null,
-              isBypass: true,
-            };
-          }
-
-          // ❌ fallback
-          throw new Response("Unauthorized", { status: 401 });
-        }
+  throw new Response("Unauthorized", { status: 401 });
+}
 
   // ================= BILLING CHECK (NEW) =================
   console.log("[BILLING] Checking plan...");
