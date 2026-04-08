@@ -42,16 +42,19 @@ export default function handleRequest(
           const body = new PassThrough();
           const stream = createReadableStreamFromReadable(body);
 
-            responseHeaders.set("Content-Type", "text/html");
+          responseHeaders.set("Content-Type", "text/html");
 
-            // ✅ FIXED CSP (CRITICAL)
-            responseHeaders.set(
-              "Content-Security-Policy",
-              "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
-            );
+          // ✅ FORCE REMOVE (important)
+          responseHeaders.delete("X-Frame-Options");
 
-            // ✅ REMOVE BLOCKING HEADER
-            responseHeaders.delete("X-Frame-Options");
+          // ✅ FORCE OVERRIDE (some environments ignore delete)
+          responseHeaders.set("X-Frame-Options", "");
+
+          // ✅ SHOPIFY EMBED CSP (correct format)
+          responseHeaders.set(
+            "Content-Security-Policy",
+            "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
+          );
 
           resolve(
             new Response(stream, {
