@@ -15,12 +15,6 @@ export const shopifyApiKey = process.env.SHOPIFY_API_KEY;
 const apiSecret = process.env.SHOPIFY_API_SECRET;
 const scopes = process.env.SCOPES;
 
-// ✅ Step 2 - Enhanced logging for Render
-if (!appUrl) console.error("❌ CRITICAL: SHOPIFY_APP_URL is missing in environment!");
-if (!shopifyApiKey) console.error("❌ CRITICAL: SHOPIFY_API_KEY is missing in environment!");
-if (!apiSecret) console.error("❌ CRITICAL: SHOPIFY_API_SECRET is missing in environment!");
-if (!process.env.DATABASE_URL) console.error("❌ CRITICAL: DATABASE_URL is missing in environment!");
-
 if (!appUrl) throw new Error("SHOPIFY_APP_URL is missing");
 if (!shopifyApiKey) throw new Error("SHOPIFY_API_KEY is missing");
 if (!apiSecret) throw new Error("SHOPIFY_API_SECRET is missing");
@@ -32,7 +26,6 @@ if (!appUrl.startsWith("https://")) {
 
 // 🔍 Debug (keep temporarily)
 console.log("✅ SHOPIFY_APP_URL:", appUrl);
-console.log("✅ DETECTED PORT:", process.env.PORT || "3000 (default)");
 
 // 🚀 SHOPIFY APP CONFIG
 const shopify = shopifyApp({

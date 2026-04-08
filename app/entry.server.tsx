@@ -43,19 +43,12 @@ export default function handleRequest(
           const stream = createReadableStreamFromReadable(body);
 
           responseHeaders.set("Content-Type", "text/html");
-
-          // ✅ Step 3 & 7 — Fix Frame Headers for Shopify (Render/Iframe)
-          responseHeaders.delete("X-Frame-Options");
-          responseHeaders.set("X-Frame-Options", ""); // Force blank for sameorigin issues
-
-          // REQUIRED CSP FOR SHOPIFY (Exact Requirement)
+          
+          // 🔥 MANDATORY SHOPIFY CSP
           responseHeaders.set(
             "Content-Security-Policy",
-            "frame-ancestors https://admin.shopify.com https://*.myshopify.com https://*.shopify.com"
+            "frame-ancestors https://admin.shopify.com https://admin.shopify.com/store/* https://*.myshopify.com https://*.shopify.com;"
           );
-
-          // Log headers for debugging (Step 7)
-          console.log("FINAL RESPONSE HEADERS:", Object.fromEntries(responseHeaders.entries()));
 
           resolve(
             new Response(stream, {
