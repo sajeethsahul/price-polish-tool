@@ -2,7 +2,6 @@ import { Page, Card, Text, BlockStack, List, Box, Badge, Banner, Divider, Inline
 import { ShieldCheckMarkIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import type { LoaderFunctionArgs } from "react-router";
-import { useNavigate } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -22,9 +21,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function HelpPage() {
-  const navigate = useNavigate();
   return (
-    <Page title="User Guide & Help" backAction={{ onAction: () => navigate("/app") }}>
+    <Page title="User Guide & Help" backAction={{ url: "/app" }}>
       <BlockStack gap="500">
         <Banner tone="info" title="Quick Summary">
           Price Polish helps you optimize your product prices using markup and rounding rules. You can preview changes, apply them permanently to your store, or use a dynamic storefront extension.

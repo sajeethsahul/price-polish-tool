@@ -25,16 +25,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
+  // ================= BYPASS (SAFE MODE) =================
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
       currencyCode: "USD",
       host: null,
       isBypass: true,
-      hasActivePlan: false, // 👈 important
+      hasActivePlan: false,
     };
   }
 
+  // ================= AUTH =================
   let auth;
 
   try {
@@ -56,74 +58,66 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { admin, session, billing: billingApi } = auth;
 
-//const url = new URL(request.url);
-const pathname = url.pathname;
+  const pathname = url.pathname;
 
-if (!session?.shop && !pathname.includes("/auth/session-token")) {
-  const shopFromUrl = url.searchParams.get("shop");
-  const hasChargeId = url.searchParams.has("charge_id");
+  // ================= SESSION RECOVERY =================
+  if (!session?.shop && !pathname.includes("/auth/session-token")) {
+    const shopFromUrl = url.searchParams.get("shop");
 
-  console.warn("NO SESSION → handling recovery", {
-    shopFromUrl,
-    hasChargeId,
-    pathname,
-  });
-
-  // ✅ Normal auth
-  if (shopFromUrl) {
-    throw new Response(null, {
-      status: 302,
-      headers: {
-        Location: `/auth?shop=${shopFromUrl}`,
-      },
+    console.warn("⚠️ NO SESSION → recovering", {
+      shopFromUrl,
+      pathname,
     });
-  }
 
-  // 🔥 Billing return
-  if (hasChargeId) {
-    return {
-      apiKey: process.env.SHOPIFY_API_KEY ?? null,
-      currencyCode: "USD",
-      host: null,
-      isBypass: true,
-    };
-  }
-
-  throw new Response("Unauthorized", { status: 401 });
-}
-
-  // ================= BILLING CHECK (NEW) =================
-  console.log("[BILLING] Checking plan...");
-  
-    let hasActivePlan = false;
-
-    try {
-      const billingCheck = await billingApi.check({
-        plans: ["basic"], // ✅ match your config
-        isTest: true,
+    if (shopFromUrl) {
+      throw new Response(null, {
+        status: 302,
+        headers: {
+          Location: `/auth?shop=${shopFromUrl}`,
+        },
       });
-
-      hasActivePlan = billingCheck?.hasActivePayment || false;
-
-      if (!hasActivePlan) {
-        console.log("[BILLING] FREE MODE");
-      } else {
-        console.log("[BILLING] PAID USER");
-      }
-
-    } catch (err) {
-      console.error("[BILLING] CHECK ERROR:", err);
-      hasActivePlan = false;
     }
 
-  console.log("[BILLING] STATUS:", hasActivePlan ? "PAID" : "FREE");
+    throw new Response("Unauthorized", { status: 401 });
+  }
+
+  // ================= BILLING CHECK =================
+  console.log("[BILLING] Checking plan...");
+
+  let hasActivePlan = false;
+
+  try {
+    const billingCheck = await billingApi.check({
+      plans: ["basic"],
+      isTest: true,
+    });
+
+    hasActivePlan = billingCheck?.hasActivePayment || false;
+
+    console.log("[BILLING] STATUS:", hasActivePlan ? "PAID" : "FREE");
+  } catch (err) {
+    console.error("[BILLING] CHECK ERROR:", err);
+    hasActivePlan = false;
+  }
 
   // ================= HOST =================
   let host = url.searchParams.get("host");
 
-  if (!host) {
+  if (!host && session?.shop) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+  }
+
+  // 🚨 HARD GUARD (IMPORTANT)
+  if (!host) {
+    console.error("❌ HOST MISSING — forcing reload");
+
+    throw new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/auth?shop=${session.shop}`,
+      },
+    });
   }
 
   // ================= DATA =================
@@ -144,12 +138,13 @@ if (!session?.shop && !pathname.includes("/auth/session-token")) {
     console.error("Currency fetch failed:", err);
   }
 
+  // ================= FINAL RESPONSE =================
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,
     host,
     isBypass: false,
-    hasActivePlan, // 👈 IMPORTANT (used in UI)
+    hasActivePlan,
   };
 };
 
