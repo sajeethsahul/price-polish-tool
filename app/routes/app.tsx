@@ -57,16 +57,42 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session, billing: billingApi } = auth;
 
   // 🔥 SAFETY CHECK
-  if (!session?.shop) {
-    console.warn("NO SESSION → forcing auth");
+    if (!session?.shop) {
+      const shopFromUrl = url.searchParams.get("shop");
+      const hasChargeId = url.searchParams.has("charge_id");
 
-    throw new Response(null, {
-      status: 302,
-      headers: {
-        Location: `/auth?shop=${url.searchParams.get("shop")}`,
-      },
-    });
-  }
+      console.warn("NO SESSION → handling recovery", {
+        shopFromUrl,
+        hasChargeId,
+      });
+
+      // ✅ CASE 1: Normal auth flow (shop exists)
+      if (shopFromUrl) {
+        throw new Response(null, {
+          status: 302,
+          headers: {
+            Location: `/auth?shop=${shopFromUrl}`,
+          },
+        });
+      }
+
+      // 🔥 CASE 2: Billing return (NO shop, but charge_id present)
+      if (hasChargeId) {
+        console.log("Billing return detected → allowing app to load");
+
+        return {
+          apiKey: process.env.SHOPIFY_API_KEY ?? null,
+          currencyCode: "USD",
+          host: null,
+          isBypass: true, // 🔥 prevents auth loop
+        };
+      }
+
+      // ❌ FALLBACK (rare case)
+      console.error("No session and no shop → forcing safe fallback");
+
+      throw new Response("Unauthorized", { status: 401 });
+    }
 
   // ================= BILLING CHECK (NEW) =================
   console.log("[BILLING] Checking plan...");
