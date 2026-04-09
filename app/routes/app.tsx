@@ -150,46 +150,45 @@ export default function AppLayout() {
   const app = useAppBridge() as any;
 
   // 🔥 Billing button handler with App Bridge v4
-  const handleStartTrial = async () => {
-    if (typeof window === "undefined") return;
+ const handleStartTrial = async () => {
+  if (typeof window === "undefined") return;
 
-    const params = new URLSearchParams(window.location.search);
-    const shop = params.get("shop");
-    const hostParam = params.get("host");
+  const params = new URLSearchParams(window.location.search);
+  const shop = params.get("shop");
+  const hostParam = params.get("host");
 
-    if (!shop || !hostParam) {
-      console.error("Missing shop/host in query params");
-      return;
-    }
+  if (!shop || !hostParam) {
+    console.error("Missing shop/host in query params");
+    return;
+  }
 
-    // Call server to create billing + get confirmationUrl
-    const response = await fetch(
-      `/api/billing?shop=${encodeURIComponent(
-        shop,
-      )}&host=${encodeURIComponent(hostParam)}`,
-      {
-        credentials: "include",
-      },
-    );
+  // Call server to create billing + get confirmationUrl
+  const response = await fetch(
+    `/api/billing?shop=${encodeURIComponent(
+      shop,
+    )}&host=${encodeURIComponent(hostParam)}`,
+    {
+      credentials: "include",
+    },
+  );
 
-    if (!response.ok) {
-      console.error("Billing request failed", response.status);
-      return;
-    }
+  if (!response.ok) {
+    console.error("Billing request failed", response.status);
+    return;
+  }
 
-    const { confirmationUrl } = await response.json();
+  const { confirmationUrl } = await response.json();
 
-    // If Shopify has returned from billing (charge_id), confirmationUrl is null
-    if (!confirmationUrl) {
-      // Just reload /app — loader will re-check billing and show full app
-      window.location.href = `/app?shop=${shop}&host=${hostParam}&embedded=1`;
-      return;
-    }
+  if (!confirmationUrl) {
+    // If you ever return null, just reload /app
+    window.location.href = `/app?shop=${shop}&host=${hostParam}&embedded=1`;
+    return;
+  }
 
-    // ✅ Open billing in top-level Shopify Admin
-    const redirect = Redirect.create(app);
-    redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-  };
+  // ✅ This is the critical line: top-level redirect via App Bridge
+  const redirect = Redirect.create(app);
+  redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
+};
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
@@ -232,9 +231,9 @@ export default function AppLayout() {
                     <Text as="p">
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
-                    <Button variant="primary" onClick={handleStartTrial}>
-                      Start Free Trial
-                    </Button>
+                  <Button variant="primary" onClick={handleStartTrial}>
+                    Start Free Trial
+                  </Button>
                   </BlockStack>
                 </Card>
               </Page>
