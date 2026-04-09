@@ -188,18 +188,20 @@ export default function AppLayout() {
                         <Button
                           variant="primary"
                           onClick={() => {
-                            if (!app) return;
+                            if (typeof window === "undefined") return;
 
-                            const redirect = Redirect.create(app);
+                            const params = new URLSearchParams(window.location.search);
 
-                            redirect.dispatch(
-                              Redirect.Action.REMOTE,
-                              "/api/billing"
-                            );
+                            const shop = params.get("shop");
+                            const host = params.get("host");
+
+                            const url = `/api/billing?shop=${shop}&host=${host}`;
+
+                            window.location.href = url; // ✅ NOT window.top, NOT App Bridge
                           }}
                         >
                           Start Free Trial
-                        </Button>                                       
+                        </Button>                                    
                   </BlockStack>
                 </Card>
               </Page>
