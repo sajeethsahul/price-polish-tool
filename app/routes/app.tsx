@@ -174,17 +174,21 @@ export default function AppLayout() {
                 <Card>
                   <BlockStack gap="300">
                     <Text as="h2" variant="headingMd">
-                      Unlock Price Polish 🚀
+                      Unlock Price Polish 
                     </Text>
                     <Text as="p">
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
-                    <Button
-                      variant="primary"
-                      onClick={() => navigate("/api/billing")}
-                    >
-                      Start Free Trial
-                    </Button>
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.open("/api/billing", "_top");
+                          }
+                        }}
+                      >
+                        Start Free Trial
+                      </Button>                                          
                   </BlockStack>
                 </Card>
               </Page>
