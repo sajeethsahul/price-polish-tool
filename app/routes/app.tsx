@@ -230,7 +230,7 @@ export default function AppLayout() {
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
                   <Button variant="primary" onClick={handleStartTrial}>
-                    Start Free Trial 1
+                    Start Free Trial 2
                   </Button>
                   </BlockStack>
                 </Card>
