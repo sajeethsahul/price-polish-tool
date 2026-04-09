@@ -33,20 +33,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // 🔁 Detect return from billing (Shopify sends charge_id)
   const hasChargeId = url.searchParams.has("charge_id");
-  if (hasChargeId) {
-    console.log("[BILLING RETURN DETECTED]");
-    // Tell client there is no new confirmation URL → it should reload /app
-    return json({ confirmationUrl: null as string | null });
-  }
+
+  // if (hasChargeId) {
+  //   console.log("[BILLING RETURN DETECTED]");
+  //   // Tell client there is no new confirmation URL → it should reload /app
+  //   return json({ confirmationUrl: null as string | null });
+  // }
 
   // ✅ Normal billing request: create charge and get confirmationUrl
-  const rawResult = await billing.request({
-    plan: "basic",
-    isTest: true,
-    trialDays: 7,
-    // Shopify will return here (api.billing) with charge_id
-    returnUrl: `${APP_URL}/api/billing?shop=${shop}&host=${host}&embedded=1`,
-  });
+const rawResult = await billing.request({
+  plan: "basic",
+  isTest: true,
+  trialDays: 7,
+  // ✅ After approval, go back into embedded app
+  returnUrl: `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`,
+});
 
   // Explicitly assert the shape so TS knows confirmationUrl exists
   const result = rawResult as BillingRequestResult;
