@@ -147,7 +147,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCode,
     host,
     isBypass: false,
-    hasActivePlan,
+    hasActivePlan:true,
   };
 };
 
