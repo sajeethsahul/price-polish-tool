@@ -1,14 +1,21 @@
-import { Outlet, Link, useLoaderData, useNavigation } from "react-router";
+import {
+  Outlet,
+  Link,
+  useLoaderData,
+  useNavigation,
+} from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+
 import {
   AppProvider as PolarisProvider,
-  SkeletonPage, Frame,
+  SkeletonPage,
   Layout,
   Card,
   SkeletonBodyText,
   SkeletonDisplayText,
   Loading,
   BlockStack,
+  Frame,
 } from "@shopify/polaris";
 
 import {
@@ -19,52 +26,44 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 
 // ================= LOADER =================
-
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
-  const pathname = url.pathname;
 
-  // ================= BYPASS =================
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
       currencyCode: "USD",
       host: null,
       isBypass: true,
-      hasActivePlan: true, // 🔥 always true
+      hasActivePlan: true,
     };
   }
 
-  // ================= AUTH =================
   let auth;
 
   try {
     auth = await authenticate.admin(request);
   } catch (err: any) {
-    console.error("AUTH ERROR:", err);
-
     if (err?.headers?.get("Location")) {
       throw new Response(null, {
         status: 302,
         headers: { Location: err.headers.get("Location") },
       });
     }
-
     throw err;
   }
 
-  const { admin, session } = auth;
+  const { admin, session, billing } = auth;
 
-  // ================= SESSION RECOVERY =================
-  if (!session?.shop && !pathname.includes("/auth/session-token")) {
-    const shopFromUrl = url.searchParams.get("shop");
+  // ================= SESSION SAFETY =================
+  if (!session?.shop) {
+    const shop = url.searchParams.get("shop");
 
-    if (shopFromUrl) {
+    if (shop) {
       throw new Response(null, {
         status: 302,
-        headers: { Location: `/auth?shop=${shopFromUrl}` },
+        headers: { Location: `/auth?shop=${shop}` },
       });
     }
 
@@ -74,22 +73,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // ================= HOST =================
   let host = url.searchParams.get("host");
 
-  if (!host && session?.shop) {
+  if (!host) {
     const store = session.shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  if (!host) {
-    throw new Response(null, {
-      status: 302,
-      headers: { Location: `/auth?shop=${session.shop}` },
+  // ================= BILLING CHECK (SAFE) =================
+  let hasActivePlan = false;
+
+  try {
+    const billingCheck = await billing.check({
+      plans: ["basic"],
+      isTest: true,
     });
+
+    hasActivePlan = billingCheck?.hasActivePayment || false;
+
+    console.log("[BILLING STATUS]", hasActivePlan ? "ACTIVE" : "INACTIVE");
+  } catch (err) {
+    console.error("[BILLING ERROR]", err);
+    hasActivePlan = false;
   }
 
-  // ================= 🔥 BILLING DISABLED =================
-  const hasActivePlan = true; // 🔥 FORCE ENABLE
-
-  // ================= DATA =================
+  // ================= SHOP DATA =================
   let currencyCode = "USD";
 
   try {
@@ -107,7 +113,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
-  // ================= FINAL =================
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     currencyCode,
@@ -119,41 +124,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // ================= COMPONENT =================
 export default function AppLayout() {
-  const raw = useLoaderData() as any;
+  const data = useLoaderData() as any;
   const navigation = useNavigation();
-  const hasActivePlan = raw?.hasActivePlan ?? false;
-  const host = raw?.host ?? null;
-
-const handleUpgrade = async () => {
-  try {
-    const res = await fetch(`/api/billing?host=${host}`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (res.redirected) {
-      if (window.top) {
-        window.top.location.href = res.url;
-      } else {
-        window.location.href = res.url;
-      }
-    }
-
-  } catch (err) {
-    console.error("Upgrade failed:", err);
-  }
-};
 
   const isLoading = navigation.state === "loading";
 
-  const apiKey = raw?.apiKey ?? null; 
-  const currencyCode = raw?.currencyCode ?? "USD";
-  const isBypass = raw?.isBypass ?? false;
+  const { apiKey, host, currencyCode, isBypass, hasActivePlan } = data;
 
-  // ================= MAIN UI =================
   const AppContent = (
     <PolarisProvider i18n={{}}>
-      <Frame> {/* 🔥 CRITICAL FIX */}
+      <Frame>
         {isLoading ? (
           <SkeletonPage title="Price Polish">
             <Loading />
@@ -179,38 +159,11 @@ const handleUpgrade = async () => {
               </NavMenu>
             )}
 
-          {!hasActivePlan && (
-            <div style={{
-              background: "#fff4e5",
-              padding: "12px",
-              borderRadius: "8px",
-              marginBottom: "12px",
-              border: "1px solid #ffd79d"
-            }}>
-              <p style={{ margin: 0 }}>
-                 Unlock full pricing automation with Pro plan
-              </p>
-
-              <button
-                onClick={handleUpgrade}
-                style={{
-                  marginTop: "8px",
-                  padding: "8px 12px",
-                  background: "#008060",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer"
-                }}
-              >
-                Upgrade Now
-              </button>
-            </div>
-          )}
-            <Outlet context={{ currencyCode, isBypass }} />
+            {/* 🔥 PASS BILLING STATUS TO ALL PAGES */}
+            <Outlet context={{ currencyCode, isBypass, hasActivePlan }} />
           </>
         )}
-      </Frame> {/* 🔥 CRITICAL FIX */}
+      </Frame>
     </PolarisProvider>
   );
 
@@ -219,19 +172,13 @@ const handleUpgrade = async () => {
     return AppContent;
   }
 
-  // ================= SAFE GUARD =================
-  // 🔥 DO NOT BLOCK UI EVER
+  // ================= APP BRIDGE =================
   if (!apiKey || !host) {
-
-    console.warn("App Bridge not ready:", { apiKey, host });
-
-    return AppContent; // ✅ NEVER return Skeleton here
+    return AppContent;
   }
 
-
-  // ================= APP BRIDGE =================
   return (
-    // @ts-expect-error host required
+    // @ts-expect-error Shopify host requirement
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
       {AppContent}
     </ShopifyAppProvider>
