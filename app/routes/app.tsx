@@ -162,7 +162,6 @@ export default function AppLayout() {
     return;
   }
 
-  // Call server to create billing + get confirmationUrl
   const response = await fetch(
     `/api/billing?shop=${encodeURIComponent(
       shop,
@@ -180,12 +179,11 @@ export default function AppLayout() {
   const { confirmationUrl } = await response.json();
 
   if (!confirmationUrl) {
-    // If you ever return null, just reload /app
+    // fallback: reload app
     window.location.href = `/app?shop=${shop}&host=${hostParam}&embedded=1`;
     return;
   }
 
-  // ✅ This is the critical line: top-level redirect via App Bridge
   const redirect = Redirect.create(app);
   redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
 };
@@ -232,7 +230,7 @@ export default function AppLayout() {
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
                   <Button variant="primary" onClick={handleStartTrial}>
-                    Start Free Trial
+                    Start Free Trial 1
                   </Button>
                   </BlockStack>
                 </Card>

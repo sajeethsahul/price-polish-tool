@@ -1,4 +1,3 @@
-// app/routes/api.billing.ts
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
@@ -12,21 +11,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing, session } = await authenticate.admin(request);
 
   const shop = session.shop;
+  if (!shop) {
+    throw new Response("Missing shop in session", { status: 401 });
+  }
+
   let host = url.searchParams.get("host");
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  const APP_URL = process.env.SHOPIFY_APP_URL!;
-  // Detect return is no longer used once returnUrl goes to /app, so you can remove:
-  // const hasChargeId = url.searchParams.has("charge_id");
+  const APP_URL = process.env.SHOPIFY_APP_URL;
+  if (!APP_URL) {
+    throw new Error("SHOPIFY_APP_URL missing");
+  }
 
   const rawResult = await billing.request({
     plan: "basic",
     isTest: true,
     trialDays: 7,
-    // After approval, Shopify will go here (embedded app)
+    // ⬇️ critical: back into your embedded app route
     returnUrl: `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`,
   });
 
