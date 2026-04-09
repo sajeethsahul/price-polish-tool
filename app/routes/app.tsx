@@ -3,6 +3,7 @@ import {
   Link,
   useLoaderData,
   useNavigation,
+  useNavigate,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
@@ -16,6 +17,9 @@ import {
   Loading,
   BlockStack,
   Frame,
+  Page,
+  Text,
+  Button,
 } from "@shopify/polaris";
 
 import {
@@ -56,7 +60,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { admin, session, billing } = auth;
 
-  // ================= SESSION SAFETY =================
   if (!session?.shop) {
     const shop = url.searchParams.get("shop");
 
@@ -70,7 +73,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Response("Unauthorized", { status: 401 });
   }
 
-  // ================= HOST =================
   let host = url.searchParams.get("host");
 
   if (!host) {
@@ -78,24 +80,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= BILLING CHECK (SAFE) =================
+  // 🔥 FORCE BILLING TOGGLE
+  const FORCE_BILLING = process.env.NODE_ENV !== "production";
+
   let hasActivePlan = false;
 
-  try {
-    const billingCheck = await billing.check({
-      plans: ["basic"],
-      isTest: true,
-    });
+  if (!FORCE_BILLING) {
+    try {
+      const billingCheck = await billing.check({
+        plans: ["basic"],
+        isTest: true,
+      });
 
-    hasActivePlan = billingCheck?.hasActivePayment || false;
+      console.log("[BILLING RAW]", billingCheck);
 
-    console.log("[BILLING STATUS]", hasActivePlan ? "ACTIVE" : "INACTIVE");
-  } catch (err) {
-    console.error("[BILLING ERROR]", err);
+      hasActivePlan = billingCheck?.hasActivePayment || false;
+    } catch (err) {
+      console.error("[BILLING ERROR]", err);
+      hasActivePlan = false;
+    }
+  } else {
+    // 🔥 DEV MODE → ALWAYS SHOW BILLING
     hasActivePlan = false;
   }
 
-  // ================= SHOP DATA =================
   let currencyCode = "USD";
 
   try {
@@ -126,6 +134,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppLayout() {
   const data = useLoaderData() as any;
   const navigation = useNavigation();
+  const navigate = useNavigate();
 
   const isLoading = navigation.state === "loading";
 
@@ -159,26 +168,45 @@ export default function AppLayout() {
               </NavMenu>
             )}
 
-            {/* 🔥 PASS BILLING STATUS TO ALL PAGES */}
-            <Outlet context={{ currencyCode, isBypass, hasActivePlan }} />
+            {/* 🔥 BILLING UI (GLOBAL CONTROL) */}
+            {!hasActivePlan ? (
+              <Page title="Start Free Trial">
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Unlock Price Polish 🚀
+                    </Text>
+                    <Text as="p">
+                      Start your 7-day free trial to activate pricing automation.
+                    </Text>
+                    <Button
+                      variant="primary"
+                      onClick={() => navigate("/api/billing")}
+                    >
+                      Start Free Trial
+                    </Button>
+                  </BlockStack>
+                </Card>
+              </Page>
+            ) : (
+              <Outlet context={{ currencyCode, isBypass, hasActivePlan }} />
+            )}
           </>
         )}
       </Frame>
     </PolarisProvider>
   );
 
-  // ================= BYPASS =================
   if (isBypass) {
     return AppContent;
   }
 
-  // ================= APP BRIDGE =================
   if (!apiKey || !host) {
     return AppContent;
   }
 
   return (
-    // @ts-expect-error Shopify host requirement
+    // @ts-expect-error
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
       {AppContent}
     </ShopifyAppProvider>
