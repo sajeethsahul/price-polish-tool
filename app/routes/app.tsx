@@ -33,7 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       currencyCode: "USD",
       host: null,
       isBypass: true,
-      hasActivePlan: false,
+      hasActivePlan: true, // 🔥 always true
     };
   }
 
@@ -55,13 +55,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw err;
   }
 
-  const { admin, session, billing: billingApi } = auth;
+  const { admin, session } = auth;
 
   // ================= SESSION RECOVERY =================
   if (!session?.shop && !pathname.includes("/auth/session-token")) {
     const shopFromUrl = url.searchParams.get("shop");
-
-    console.warn("⚠️ NO SESSION → recovering", { shopFromUrl });
 
     if (shopFromUrl) {
       throw new Response(null, {
@@ -82,46 +80,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   if (!host) {
-    console.error("❌ HOST MISSING — forcing auth");
-
     throw new Response(null, {
       status: 302,
       headers: { Location: `/auth?shop=${session.shop}` },
     });
   }
 
-  // ================= BILLING CHECK =================
-  let hasActivePlan = false;
-
-  try {
-    const billingCheck = await billingApi.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    hasActivePlan = billingCheck?.hasActivePayment || false;
-
-    console.log("[BILLING STATUS]", hasActivePlan ? "ACTIVE" : "INACTIVE");
-
-    // 🔥 ONLY trigger billing IF:
-    // - no plan
-    // - NOT returning from billing (VERY IMPORTANT FIX)
-    const hasChargeId = url.searchParams.has("charge_id");
-
-    if (!hasActivePlan && !hasChargeId) {
-      console.log("[BILLING] Triggering request...");
-
-      return billingApi.request({
-        plan: "basic",
-        isTest: true,
-        returnUrl: `${process.env.SHOPIFY_APP_URL}/app?shop=${session.shop}&host=${host}&embedded=1`,
-      });
-    }
-
-  } catch (err) {
-    console.error("[BILLING ERROR]", err);
-    hasActivePlan = false;
-  }
+  // ================= 🔥 BILLING DISABLED =================
+  const hasActivePlan = true; // 🔥 FORCE ENABLE
 
   // ================= DATA =================
   let currencyCode = "USD";
@@ -147,7 +113,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCode,
     host,
     isBypass: false,
-    hasActivePlan:true,
+    hasActivePlan,
   };
 };
 
