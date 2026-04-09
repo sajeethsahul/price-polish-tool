@@ -28,6 +28,9 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { useAppBridge } from "@shopify/app-bridge-react";
+
+
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -139,6 +142,7 @@ export default function AppLayout() {
   const isLoading = navigation.state === "loading";
 
   const { apiKey, host, currencyCode, isBypass, hasActivePlan } = data;
+  const app = useAppBridge() as any;
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
@@ -179,16 +183,19 @@ export default function AppLayout() {
                     <Text as="p">
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          if (typeof window !== "undefined") {
-                            window.open("/api/billing", "_top");
-                          }
-                        }}
-                      >
-                        Start Free Trial
-                      </Button>                                          
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        if (!app) return;
+
+                        app.redirect.dispatch(
+                          app.redirect.Action.REMOTE,
+                          "/api/billing"
+                        );
+                      }}
+                    >
+                      Start Free Trial
+                    </Button>                                         
                   </BlockStack>
                 </Card>
               </Page>
