@@ -5,24 +5,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const url = new URL(request.url);
 
+    console.log("🔥 BILLING HIT:", request.url);
+
     const APP_URL = process.env.SHOPIFY_APP_URL;
 
     if (!APP_URL) {
       throw new Error("SHOPIFY_APP_URL missing");
     }
 
-
-
-    console.log("🔥 BILLING HIT:", request.url);
-
     // ================= AUTH =================
-    const auth = await authenticate.admin(request);
-
-    if (!auth) {
-      throw new Error("Auth failed");
-    }
-
-    const { billing, session } = auth;
+    const { billing, session } = await authenticate.admin(request);
 
     if (!session?.shop) {
       throw new Error("Missing session.shop");
@@ -46,16 +38,40 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log("✅ RETURN URL:", returnUrl);
 
     // ================= BILLING =================
-    const result = await billing.request({
-      plan: "basic",
-      isTest: true,
-      trialDays: 7,
-      returnUrl,
-    });
+    try {
+      const result = await billing.request({
+        plan: "basic",
+        isTest: true,
+        trialDays: 7,
+        returnUrl,
+      });
 
-    console.log("✅ BILLING REQUEST SUCCESS");
+      console.log("✅ BILLING REQUEST SUCCESS");
+      return result;
 
-    return result;
+    } catch (err: any) {
+      console.error("❌ BILLING ERROR:", err);
+
+      // 🔥 HANDLE SHOPIFY 401 REAUTH (CRITICAL)
+      if (err instanceof Response) {
+        const reauthUrl = err.headers.get(
+          "X-Shopify-API-Request-Failure-Reauthorize-Url"
+        );
+
+        if (reauthUrl) {
+          console.log("🔁 REAUTH REDIRECT:", reauthUrl);
+
+          return new Response(null, {
+            status: 302,
+            headers: {
+              Location: reauthUrl,
+            },
+          });
+        }
+      }
+
+      throw err;
+    }
 
   } catch (err: any) {
     console.error("❌ BILLING CRASH:", err);
@@ -63,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return new Response(
       JSON.stringify({
         error: true,
-        message: err?.message || "Unknown error",
+        message: err?.message || "Billing failed",
       }),
       { status: 500 }
     );
