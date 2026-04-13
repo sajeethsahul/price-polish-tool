@@ -38,43 +38,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log("✅ RETURN URL:", returnUrl);
 
     // ================= BILLING =================
-    try {
-      const result: any = await billing.request({
-        plan: "basic",
-        isTest: true,
-        trialDays: 7,
-        returnUrl,
-      });
+    const result: any = await billing.request({
+      plan: "basic",
+      isTest: true,
+      trialDays: 7,
+      returnUrl,
+    });
 
-      console.log("✅ BILLING REQUEST TRIGGERED");
+    console.log("✅ BILLING REQUEST TRIGGERED");
 
-      // 🔥 SAFE CHECK (instead of instanceof)
-      if (result && typeof result === "object" && "status" in result) {
-        return result;
-      }
-
+    // 🔥 HANDLE REDIRECT RESPONSE
+    if (result && typeof result === "object" && "status" in result) {
       return result;
-
-    } catch (err: any) {
-      console.error("❌ BILLING ERROR:", err);
-
-      // 🔥 HANDLE SHOPIFY RESPONSE (302 / 401)
-      if (err && typeof err === "object" && "status" in err) {
-        console.log("🔁 RETURNING SHOPIFY RESPONSE:", err.status);
-        return err;
-      }
-
-      return new Response(
-        JSON.stringify({
-          error: true,
-          message: err?.message || "Billing failed",
-        }),
-        { status: 500 }
-      );
     }
+
+    return result;
 
   } catch (err: any) {
     console.error("❌ BILLING CRASH:", err);
+
+    // 🔥🔥🔥 FINAL FIX — HANDLE RESPONSE HERE ALSO
+    if (err && typeof err === "object" && "status" in err) {
+      console.log("🔁 RETURNING SHOPIFY RESPONSE FROM OUTER:", err.status);
+      return err;
+    }
 
     return new Response(
       JSON.stringify({
