@@ -46,28 +46,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         returnUrl,
       });
 
-      console.log("✅ BILLING REQUEST SUCCESS");
+      console.log("✅ BILLING REQUEST TRIGGERED");
+
+      // 🔥 IMPORTANT: Shopify may return Response (302)
+      if (result instanceof Response) {
+        return result;
+      }
+
       return result;
 
     } catch (err: any) {
       console.error("❌ BILLING ERROR:", err);
 
-      // 🔥 HANDLE SHOPIFY 401 REAUTH (CRITICAL)
+      // 🔥 HANDLE ALL SHOPIFY RESPONSE ERRORS (302 / 401 etc)
       if (err instanceof Response) {
-        const reauthUrl = err.headers.get(
-          "X-Shopify-API-Request-Failure-Reauthorize-Url"
-        );
+        console.log("🔁 FORWARDING SHOPIFY RESPONSE:", err.status);
 
-        if (reauthUrl) {
-          console.log("🔁 REAUTH REDIRECT:", reauthUrl);
-
-          return new Response(null, {
-            status: 302,
-            headers: {
-              Location: reauthUrl,
-            },
-          });
-        }
+        // Directly return Shopify response (CRITICAL FIX)
+        return err;
       }
 
       throw err;
