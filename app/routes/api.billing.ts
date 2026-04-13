@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     plan: "basic",
     isTest: true,
     trialDays: 7,
-    returnUrl: `/app?shop=${shop}&host=${host}&embedded=1`,
+    returnUrl: `https://price-polish-tool.onrender.com/shopify/billing/success?shop=${shop}&host=${host}&embedded=1`,
   });
 
   const result = rawResult as BillingRequestResult;
