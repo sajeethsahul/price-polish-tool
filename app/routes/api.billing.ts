@@ -26,13 +26,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Error("SHOPIFY_APP_URL missing");
   }
 
-      // app/routes/api.billing.ts
-      const rawResult = await billing.request({
-        plan: "basic",
-        isTest: true,
-        trialDays: 7,
-        returnUrl: `https://price-polish-tool.onrender.com/app?shop=${shop}&host=${host}&embedded=1`,
-      });
+  // app/routes/api.billing.ts
+  const rawResult = await billing.request({
+    plan: "basic",
+    isTest: true,
+    trialDays: 7,
+    returnUrl: `/app?shop=${shop}&host=${host}&embedded=1`,
+  });
 
   const result = rawResult as BillingRequestResult;
 
