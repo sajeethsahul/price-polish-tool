@@ -5,6 +5,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const url = new URL(request.url);
 
+    const APP_URL = process.env.SHOPIFY_APP_URL;
+
+    if (!APP_URL) {
+      throw new Error("SHOPIFY_APP_URL missing");
+    }
+
+
+
     console.log("🔥 BILLING HIT:", request.url);
 
     // ================= AUTH =================
@@ -33,7 +41,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log("✅ SESSION:", { shop, host });
 
     // ================= RETURN URL =================
-    const returnUrl = `/app?shop=${shop}&host=${host}&embedded=1`;
+    const returnUrl = `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`;
 
     console.log("✅ RETURN URL:", returnUrl);
 
