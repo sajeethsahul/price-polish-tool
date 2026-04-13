@@ -37,6 +37,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   console.log("[BULK] SESSION", { shop });
 
   // ================= BILLING PROTECTION =================
+  // ================= BILLING PROTECTION =================
   let hasActivePlan = false;
 
   try {
@@ -51,8 +52,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.error("[BULK] BILLING CHECK ERROR:", err);
   }
 
+  // 🔥 ADD THIS
+  const url = new URL(request.url);
+  const hasChargeId = url.searchParams.has("charge_id");
+
   // 🚨 BLOCK FREE USERS
-  if (!hasActivePlan) {
+  if (!hasActivePlan && !hasChargeId) {
     console.warn("[BULK] BLOCKED - FREE USER");
 
     return cors(new Response(
@@ -63,6 +68,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { status: 403, headers: { "Content-Type": "application/json" } },
     ));
   }
+
+
 
   // ================= MAIN LOGIC =================
   try {
@@ -187,8 +194,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       failedCount === 0
         ? "BULK_SUCCESS"
         : successCount > 0
-        ? "BULK_PARTIAL_FAILURE"
-        : "BULK_TOTAL_FAILURE";
+          ? "BULK_PARTIAL_FAILURE"
+          : "BULK_TOTAL_FAILURE";
 
     console.log("[BULK] COMPLETE", {
       shop,

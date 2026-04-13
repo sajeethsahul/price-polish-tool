@@ -1,4 +1,3 @@
-// app/routes/app.tsx
 import {
   Outlet,
   Link,
@@ -6,6 +5,7 @@ import {
   useNavigation,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { useEffect } from "react";
 
 import {
   AppProvider as PolarisProvider,
@@ -27,17 +27,13 @@ import {
 } from "@shopify/shopify-app-react-router/react";
 
 import { NavMenu } from "@shopify/app-bridge-react";
-import { useAppBridge } from "@shopify/app-bridge-react";
-import { Redirect } from "@shopify/app-bridge/actions";
-
 import { authenticate } from "../shopify.server";
 
-// =============== LOADER ===============
+// ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
-  // 🔁 BYPASS MODE (local/test without Shopify)
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -52,7 +48,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     auth = await authenticate.admin(request);
   } catch (err: any) {
-    // Handle redirects thrown by authenticate.admin
     if (err?.headers?.get && err.headers.get("Location")) {
       throw new Response(null, {
         status: 302,
@@ -83,12 +78,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // 🔥 FORCE BILLING IN DEV: always show paywall
-  const FORCE_BILLING = process.env.NODE_ENV !== "production";
+  // 🔥 HANDLE BILLING STATE
+  const hasChargeId = url.searchParams.has("charge_id");
 
   let hasActivePlan = false;
 
-  if (!FORCE_BILLING) {
+  if (hasChargeId) {
+    console.log("💰 Billing approved → unlock UI");
+    hasActivePlan = true;
+  } else {
     try {
       const billingCheck = await billing.check({
         plans: ["basic"],
@@ -96,16 +94,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       });
 
       console.log("[BILLING RAW]", billingCheck);
+
       hasActivePlan = billingCheck?.hasActivePayment || false;
     } catch (err) {
       console.error("[BILLING ERROR]", err);
       hasActivePlan = false;
     }
-  } else {
-    // DEV → always show billing gate
-    hasActivePlan = false;
   }
 
+  // ================= CURRENCY =================
   let currencyCode = "USD";
 
   try {
@@ -132,44 +129,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-// =============== COMPONENT ===============
+// ================= COMPONENT =================
 export default function AppLayout() {
-  const data = useLoaderData() as {
-    apiKey: string | null;
-    currencyCode: string;
-    host: string | null;
-    isBypass: boolean;
-    hasActivePlan: boolean;
-  };
-
+  const data = useLoaderData() as any;
   const navigation = useNavigation();
-  const isLoading = navigation.state === "loading";
 
+  const isLoading = navigation.state === "loading";
   const { apiKey, host, currencyCode, isBypass, hasActivePlan } = data;
 
-  const app = useAppBridge() as any;
-
-  // 🔥 Billing button handler with App Bridge v4
-  const handleStartTrial = () => {
-    if (typeof window === "undefined") return;
-
+  // 🔥 CLEAN charge_id AFTER RETURN
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
+    if (params.has("charge_id")) {
+      console.log("🧹 Cleaning charge_id from URL");
+      window.location.replace(window.location.pathname);
+    }
+  }, []);
+
+  // 🔥 BILLING BUTTON
+  const handleStartTrial = () => {
+    const params = new URLSearchParams(window.location.search);
     const shop = params.get("shop");
     const host = params.get("host");
 
-    if (!shop || !host) {
-      console.error("❌ Missing shop/host");
-      return;
-    }
+    if (!shop || !host) return;
 
     const url = `/api/billing?shop=${encodeURIComponent(
       shop
     )}&host=${encodeURIComponent(host)}`;
 
-    console.log("🚀 Billing redirect:", url);
-
-    // 🔥 CRITICAL: break out of iframe + avoid fetch
     window.open(url, "_top");
   };
 
@@ -194,16 +183,13 @@ export default function AppLayout() {
           <>
             {!isBypass && (
               <NavMenu>
-                <Link to="/app" rel="home">
-                  Dashboard
-                </Link>
+                <Link to="/app">Dashboard</Link>
                 <Link to="/app/rules">Pricing Rules</Link>
                 <Link to="/app/settings">Settings</Link>
-                <Link to="/app/help">Help Guide</Link>
+                <Link to="/app/help">Help</Link>
               </NavMenu>
             )}
 
-            {/* 🔥 Global billing gate */}
             {!hasActivePlan ? (
               <Page title="Start Free Trial">
                 <Card>
@@ -212,21 +198,17 @@ export default function AppLayout() {
                       Unlock Price Polish
                     </Text>
                     <Text as="p">
-                      Start your 7-day free trial to activate pricing automation.
+                      Start your 7-day free trial.
                     </Text>
                     <Button variant="primary" onClick={handleStartTrial}>
-                      Start Free Trial n
+                      Start Free Trial
                     </Button>
                   </BlockStack>
                 </Card>
               </Page>
             ) : (
               <Outlet
-                context={{
-                  currencyCode,
-                  isBypass,
-                  hasActivePlan,
-                }}
+                context={{ currencyCode, isBypass, hasActivePlan }}
               />
             )}
           </>
@@ -235,18 +217,10 @@ export default function AppLayout() {
     </PolarisProvider>
   );
 
-  // Bypass mode: no ShopifyAppProvider wrapper
-  if (isBypass) {
-    return AppContent;
-  }
-
-  // If API key or host missing, still render app (will show error in console)
-  if (!apiKey || !host) {
-    return AppContent;
-  }
+  if (isBypass || !apiKey || !host) return AppContent;
 
   return (
-    // @ts-expect-error Shopify app provider typing
+    // @ts-expect-error
     <ShopifyAppProvider apiKey={apiKey} host={host} embedded>
       {AppContent}
     </ShopifyAppProvider>
