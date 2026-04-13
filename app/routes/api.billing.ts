@@ -39,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // ================= BILLING =================
     try {
-      const result = await billing.request({
+      const result: any = await billing.request({
         plan: "basic",
         isTest: true,
         trialDays: 7,
@@ -48,8 +48,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       console.log("✅ BILLING REQUEST TRIGGERED");
 
-      // 🔥 IMPORTANT: Shopify may return Response (302)
-      if (result instanceof Response) {
+      // 🔥 SAFE CHECK (instead of instanceof)
+      if (result && typeof result === "object" && "status" in result) {
         return result;
       }
 
@@ -58,15 +58,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } catch (err: any) {
       console.error("❌ BILLING ERROR:", err);
 
-      // 🔥 HANDLE ALL SHOPIFY RESPONSE ERRORS (302 / 401 etc)
-      if (err instanceof Response) {
-        console.log("🔁 FORWARDING SHOPIFY RESPONSE:", err.status);
-
-        // Directly return Shopify response (CRITICAL FIX)
+      // 🔥 HANDLE SHOPIFY RESPONSE (302 / 401)
+      if (err && typeof err === "object" && "status" in err) {
+        console.log("🔁 RETURNING SHOPIFY RESPONSE:", err.status);
         return err;
       }
 
-      throw err;
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: err?.message || "Billing failed",
+        }),
+        { status: 500 }
+      );
     }
 
   } catch (err: any) {
