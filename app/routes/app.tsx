@@ -150,43 +150,28 @@ export default function AppLayout() {
   const app = useAppBridge() as any;
 
   // 🔥 Billing button handler with App Bridge v4
- const handleStartTrial = async () => {
-  if (typeof window === "undefined") return;
+  const handleStartTrial = () => {
+    if (typeof window === "undefined") return;
 
-  const params = new URLSearchParams(window.location.search);
-  const shop = params.get("shop");
-  const hostParam = params.get("host");
+    const params = new URLSearchParams(window.location.search);
 
-  if (!shop || !hostParam) {
-    console.error("Missing shop/host in query params");
-    return;
-  }
+    const shop = params.get("shop");
+    const host = params.get("host");
 
-  const response = await fetch(
-    `/api/billing?shop=${encodeURIComponent(
-      shop,
-    )}&host=${encodeURIComponent(hostParam)}`,
-    {
-      credentials: "include",
-    },
-  );
+    if (!shop || !host) {
+      console.error("❌ Missing shop/host");
+      return;
+    }
 
-  if (!response.ok) {
-    console.error("Billing request failed", response.status);
-    return;
-  }
+    const url = `/api/billing?shop=${encodeURIComponent(
+      shop
+    )}&host=${encodeURIComponent(host)}`;
 
-  const { confirmationUrl } = await response.json();
+    console.log("🚀 Billing redirect:", url);
 
-  if (!confirmationUrl) {
-    // fallback: reload app
-    window.location.href = `/app?shop=${shop}&host=${hostParam}&embedded=1`;
-    return;
-  }
-
-  const redirect = Redirect.create(app);
-  redirect.dispatch(Redirect.Action.REMOTE, confirmationUrl);
-};
+    // 🔥 CRITICAL: break out of iframe + avoid fetch
+    window.open(url, "_top");
+  };
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
@@ -229,9 +214,9 @@ export default function AppLayout() {
                     <Text as="p">
                       Start your 7-day free trial to activate pricing automation.
                     </Text>
-                  <Button variant="primary" onClick={handleStartTrial}>
-                    Start Free Trial 2
-                  </Button>
+                    <Button variant="primary" onClick={handleStartTrial}>
+                      Start Free Trial n
+                    </Button>
                   </BlockStack>
                 </Card>
               </Page>
