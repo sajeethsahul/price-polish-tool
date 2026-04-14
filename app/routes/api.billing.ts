@@ -72,12 +72,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       );
 
     } catch (err: any) {
-      console.error("❌ BILLING ERROR:", err);
+      console.error("❌ BILLING CRASH:", err);
 
-      // ✅ FINAL FIX — DO NOT TOUCH RESPONSE
+      // 🔥🔥🔥 CRITICAL FIX — HANDLE SHOPIFY RESPONSE HERE
       if (err instanceof Response) {
-        console.log("🔁 Returning Shopify Response directly");
-        return err; // 🔥 THIS IS THE KEY FIX
+        console.log("🔁 OUTER: Returning Shopify Response directly");
+        return err;
       }
 
       return new Response(
