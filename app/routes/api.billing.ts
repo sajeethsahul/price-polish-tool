@@ -47,7 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       console.log("✅ BILLING RESULT:", result);
 
-      // ✅ CASE 1 — confirmationUrl exists
+      // ✅ CASE 1 — confirmationUrl
       if (result?.confirmationUrl) {
         console.log("➡️ Redirecting to confirmationUrl");
 
@@ -59,7 +59,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
       }
 
-      // ❗ FAIL FAST (no silent fallback)
+      // ❗ FAIL FAST
       console.error("❌ No confirmationUrl returned");
 
       return new Response(
@@ -74,14 +74,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } catch (err: any) {
       console.error("❌ BILLING ERROR:", err);
 
-      // ✅ CASE 2 — Shopify throws redirect Response
+      // ✅ FINAL FIX — DO NOT TOUCH RESPONSE
       if (err instanceof Response) {
-        console.log("➡️ Returning Shopify redirect response");
-
-        return err; // 🔥 CRITICAL FIX
+        console.log("🔁 Returning Shopify Response directly");
+        return err; // 🔥 THIS IS THE KEY FIX
       }
 
-      throw err;
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: err?.message || "Billing failed",
+        }),
+        { status: 500 }
+      );
     }
 
   } catch (err: any) {
