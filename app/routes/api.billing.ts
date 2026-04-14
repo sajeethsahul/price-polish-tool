@@ -2,13 +2,12 @@ import { authenticate } from "../shopify.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  try {
-    const url = new URL(request.url);
+  const url = new URL(request.url);
 
+  try {
     console.log("🔥 BILLING HIT:", request.url);
 
     const APP_URL = process.env.SHOPIFY_APP_URL;
-
     if (!APP_URL) {
       throw new Error("SHOPIFY_APP_URL missing");
     }
@@ -38,30 +37,55 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log("✅ RETURN URL:", returnUrl);
 
     // ================= BILLING =================
-    const result: any = await billing.request({
-      plan: "basic",
-      isTest: true,
-      trialDays: 7,
-      returnUrl,
-    });
+    try {
+      const result: any = await billing.request({
+        plan: "basic",
+        isTest: true,
+        trialDays: 7,
+        returnUrl,
+      });
 
-    console.log("✅ BILLING REQUEST TRIGGERED");
+      console.log("✅ BILLING RESULT:", result);
 
-    // 🔥 HANDLE REDIRECT RESPONSE
-    if (result && typeof result === "object" && "status" in result) {
-      return result;
+      // ✅ CASE 1 — confirmationUrl exists
+      if (result?.confirmationUrl) {
+        console.log("➡️ Redirecting to confirmationUrl");
+
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: result.confirmationUrl,
+          },
+        });
+      }
+
+      // ❗ FAIL FAST (no silent fallback)
+      console.error("❌ No confirmationUrl returned");
+
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: "Billing did not return confirmationUrl",
+          debug: result,
+        }),
+        { status: 500 }
+      );
+
+    } catch (err: any) {
+      console.error("❌ BILLING ERROR:", err);
+
+      // ✅ CASE 2 — Shopify throws redirect Response
+      if (err instanceof Response) {
+        console.log("➡️ Returning Shopify redirect response");
+
+        return err; // 🔥 CRITICAL FIX
+      }
+
+      throw err;
     }
-
-    return result;
 
   } catch (err: any) {
     console.error("❌ BILLING CRASH:", err);
-
-    // 🔥🔥🔥 FINAL FIX — HANDLE RESPONSE HERE ALSO
-    if (err && typeof err === "object" && "status" in err) {
-      console.log("🔁 RETURNING SHOPIFY RESPONSE FROM OUTER:", err.status);
-      return err;
-    }
 
     return new Response(
       JSON.stringify({

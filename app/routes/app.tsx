@@ -150,15 +150,18 @@ export default function AppLayout() {
   // 🔥 BILLING BUTTON
   const handleStartTrial = () => {
     const params = new URLSearchParams(window.location.search);
+
     const shop = params.get("shop");
     const host = params.get("host");
 
-    if (!shop || !host) return;
+    if (!shop || !host) {
+      console.error("Missing shop/host");
+      return;
+    }
 
-    const url = `/api/billing?shop=${encodeURIComponent(
-      shop
-    )}&host=${encodeURIComponent(host)}`;
+    const url = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
 
+    // ✅ MUST BREAK OUT OF IFRAME
     window.open(url, "_top");
   };
 
