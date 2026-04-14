@@ -17,16 +17,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     // 🔥 CRITICAL FIX — FORCE SESSION
     if (!auth?.session?.shop) {
-      const shop = url.searchParams.get("shop");
-
-      console.log("⚠️ NO SESSION → redirecting to /auth");
-
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: `/auth?shop=${shop}`,
-        },
-      });
+      console.log("⚠️ NO SESSION → returning Shopify auth response");
+      return auth; // ✅ correct
     }
 
     const { billing, session } = auth;
