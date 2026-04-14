@@ -13,12 +13,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     // ================= AUTH =================
-    const { billing, session } = await authenticate.admin(request);
+    const auth = await authenticate.admin(request);
 
-    if (!session?.shop) {
-      throw new Error("Missing session.shop");
+    // 🔥 CRITICAL FIX — FORCE SESSION
+    if (!auth?.session?.shop) {
+      const shop = url.searchParams.get("shop");
+
+      console.log("⚠️ NO SESSION → redirecting to /auth");
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: `/auth?shop=${shop}`,
+        },
+      });
     }
 
+    const { billing, session } = auth;
     const shop = session.shop;
 
     // ================= HOST =================
@@ -72,11 +83,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       );
 
     } catch (err: any) {
-      console.error("❌ BILLING CRASH:", err);
+      console.error("❌ BILLING ERROR:", err);
 
-      // 🔥🔥🔥 CRITICAL FIX — HANDLE SHOPIFY RESPONSE HERE
+      // 🔥 CRITICAL — ALWAYS RETURN SHOPIFY RESPONSE
       if (err instanceof Response) {
-        console.log("🔁 OUTER: Returning Shopify Response directly");
+        console.log("🔁 Returning Shopify Response directly");
         return err;
       }
 
@@ -91,6 +102,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   } catch (err: any) {
     console.error("❌ BILLING CRASH:", err);
+
+    // 🔥 HANDLE OUTER RESPONSE ALSO
+    if (err instanceof Response) {
+      console.log("🔁 OUTER: Returning Shopify Response directly");
+      return err;
+    }
 
     return new Response(
       JSON.stringify({
