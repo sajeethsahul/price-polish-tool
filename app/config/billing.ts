@@ -3,7 +3,7 @@ export const BILLING_PLANS = {
     name: "basic",
     amount: 6.99,
     currencyCode: "USD",
-    interval: "EVERY_30_DAYS",
+    interval: "Every30Days",
     trialDays: 7,
   },
 };
