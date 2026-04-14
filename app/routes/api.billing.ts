@@ -4,9 +4,9 @@ import type { LoaderFunctionArgs } from "react-router";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
-  try {
-    console.log("🔥 BILLING HIT:", request.url);
+  console.log("🔥 BILLING HIT:", request.url);
 
+  try {
     const APP_URL = process.env.SHOPIFY_APP_URL;
     if (!APP_URL) {
       throw new Error("SHOPIFY_APP_URL missing");
@@ -15,10 +15,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // ================= AUTH =================
     const auth = await authenticate.admin(request);
 
-    // 🔥 CRITICAL FIX — FORCE SESSION
+    // ✅ Let Shopify handle auth redirect automatically
     if (!auth?.session?.shop) {
       console.log("⚠️ NO SESSION → returning Shopify auth response");
-      return auth; // ✅ correct
+      return auth;
     }
 
     const { billing, session } = auth;
@@ -29,7 +29,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (!host) {
       const store = shop.replace(".myshopify.com", "");
-      host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
+      host = Buffer.from(
+        `admin.shopify.com/store/${store}`
+      ).toString("base64");
     }
 
     console.log("✅ SESSION:", { shop, host });
@@ -50,7 +52,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       console.log("✅ BILLING RESULT:", result);
 
-      // ✅ CASE 1 — confirmationUrl
+      // ✅ CASE 1 — confirmationUrl returned
       if (result?.confirmationUrl) {
         console.log("➡️ Redirecting to confirmationUrl");
 
@@ -62,14 +64,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
       }
 
-      // ❗ FAIL FAST
+      // ❗ IMPORTANT: If no confirmationUrl, treat as failure
       console.error("❌ No confirmationUrl returned");
 
       return new Response(
         JSON.stringify({
           error: true,
-          message: "Billing did not return confirmationUrl",
-          debug: result,
+          message: "Billing failed: no confirmationUrl",
         }),
         { status: 500 }
       );
@@ -77,27 +78,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     } catch (err: any) {
       console.error("❌ BILLING ERROR:", err);
 
-      // 🔥 CRITICAL — ALWAYS RETURN SHOPIFY RESPONSE
+      // ✅ CRITICAL — Shopify throws redirect as Response
       if (err instanceof Response) {
-        console.log("🔁 Returning Shopify Response directly");
+        console.log("🔁 Returning Shopify redirect response");
         return err;
       }
 
-      return new Response(
-        JSON.stringify({
-          error: true,
-          message: err?.message || "Billing failed",
-        }),
-        { status: 500 }
-      );
+      throw err;
     }
 
   } catch (err: any) {
     console.error("❌ BILLING CRASH:", err);
 
-    // 🔥 HANDLE OUTER RESPONSE ALSO
+    // ✅ Handle outer Response (VERY IMPORTANT)
     if (err instanceof Response) {
-      console.log("🔁 OUTER: Returning Shopify Response directly");
+      console.log("🔁 OUTER: returning Shopify response");
       return err;
     }
 

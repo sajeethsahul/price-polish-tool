@@ -6,7 +6,8 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
-import { BillingInterval } from "@shopify/shopify-api";
+//import { BillingInterval } from "@shopify/shopify-api";
+import { BillingInterval } from "@shopify/shopify-app-react-router/server";
 import { BILLING_PLANS } from "./config/billing";
 
 // 🔥 ENV VALIDATION (STRICT)
@@ -45,18 +46,18 @@ const shopify = shopifyApp({
 
   isEmbeddedApp: true,
 
-    billing: {
-      basic: {
-        lineItems: [
-          {
-            amount: BILLING_PLANS.BASIC.amount,
-            currencyCode: BILLING_PLANS.BASIC.currencyCode,
-            interval: BILLING_PLANS.BASIC.interval as any,
-          },
-        ],
-        trialDays: BILLING_PLANS.BASIC.trialDays,
-      },
+  billing: {
+    basic: {
+      lineItems: [
+        {
+          amount: BILLING_PLANS.BASIC.amount,
+          currencyCode: BILLING_PLANS.BASIC.currencyCode,
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+      trialDays: BILLING_PLANS.BASIC.trialDays,
     },
+  },
 
   // 🔥 REQUIRED for iframe (Render + Shopify)
   cookies: {
