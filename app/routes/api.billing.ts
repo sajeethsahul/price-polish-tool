@@ -22,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing, session } = authOrResponse;
   const shop = session.shop;
 
-  // 2) Resolve host
+  // 2) Resolve host (fallback if not provided)
   let host = url.searchParams.get("host");
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
@@ -31,22 +31,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   console.log("✅ SESSION:", { shop, host });
 
-  // 3) Return URL back into /app
+  // 3) Return URL back into /app (embedded)
   const returnUrl = `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`;
   console.log("✅ RETURN URL:", returnUrl);
 
-  // 4) Billing request
+  // 4) Create billing request
   try {
     const result: any = await billing.request({
-      plan: "basic",          // must match your billing config key
-      isTest: true,           // keep true in dev
-      trialDays: 7,           // or BILLING_PLANS.BASIC.trialDays
+      plan: "basic",   // must match your billing config key
+      isTest: true,    // keep true in dev
+      trialDays: 7,    // or your configured trial length
       returnUrl,
     });
 
     console.log("✅ BILLING RESULT:", result);
 
-    // CASE A: Object with confirmationUrl → redirect to it
+    // CASE A: Object with confirmationUrl → redirect merchant to Shopify approval page
     if (result && typeof result === "object" && "confirmationUrl" in result) {
       console.log("➡️ Redirecting to confirmationUrl");
       return new Response(null, {
