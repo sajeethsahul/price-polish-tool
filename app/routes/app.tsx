@@ -82,25 +82,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const hasChargeId = url.searchParams.has("charge_id");
 
   let hasActivePlan = false;
+  // In app._index.tsx loader, right after authenticate
+  const FORCE_BYPASS_BILLING = true; // set false later
 
   if (hasChargeId) {
     console.log("💰 Billing approved → unlock UI");
     hasActivePlan = true;
   } else {
     try {
-      const billingCheck = await billing.check({
-        plans: ["basic"],
-        isTest: true,
-      });
-
-      console.log("[BILLING RAW-MY TESTING]", billingCheck);
-
-      //hasActivePlan = billingCheck?.hasActivePayment || false;
-      hasActivePlan =
-        billingCheck?.hasActivePayment ||
-        billingCheck?.appSubscriptions?.length > 0 ||
-        billingCheck?.oneTimePurchases?.length > 0 ||
-        false;
+      if (FORCE_BYPASS_BILLING) {
+        hasActivePlan = true;
+      } else {
+        const billingCheck = await billing.check({ isTest: true });
+        console.log("[BILLING RAW FULL]", JSON.stringify(billingCheck, null, 2));
+        hasActivePlan =
+          billingCheck?.hasActivePayment ||
+          billingCheck?.appSubscriptions?.length > 0 ||
+          billingCheck?.oneTimePurchases?.length > 0 ||
+          false;
+      }
     } catch (err) {
       console.error("[BILLING ERROR]", err);
       hasActivePlan = false;
