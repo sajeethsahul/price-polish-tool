@@ -93,9 +93,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         isTest: true,
       });
 
-      console.log("[BILLING RAW]", billingCheck);
+      console.log("[BILLING RAW-MY TESTING]", billingCheck);
 
-      hasActivePlan = billingCheck?.hasActivePayment || false;
+      //hasActivePlan = billingCheck?.hasActivePayment || false;
+      hasActivePlan =
+        billingCheck?.hasActivePayment ||
+        billingCheck?.appSubscriptions?.length > 0 ||
+        billingCheck?.oneTimePurchases?.length > 0 ||
+        false;
     } catch (err) {
       console.error("[BILLING ERROR]", err);
       hasActivePlan = false;
