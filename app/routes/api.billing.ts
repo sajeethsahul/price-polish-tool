@@ -10,10 +10,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Error("SHOPIFY_APP_URL missing");
   }
 
-  // 1) Authenticate admin
+  // ================= AUTH =================
   const authOrResponse = await authenticate.admin(request);
 
-  // Shopify may return a Response (reauth / redirect) – just return it
+  // 🔁 Shopify may return redirect response (reauth)
   if (authOrResponse instanceof Response) {
     console.log("🔁 Returning Shopify auth Response");
     return authOrResponse;
@@ -22,7 +22,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing, session } = authOrResponse;
   const shop = session.shop;
 
-  // 2) Resolve host (fallback if not provided)
+  // ================= HOST =================
   let host = url.searchParams.get("host");
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
@@ -31,56 +31,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   console.log("✅ SESSION:", { shop, host });
 
-  // 3) Return URL back into /app (embedded)
+  // ================= RETURN URL =================
   const returnUrl = `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`;
   console.log("✅ RETURN URL:", returnUrl);
 
-  // 4) Create billing request
+  // ================= BILLING FLOW =================
   try {
-    const result: any = await billing.request({
-      plan: "basic",   // must match your billing config key
-      isTest: true,    // keep true in dev
-      trialDays: 7,    // or your configured trial length
-      returnUrl,
+    console.log("🔥 BILLING REQUIRE FLOW");
+
+    const response = await billing.require({
+      plans: ["basic"],     // MUST match config
+      isTest: true,
+      onFailure: async () => {
+        console.log("➡️ No active plan → creating charge");
+
+        return billing.request({
+          plan: "basic",
+          isTest: true,
+          trialDays: 7,
+          returnUrl,
+        });
+      },
     });
 
-    console.log("✅ BILLING RESULT:", result);
-
-    // CASE A: Object with confirmationUrl → redirect merchant to Shopify approval page
-    if (result && typeof result === "object" && "confirmationUrl" in result) {
-      console.log("➡️ Redirecting to confirmationUrl");
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: result.confirmationUrl,
-        },
-      });
+    // 🔁 VERY IMPORTANT: return Shopify response directly
+    if (response instanceof Response) {
+      console.log("🔁 Returning Shopify billing response");
+      return response;
     }
 
-    // CASE B: Shopify already returned a Response (often 302)
-    if (result instanceof Response) {
-      console.log("🔁 Returning Shopify billing Response");
-      return result;
-    }
+    // ✅ If no redirect → user already has active plan
+    console.log("✅ Active plan already exists");
 
-    // CASE C: Unexpected shape
-    console.error("❌ Billing returned unexpected result", result);
-    return new Response(
-      JSON.stringify({
-        error: true,
-        message: "Billing failed: unexpected result",
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: returnUrl,
       },
-    );
+    });
+
   } catch (err: any) {
     console.error("❌ BILLING ERROR:", err);
 
-    // If Shopify throws a Response (redirect / error), return it
+    // 🔁 Shopify throws Response → MUST return directly
     if (err instanceof Response) {
-      console.log("🔁 Returning thrown Shopify billing Response");
+      console.log("🔁 Returning thrown Shopify billing response");
       return err;
     }
 
@@ -92,7 +87,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      },
+      }
     );
   }
 };
