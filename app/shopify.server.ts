@@ -48,13 +48,9 @@ const shopify = shopifyApp({
 
   billing: {
     basic: {
-      lineItems: [
-        {
-          amount: BILLING_PLANS.BASIC.amount,
-          currencyCode: BILLING_PLANS.BASIC.currencyCode,
-          interval: BillingInterval.Every30Days,
-        },
-      ],
+      amount: BILLING_PLANS.BASIC.amount,
+      currencyCode: BILLING_PLANS.BASIC.currencyCode,
+      interval: BillingInterval.Every30Days as any,
       trialDays: BILLING_PLANS.BASIC.trialDays,
     },
   },
