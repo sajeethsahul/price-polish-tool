@@ -73,7 +73,7 @@ const shopify = shopifyApp({
 export default shopify;
 
 // ✅ REQUIRED EXPORTS
-export const apiVersion = ApiVersion.October25;
+export const apiVersion = ApiVersion.October24;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
