@@ -28,6 +28,7 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { redirect } from "@remix-run/node";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -83,28 +84,39 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   let hasActivePlan = false;
 
-  // ✅ STEP 1 — After approval (temporary unlock)
+  // ✅ STEP 1 — TRUST SHOPIFY REDIRECT
   if (chargeId) {
-    console.log("💰 Charge detected → unlock UI");
+    console.log("💰 Charge detected → unlocking app");
+
     hasActivePlan = true;
-  } else {
-    try {
-      const billingCheck = await billing.check({
-        plans: ["basic"],
-        isTest: true,
-      });
 
-      console.log("[BILLING RAW]", billingCheck);
+    // OPTIONAL: clean URL (recommended)
+    const shop = url.searchParams.get("shop");
+    return redirect(`/app?shop=${shop}&host=${host}&embedded=1`);
+  }
 
-      hasActivePlan =
-        billingCheck?.hasActivePayment ||
-        billingCheck?.appSubscriptions?.length > 0 ||
-        false;
+  // ✅ STEP 2 — CHECK BILLING (REAL STORES)
+  try {
+    const billingCheck = await billing.check({
+      plans: ["basic"],
+      isTest: true,
+    });
 
-    } catch (err) {
-      console.error("[BILLING ERROR]", err);
-      hasActivePlan = false;
-    }
+    console.log("[BILLING RAW]", billingCheck);
+
+    hasActivePlan =
+      billingCheck?.hasActivePayment ||
+      billingCheck?.appSubscriptions?.length > 0;
+
+  } catch (err) {
+    console.error("[BILLING ERROR]", err);
+  }
+
+  // ✅ STEP 3 — DEV BYPASS (IMPORTANT)
+  const FORCE_BYPASS_BILLING = true;
+
+  if (FORCE_BYPASS_BILLING) {
+    hasActivePlan = true;
   }
 
   // ================= CURRENCY =================
