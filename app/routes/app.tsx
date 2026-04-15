@@ -79,69 +79,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   // 🔥 HANDLE BILLING STATE
-  const hasChargeId = url.searchParams.has("charge_id");
-
   const chargeId = url.searchParams.get("charge_id");
+
   let hasActivePlan = false;
 
+  // ✅ STEP 1 — After approval (temporary unlock)
   if (chargeId) {
-    console.log("💰 Charge detected → verifying with Shopify");
-
-    try {
-      const response = await admin.graphql(`
-      mutation {
-        appSubscriptionCreate(
-          name: "basic"
-          returnUrl: "${process.env.SHOPIFY_APP_URL}/app"
-          test: true
-          lineItems: [
-            {
-              plan: {
-                appRecurringPricingDetails: {
-                  price: { amount: 6.99, currencyCode: USD }
-                  interval: EVERY_30_DAYS
-                }
-              }
-            }
-          ]
-        ) {
-          userErrors {
-            field
-            message
-          }
-        }
-      }
-    `);
-
-      console.log("✅ Charge verification done");
-
-    } catch (err) {
-      console.error("❌ Charge verification failed", err);
-    }
-
-    hasActivePlan = true;
-  }
-
-
-  // In app._index.tsx loader, right after authenticate
-  const FORCE_BYPASS_BILLING = true; // set false later
-
-  if (hasChargeId) {
-    console.log("💰 Billing approved → unlock UI");
+    console.log("💰 Charge detected → unlock UI");
     hasActivePlan = true;
   } else {
     try {
-      if (FORCE_BYPASS_BILLING) {
-        hasActivePlan = true;
-      } else {
-        const billingCheck = await billing.check({ isTest: true });
-        console.log("[BILLING RAW FULL]", JSON.stringify(billingCheck, null, 2));
-        hasActivePlan =
-          billingCheck?.hasActivePayment ||
-          billingCheck?.appSubscriptions?.length > 0 ||
-          billingCheck?.oneTimePurchases?.length > 0 ||
-          false;
-      }
+      const billingCheck = await billing.check({
+        plans: ["basic"],
+        isTest: true,
+      });
+
+      console.log("[BILLING RAW]", billingCheck);
+
+      hasActivePlan =
+        billingCheck?.hasActivePayment ||
+        billingCheck?.appSubscriptions?.length > 0 ||
+        false;
+
     } catch (err) {
       console.error("[BILLING ERROR]", err);
       hasActivePlan = false;
