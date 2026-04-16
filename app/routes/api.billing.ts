@@ -41,6 +41,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log("🚀 billing.require triggered");
 
   // 🔥🔥🔥 THIS IS THE FIX
+  try{
   return billing.require({
     plans: ["basic"],
     isTest: true,
@@ -52,6 +53,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         returnUrl,
       });
 
+      console.log("FULL BILLING RESULT:", JSON.stringify(result, null, 2));
+
       if (result?.confirmationUrl) {
         return new Response(null, {
           status: 302,
@@ -60,8 +63,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           },
         });
       }
+      
 
       throw new Error("No confirmationUrl");
     },
   });
+}
+catch (err: any) {
+  console.log("🔥 BILLING THROW FULL:", err);
+
+  if (err instanceof Response) {
+    console.log("🔥 REDIRECT LOCATION:", err.headers.get("Location"));
+    return err;
+  }
+}
 };
