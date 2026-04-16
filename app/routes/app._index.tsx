@@ -526,8 +526,8 @@ useEffect(() => {
         <BlockStack gap="200">
           <InlineStack gap="400" align="space-between">
             <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
-            <Badge tone={typeof window !== "undefined" && window.top && window.top !== window.self ? "success" : "critical"}>
-              {typeof window !== "undefined" && window.top && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
+            <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
+              {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
             </Badge>
           </InlineStack>
           <InlineStack gap="400" align="space-between">

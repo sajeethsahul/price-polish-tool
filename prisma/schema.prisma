@@ -65,3 +65,13 @@ model ActivityLog {
   meta      Json?
   createdAt DateTime @default(now())
 }
+
+model Subscription {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  plan      String
+  status    String   // active | cancelled
+  chargeId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

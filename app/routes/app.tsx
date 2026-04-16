@@ -2,7 +2,7 @@ import {
   Outlet,
   Link,
   useLoaderData,
-  useNavigation,
+  useNavigation,redirect
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useEffect } from "react";
@@ -28,13 +28,16 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { redirect } from "@remix-run/node";
+//import { redirect } from "@remix-run/node";
+import { hasActivePlan } from "../utils/activePlan.server";
+
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const isBypass = url.searchParams.get("bypass") === "true";
 
+  // ✅ DEV BYPASS
   if (isBypass) {
     return {
       apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
@@ -45,6 +48,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     };
   }
 
+  // ================= AUTH =================
   let auth;
   try {
     auth = await authenticate.admin(request);
@@ -58,7 +62,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw err;
   }
 
-  const { admin, session, billing } = auth;
+  const { admin, session } = auth;
 
   if (!session?.shop) {
     const shop = url.searchParams.get("shop");
@@ -73,50 +77,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw new Response("Unauthorized", { status: 401 });
   }
 
+  const shop = session.shop;
+
+  // ================= HOST =================
   let host = url.searchParams.get("host");
   if (!host) {
-    const store = session.shop.replace(".myshopify.com", "");
+    const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // 🔥 HANDLE BILLING STATE
+  // ================= BILLING =================
   const chargeId = url.searchParams.get("charge_id");
 
-  let hasActivePlan = false;
+  let hasPlan = false;
 
-  // ✅ STEP 1 — TRUST SHOPIFY REDIRECT
+  // ✅ STEP 1 — AFTER APPROVAL
   if (chargeId) {
-    console.log("💰 Charge detected → unlocking app");
+    console.log("💰 Charge detected → saving + redirect");
 
-    hasActivePlan = true;
+    // OPTIONAL: here you can save subscription if not already saved
 
-    // OPTIONAL: clean URL (recommended)
-    const shop = url.searchParams.get("shop");
     return redirect(`/app?shop=${shop}&host=${host}&embedded=1`);
   }
 
-  // ✅ STEP 2 — CHECK BILLING (REAL STORES)
+  // ✅ STEP 2 — DB CHECK (REAL SOURCE OF TRUTH)
   try {
-    const billingCheck = await billing.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    console.log("[BILLING RAW]", billingCheck);
-
-    hasActivePlan =
-      billingCheck?.hasActivePayment ||
-      billingCheck?.appSubscriptions?.length > 0;
-
+    hasPlan = await hasActivePlan(shop);
   } catch (err) {
-    console.error("[BILLING ERROR]", err);
-  }
-
-  // ✅ STEP 3 — DEV BYPASS (IMPORTANT)
-  const FORCE_BYPASS_BILLING = true;
-
-  if (FORCE_BYPASS_BILLING) {
-    hasActivePlan = true;
+    console.error("❌ Plan check failed", err);
+    hasPlan = false;
   }
 
   // ================= CURRENCY =================
@@ -142,7 +131,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCode,
     host,
     isBypass,
-    hasActivePlan,
+    hasActivePlan: hasPlan,
   };
 };
 

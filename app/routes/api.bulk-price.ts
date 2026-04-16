@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
+import { requireActivePlan } from "../utils/activePlan.server";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -37,37 +38,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   console.log("[BULK] SESSION", { shop });
 
   // ================= BILLING PROTECTION =================
-  // ================= BILLING PROTECTION =================
-  let hasActivePlan = false;
+try {
+  await requireActivePlan(shop);
+} catch (err) {
+  console.warn("[BULK] BLOCKED - NO ACTIVE PLAN");
 
-  try {
-    const billingCheck = await billingApi.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    hasActivePlan = billingCheck?.hasActivePayment || false;
-
-  } catch (err) {
-    console.error("[BULK] BILLING CHECK ERROR:", err);
-  }
-
-  // 🔥 ADD THIS
-  const url = new URL(request.url);
-  const hasChargeId = url.searchParams.has("charge_id");
-
-  // 🚨 BLOCK FREE USERS
-  if (!hasActivePlan && !hasChargeId) {
-    console.warn("[BULK] BLOCKED - FREE USER");
-
-    return cors(new Response(
+  return cors(
+    new Response(
       JSON.stringify({
         success: false,
         error: "Upgrade required to apply pricing",
       }),
-      { status: 403, headers: { "Content-Type": "application/json" } },
-    ));
-  }
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    )
+  );
+}
 
 
 
