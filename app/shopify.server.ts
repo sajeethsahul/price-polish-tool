@@ -57,7 +57,6 @@ billing: {
     trialDays: BILLING_PLANS.BASIC.trialDays,
   },
 },
-
   // 🔥 REQUIRED for iframe (Render + Shopify)
   cookies: {
     sameSite: "none",
