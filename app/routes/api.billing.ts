@@ -7,18 +7,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
   const chargeId = url.searchParams.get("charge_id");
-  const shop = url.searchParams.get("shop");
+  const shopParam = url.searchParams.get("shop");
 
-  // 🔥 STEP 1 — AFTER APPROVAL (MOST IMPORTANT)
-  if (chargeId && shop) {
-    console.log("💰 Saving subscription:", { shop, chargeId });
+  // 🔥 STEP 1 — AFTER APPROVAL
+  if (chargeId && shopParam) {
+    console.log("💰 Saving subscription:", { shop: shopParam, chargeId });
 
-    await saveSubscription(shop, chargeId);
+    await saveSubscription(shopParam, chargeId);
 
-    return redirect(`/app?shop=${shop}&embedded=1`);
+    return redirect(`/app?shop=${shopParam}&embedded=1`);
   }
 
-  // 🔥 STEP 2 — START BILLING FLOW
+  // 🔥 STEP 2 — AUTH
   const auth = await authenticate.admin(request);
 
   if (auth instanceof Response) {
@@ -27,39 +27,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { billing, session } = auth;
 
-  if (!session?.shop) {
-    throw new Response("Unauthorized", { status: 401 });
-  }
-
-  const currentShop = session.shop;
+  const shop = session.shop;
 
   let host = url.searchParams.get("host");
   if (!host) {
-    const store = currentShop.replace(".myshopify.com", "");
+    const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
   const APP_URL = process.env.SHOPIFY_APP_URL!;
-  const returnUrl = `${APP_URL}/api/billing?shop=${currentShop}&host=${host}`;
+  const returnUrl = `${APP_URL}/api/billing?shop=${shop}&host=${host}`;
 
-  console.log("🚀 Creating billing request");
+  console.log("🚀 billing.require triggered");
 
-  const result: any = await billing.request({
-    plan: "basic",
+  // 🔥🔥🔥 THIS IS THE FIX
+  return billing.require({
+    plans: ["basic"],
     isTest: true,
-    trialDays: 7,
-    returnUrl,
+    onFailure: async () => {
+      const result: any = await billing.request({
+        plan: "basic",
+        isTest: true,
+        trialDays: 7,
+        returnUrl,
+      });
+
+      if (result?.confirmationUrl) {
+        return new Response(null, {
+          status: 302,
+          headers: {
+            Location: result.confirmationUrl,
+          },
+        });
+      }
+
+      throw new Error("No confirmationUrl");
+    },
   });
-
-  // ✅ Redirect to Shopify approval page
-  if (result?.confirmationUrl) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: result.confirmationUrl,
-      },
-    });
-  }
-
-  throw new Error("Billing failed: no confirmationUrl");
 };
