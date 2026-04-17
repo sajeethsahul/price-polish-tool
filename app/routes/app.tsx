@@ -62,15 +62,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // ================= BILLING FLOW =================
   const chargeId = url.searchParams.get("charge_id");
 
-  // 🔥 STEP 1 — AFTER APPROVAL (CRITICAL)
-  if (chargeId) {
-    console.log("💰 Charge detected → saving to DB");
-
-    await saveSubscription(shop, chargeId);
-
-    // ✅ CLEAN URL (VERY IMPORTANT)
-    return redirect(`/app?shop=${shop}&host=${host}&embedded=1`);
-  }
+const subscription = await getSubscription(shop);
+console.log("📦 DB SUBSCRIPTION:", subscription);
 
   // 🔥 STEP 2 — CHECK DB (SOURCE OF TRUTH)
   let hasActivePlan = false;

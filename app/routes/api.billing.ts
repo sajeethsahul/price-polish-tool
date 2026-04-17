@@ -1,82 +1,95 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { saveSubscription } from "../services/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
-  console.log("🔥 BILLING HIT:", request.url);
+  const chargeId = url.searchParams.get("charge_id");
+  const shopParam = url.searchParams.get("shop");
 
-  // ================= AUTH =================
+  // ===============================
+  // ✅ STEP 1 — AFTER APPROVAL
+  // ===============================
+  if (chargeId && shopParam) {
+    console.log("💰 Saving subscription:", { shop: shopParam, chargeId });
+
+    await saveSubscription(shopParam, chargeId);
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `/app?shop=${shopParam}&embedded=1`,
+      },
+    });
+  }
+
+  // ===============================
+  // 🔐 STEP 2 — AUTH
+  // ===============================
   const auth = await authenticate.admin(request);
 
   if (auth instanceof Response) {
     return auth;
   }
 
-  const { billing, session } = auth;
+  const { session, admin } = auth;
   const shop = session.shop;
 
-  // ================= HOST =================
   let host = url.searchParams.get("host");
-
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= RETURN URL =================
   const APP_URL = process.env.SHOPIFY_APP_URL!;
-  const returnUrl = `${APP_URL}/app?shop=${shop}&host=${host}&embedded=1`;
+  const returnUrl = `${APP_URL}/api/billing?shop=${shop}&host=${host}`;
 
-  console.log("✅ RETURN URL:", returnUrl);
+  console.log("🚀 Creating subscription");
 
-  // ================= BILLING =================
-  try {
-    const result: any = await billing.request({
-      plan: "basic",
-      isTest: true,  
-      returnUrl,
-    });
-
-   console.log("🔥 BILLING RESULT FULL:", JSON.stringify(result, null, 2));
-
-    // ✅ CASE 1 — Shopify returns Response
-    if (result instanceof Response) {
-      return result;
+  // ===============================
+  // 💰 STEP 3 — CREATE BILLING
+  // ===============================
+  const response = await admin.graphql(`
+    mutation {
+      appSubscriptionCreate(
+        name: "Basic Plan"
+        returnUrl: "${returnUrl}"
+        test: true
+        lineItems: [
+          {
+            plan: {
+              appRecurringPricingDetails: {
+                price: { amount: 6.99, currencyCode: USD }
+                interval: EVERY_30_DAYS
+              }
+            }
+          }
+        ]
+      ) {
+        confirmationUrl
+        userErrors {
+          message
+        }
+      }
     }
+  `);
 
-    // ✅ CASE 2 — confirmationUrl
-    if (result?.confirmationUrl) {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: result.confirmationUrl,
-        },
-      });
-    }
+  const data = await response.json();
 
-    // ❌ Unexpected
-    return new Response(
-      JSON.stringify({
-        error: true,
-        message: "Billing failed: no confirmationUrl",
-      }),
-      { status: 500 }
-    );
+  console.log("🔥 BILLING RESPONSE:", JSON.stringify(data, null, 2));
 
-  } catch (err: any) {
-    console.error("❌ BILLING ERROR:", err);
+  const confirmationUrl =
+    data?.data?.appSubscriptionCreate?.confirmationUrl;
 
-    if (err instanceof Response) {
-      return err;
-    }
-
-    return new Response(
-      JSON.stringify({
-        error: true,
-        message: err?.message || "Billing failed",
-      }),
-      { status: 500 }
-    );
+  if (!confirmationUrl) {
+    throw new Error("No confirmationUrl");
   }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: confirmationUrl,
+    },
+  });
 };
