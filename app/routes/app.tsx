@@ -2,7 +2,8 @@ import {
   Outlet,
   Link,
   useLoaderData,
-  useNavigation,redirect
+  useNavigation,
+  redirect,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useEffect } from "react";
@@ -28,52 +29,24 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-//import { redirect } from "@remix-run/node";
-import { hasActivePlan } from "../utils/activePlan.server";
+import { saveSubscription } from "../services/billing.server";
+import { getSubscription } from "../services/billing.server";
 
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
-  const isBypass = url.searchParams.get("bypass") === "true";
-
-  // ✅ DEV BYPASS
-  if (isBypass) {
-    return {
-      apiKey: process.env.SHOPIFY_API_KEY ?? "mock-api-key",
-      currencyCode: "USD",
-      host: null,
-      isBypass: true,
-      hasActivePlan: true,
-    };
-  }
 
   // ================= AUTH =================
-  let auth;
-  try {
-    auth = await authenticate.admin(request);
-  } catch (err: any) {
-    if (err?.headers?.get && err.headers.get("Location")) {
-      throw new Response(null, {
-        status: 302,
-        headers: { Location: err.headers.get("Location") },
-      });
-    }
-    throw err;
+  const auth = await authenticate.admin(request);
+
+  if (auth instanceof Response) {
+    return auth;
   }
 
   const { admin, session } = auth;
 
   if (!session?.shop) {
-    const shop = url.searchParams.get("shop");
-
-    if (shop) {
-      throw new Response(null, {
-        status: 302,
-        headers: { Location: `/auth?shop=${shop}` },
-      });
-    }
-
     throw new Response("Unauthorized", { status: 401 });
   }
 
@@ -86,26 +59,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= BILLING =================
+  // ================= BILLING FLOW =================
   const chargeId = url.searchParams.get("charge_id");
 
-  let hasPlan = false;
-
-  // ✅ STEP 1 — AFTER APPROVAL
+  // 🔥 STEP 1 — AFTER APPROVAL (CRITICAL)
   if (chargeId) {
-    console.log("💰 Charge detected → saving + redirect");
+    console.log("💰 Charge detected → saving to DB");
 
-    // OPTIONAL: here you can save subscription if not already saved
+    await saveSubscription(shop, chargeId);
 
+    // ✅ CLEAN URL (VERY IMPORTANT)
     return redirect(`/app?shop=${shop}&host=${host}&embedded=1`);
   }
 
-  // ✅ STEP 2 — DB CHECK (REAL SOURCE OF TRUTH)
+  // 🔥 STEP 2 — CHECK DB (SOURCE OF TRUTH)
+  let hasActivePlan = false;
+
   try {
-    hasPlan = await hasActivePlan(shop);
+    const subscription = await getSubscription(shop);
+    hasActivePlan = subscription?.status === "active";
   } catch (err) {
-    console.error("❌ Plan check failed", err);
-    hasPlan = false;
+    console.error("❌ Subscription check failed", err);
   }
 
   // ================= CURRENCY =================
@@ -128,12 +102,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
-    currencyCode,
     host,
-    isBypass,
-    hasActivePlan: hasPlan,
+    currencyCode,
+    hasActivePlan,
   };
 };
+
 
 // ================= COMPONENT =================
 export default function AppLayout() {
@@ -141,14 +115,13 @@ export default function AppLayout() {
   const navigation = useNavigation();
 
   const isLoading = navigation.state === "loading";
-  const { apiKey, host, currencyCode, isBypass, hasActivePlan } = data;
+  const { apiKey, host, currencyCode, hasActivePlan } = data;
 
-  // 🔥 CLEAN charge_id AFTER RETURN
+  // 🔥 CLEAN charge_id (extra safety)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
     if (params.has("charge_id")) {
-      console.log("🧹 Cleaning charge_id from URL");
       window.location.replace(window.location.pathname);
     }
   }, []);
@@ -160,14 +133,11 @@ export default function AppLayout() {
     const shop = params.get("shop");
     const host = params.get("host");
 
-    if (!shop || !host) {
-      console.error("Missing shop/host");
-      return;
-    }
+    if (!shop || !host) return;
 
-    const url = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
+    const url = `/api/billing?shop=${shop}&host=${host}`;
 
-    // ✅ MUST BREAK OUT OF IFRAME
+    // ✅ MUST break iframe
     window.open(url, "_top");
   };
 
@@ -190,14 +160,12 @@ export default function AppLayout() {
           </SkeletonPage>
         ) : (
           <>
-            {!isBypass && (
-              <NavMenu>
-                <Link to="/app">Dashboard</Link>
-                <Link to="/app/rules">Pricing Rules</Link>
-                <Link to="/app/settings">Settings</Link>
-                <Link to="/app/help">Help</Link>
-              </NavMenu>
-            )}
+            <NavMenu>
+              <Link to="/app">Dashboard</Link>
+              <Link to="/app/rules">Pricing Rules</Link>
+              <Link to="/app/settings">Settings</Link>
+              <Link to="/app/help">Help</Link>
+            </NavMenu>
 
             {!hasActivePlan ? (
               <Page title="Start Free Trial">
@@ -216,9 +184,7 @@ export default function AppLayout() {
                 </Card>
               </Page>
             ) : (
-              <Outlet
-                context={{ currencyCode, isBypass, hasActivePlan }}
-              />
+              <Outlet context={{ currencyCode, hasActivePlan }} />
             )}
           </>
         )}
@@ -226,7 +192,7 @@ export default function AppLayout() {
     </PolarisProvider>
   );
 
-  if (isBypass || !apiKey || !host) return AppContent;
+  if (!apiKey || !host) return AppContent;
 
   return (
     // @ts-expect-error
