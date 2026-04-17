@@ -49,12 +49,12 @@ billing: {
   basic: {
     lineItems: [
       {
-        amount: BILLING_PLANS.BASIC.amount,
-        currencyCode: BILLING_PLANS.BASIC.currencyCode,
+        amount: 6.99,
+        currencyCode: "USD",
         interval: BillingInterval.Every30Days,
       },
     ],
-    trialDays: BILLING_PLANS.BASIC.trialDays,
+    trialDays: 7,
   },
 },
   // 🔥 REQUIRED for iframe (Render + Shopify)

@@ -34,12 +34,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const result: any = await billing.request({
       plan: "basic",
-      isTest: true,
-      trialDays: 7,
+      isTest: true,  
       returnUrl,
     });
 
-    console.log("✅ BILLING RESULT:", result);
+   console.log("🔥 BILLING RESULT FULL:", JSON.stringify(result, null, 2));
 
     // ✅ CASE 1 — Shopify returns Response
     if (result instanceof Response) {
