@@ -1,5 +1,5 @@
-import { redirect } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { redirect } from "react-router";
 import { authenticate } from "../shopify.server";
 import { saveSubscription } from "../services/billing.server";
 
@@ -9,7 +9,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const chargeId = url.searchParams.get("charge_id");
   const shopParam = url.searchParams.get("shop");
 
+  // ===============================
   // 🔥 STEP 1 — AFTER APPROVAL
+  // ===============================
   if (chargeId && shopParam) {
     console.log("💰 Saving subscription:", { shop: shopParam, chargeId });
 
@@ -18,63 +20,123 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(`/app?shop=${shopParam}&embedded=1`);
   }
 
-  // 🔥 STEP 2 — AUTH
+  // ===============================
+  // 🔐 STEP 2 — AUTH
+  // ===============================
   const auth = await authenticate.admin(request);
 
   if (auth instanceof Response) {
     return auth;
   }
 
-  const { billing, session } = auth;
+  // ✅ IMPORTANT FIX — include admin
+  const { session, admin } = auth;
 
   const shop = session.shop;
 
+  // ===============================
+  // 🧠 HOST RESOLUTION
+  // ===============================
   let host = url.searchParams.get("host");
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
+  // ===============================
+  // 🔗 RETURN URL (BACK TO THIS ROUTE)
+  // ===============================
   const APP_URL = process.env.SHOPIFY_APP_URL!;
   const returnUrl = `${APP_URL}/api/billing?shop=${shop}&host=${host}`;
 
-  console.log("🚀 billing.require triggered");
+  console.log("🚀 Creating subscription via GraphQL");
 
-  // 🔥🔥🔥 THIS IS THE FIX
-  try{
-  return billing.require({
-    plans: ["basic"],
-    isTest: true,
-    onFailure: async () => {
-      const result: any = await billing.request({
-        plan: "basic",
-        isTest: true,
-        trialDays: 7,
-        returnUrl,
-      });
-
-      console.log("FULL BILLING RESULT:", JSON.stringify(result, null, 2));
-
-      if (result?.confirmationUrl) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            Location: result.confirmationUrl,
-          },
-        });
+  // ===============================
+  // 💰 STEP 3 — GRAPHQL BILLING
+  // ===============================
+  try {
+    const response = await admin.graphql(`
+      mutation {
+        appSubscriptionCreate(
+          name: "Basic Plan"
+          returnUrl: "${returnUrl}"
+          test: true
+          lineItems: [
+            {
+              plan: {
+                appRecurringPricingDetails: {
+                  price: { amount: 6.99, currencyCode: USD }
+                  interval: EVERY_30_DAYS
+                }
+              }
+            }
+          ]
+        ) {
+          confirmationUrl
+          userErrors {
+            field
+            message
+          }
+        }
       }
-      
+    `);
 
-      throw new Error("No confirmationUrl");
-    },
-  });
-}
-catch (err: any) {
-  console.log("🔥 BILLING THROW FULL:", err);
+    const data = await response.json();
 
-  if (err instanceof Response) {
-    console.log("🔥 REDIRECT LOCATION:", err.headers.get("Location"));
-    return err;
+    console.log("🔥 GRAPHQL BILLING RESPONSE:", JSON.stringify(data, null, 2));
+
+    const confirmationUrl =
+      data?.data?.appSubscriptionCreate?.confirmationUrl;
+
+    const errors =
+      data?.data?.appSubscriptionCreate?.userErrors;
+
+    // ❌ HANDLE SHOPIFY ERRORS
+    if (errors && errors.length > 0) {
+      console.error("❌ BILLING USER ERRORS:", errors);
+
+      return new Response(
+        JSON.stringify({
+          error: true,
+          message: "Shopify billing error",
+          details: errors,
+        }),
+        { status: 500 }
+      );
+    }
+
+    // ✅ REDIRECT TO SHOPIFY APPROVAL PAGE
+    if (confirmationUrl) {
+      console.log("➡️ Redirecting to Shopify billing page");
+
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: confirmationUrl,
+        },
+      });
+    }
+
+    // ❌ FALLBACK
+    console.error("❌ No confirmationUrl returned");
+
+    return new Response(
+      JSON.stringify({
+        error: true,
+        message: "No confirmation URL returned",
+      }),
+      { status: 500 }
+    );
+
+  } catch (err: any) {
+    console.error("❌ GRAPHQL BILLING CRASH:", err);
+
+    return new Response(
+      JSON.stringify({
+        error: true,
+        message: err?.message || "Billing failed",
+      }),
+      { status: 500 }
+    );
   }
-}
 };
