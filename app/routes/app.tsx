@@ -5,7 +5,6 @@ import {
   useNavigation,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
-import { useEffect } from "react";
 
 import {
   AppProvider as PolarisProvider,
@@ -33,7 +32,7 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
-  // 🔐 AUTH
+  // 🔐 AUTH (MANDATORY)
   const auth = await authenticate.admin(request);
   if (auth instanceof Response) return auth;
 
@@ -52,23 +51,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // 💰 BILLING CHECK (SOURCE OF TRUTH)
-  let hasActivePlan = false;
+  // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
+  const billingResponse = await billing.require({
+    plans: ["basic"],
+    isTest: true,
+    onFailure: async () =>
+      billing.request({
+        plan: "basic",
+        isTest: true,
+      }),
+  });
 
-  try {
-    const billingCheck = await billing.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    console.log("💰 BILLING CHECK:", billingCheck);
-
-    hasActivePlan =
-      billingCheck?.hasActivePayment ||
-      billingCheck?.appSubscriptions?.length > 0;
-  } catch (err) {
-    console.error("❌ Billing check failed:", err);
+  // If Shopify wants to redirect → do it
+  if (billingResponse instanceof Response) {
+    return billingResponse;
   }
+
+  // ✅ If reached here → user has active plan
+  const hasActivePlan = true;
 
   // 💱 CURRENCY
   let currencyCode = "USD";
@@ -103,29 +103,6 @@ export default function AppLayout() {
 
   const isLoading = navigation.state === "loading";
   const { apiKey, host, currencyCode, hasActivePlan } = data;
-
-  // 🔥 CLEAN URL (no charge_id nonsense)/* 
-  /*useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.has("charge_id")) {
-      window.location.replace(window.location.pathname);
-    }
-  }, []); */
-
-  // 💰 BILLING BUTTON
-  const handleStartTrial = () => {
-    const params = new URLSearchParams(window.location.search);
-
-    const shop = params.get("shop");
-    const host = params.get("host");
-
-    if (!shop || !host) return;
-
-    const url = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
-
-    window.open(url, "_top"); // break iframe
-  };
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
@@ -163,7 +140,21 @@ export default function AppLayout() {
                     <Text as="p">
                       Start your 7-day free trial.
                     </Text>
-                    <Button variant="primary" onClick={handleStartTrial}>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        const shop = params.get("shop");
+                        const host = params.get("host");
+
+                        if (!shop || !host) return;
+
+                        window.open(
+                          `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`,
+                          "_top"
+                        );
+                      }}
+                    >
                       Start Free Trial
                     </Button>
                   </BlockStack>
