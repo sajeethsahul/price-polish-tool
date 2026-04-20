@@ -82,11 +82,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     `);
 
-    if (response instanceof Response) {
-      // session-token redirect → let Shopify handle it
-      return response;
-    }
-
     const data = await response.json();
     currencyCode = data?.data?.shop?.currencyCode || "USD";
   } catch (err) {
@@ -109,14 +104,14 @@ export default function AppLayout() {
   const isLoading = navigation.state === "loading";
   const { apiKey, host, currencyCode, hasActivePlan } = data;
 
-  // 🔥 CLEAN URL (no charge_id nonsense)
-  useEffect(() => {
+  // 🔥 CLEAN URL (no charge_id nonsense)/* 
+  /*useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
     if (params.has("charge_id")) {
       window.location.replace(window.location.pathname);
     }
-  }, []);
+  }, []); */
 
   // 💰 BILLING BUTTON
   const handleStartTrial = () => {

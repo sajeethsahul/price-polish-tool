@@ -41,7 +41,7 @@ const shopify = shopifyApp({
   sessionStorage: new PrismaSessionStorage(prisma) as any,
 
   // ✅ MUST for multi-store testing
-  distribution: AppDistribution.AppStore,
+  distribution: AppDistribution.SingleMerchant,
 
   isEmbeddedApp: true,
 
