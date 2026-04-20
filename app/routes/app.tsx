@@ -3,7 +3,6 @@ import {
   Link,
   useLoaderData,
   useNavigation,
-  redirect,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useEffect } from "react";
@@ -29,22 +28,16 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { saveSubscription } from "../services/billing.server";
-import { getSubscription } from "../services/billing.server";
-
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
-  // ================= AUTH =================
+  // 🔐 AUTH
   const auth = await authenticate.admin(request);
+  if (auth instanceof Response) return auth;
 
-  if (auth instanceof Response) {
-    return auth;
-  }
-
-  const { admin, session } = auth;
+  const { admin, session, billing } = auth;
 
   if (!session?.shop) {
     throw new Response("Unauthorized", { status: 401 });
@@ -52,30 +45,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const shop = session.shop;
 
-  // ================= HOST =================
+  // 🧠 HOST
   let host = url.searchParams.get("host");
   if (!host) {
     const store = shop.replace(".myshopify.com", "");
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
-  // ================= BILLING FLOW =================
-  const chargeId = url.searchParams.get("charge_id");
-
-const subscription = await getSubscription(shop);
-console.log("📦 DB SUBSCRIPTION:", subscription);
-
-  // 🔥 STEP 2 — CHECK DB (SOURCE OF TRUTH)
+  // 💰 BILLING CHECK (SOURCE OF TRUTH)
   let hasActivePlan = false;
 
   try {
-    const subscription = await getSubscription(shop);
-    hasActivePlan = subscription?.status === "active";
+    const billingCheck = await billing.check({
+      plans: ["basic"],
+      isTest: true,
+    });
+
+    console.log("💰 BILLING CHECK:", billingCheck);
+
+    hasActivePlan =
+      billingCheck?.hasActivePayment ||
+      billingCheck?.appSubscriptions?.length > 0;
   } catch (err) {
-    console.error("❌ Subscription check failed", err);
+    console.error("❌ Billing check failed:", err);
   }
 
-  // ================= CURRENCY =================
+  // 💱 CURRENCY
   let currencyCode = "USD";
 
   try {
@@ -86,6 +81,11 @@ console.log("📦 DB SUBSCRIPTION:", subscription);
         }
       }
     `);
+
+    if (response instanceof Response) {
+      // session-token redirect → let Shopify handle it
+      return response;
+    }
 
     const data = await response.json();
     currencyCode = data?.data?.shop?.currencyCode || "USD";
@@ -101,7 +101,6 @@ console.log("📦 DB SUBSCRIPTION:", subscription);
   };
 };
 
-
 // ================= COMPONENT =================
 export default function AppLayout() {
   const data = useLoaderData() as any;
@@ -110,7 +109,7 @@ export default function AppLayout() {
   const isLoading = navigation.state === "loading";
   const { apiKey, host, currencyCode, hasActivePlan } = data;
 
-  // 🔥 CLEAN charge_id (extra safety)
+  // 🔥 CLEAN URL (no charge_id nonsense)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -119,7 +118,7 @@ export default function AppLayout() {
     }
   }, []);
 
-  // 🔥 BILLING BUTTON
+  // 💰 BILLING BUTTON
   const handleStartTrial = () => {
     const params = new URLSearchParams(window.location.search);
 
@@ -128,10 +127,9 @@ export default function AppLayout() {
 
     if (!shop || !host) return;
 
-    const url = `/api/billing?shop=${shop}&host=${host}`;
+    const url = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
 
-    // ✅ MUST break iframe
-    window.open(url, "_top");
+    window.open(url, "_top"); // break iframe
   };
 
   const AppContent = (

@@ -1,95 +1,37 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { saveSubscription } from "../services/billing.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const url = new URL(request.url);
-
-  const chargeId = url.searchParams.get("charge_id");
-  const shopParam = url.searchParams.get("shop");
+  console.log("🔥 BILLING HIT:", request.url);
 
   // ===============================
-  // ✅ STEP 1 — AFTER APPROVAL
-  // ===============================
-  if (chargeId && shopParam) {
-    console.log("💰 Saving subscription:", { shop: shopParam, chargeId });
-
-    await saveSubscription(shopParam, chargeId);
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: `/app?shop=${shopParam}&embedded=1`,
-      },
-    });
-  }
-
-  // ===============================
-  // 🔐 STEP 2 — AUTH
+  // 🔐 AUTH (MANDATORY)
   // ===============================
   const auth = await authenticate.admin(request);
 
+  // 🚨 VERY IMPORTANT — handle session-token redirects
   if (auth instanceof Response) {
+    console.log("⚠️ AUTH REDIRECT");
     return auth;
   }
 
-  const { session, admin } = auth;
-  const shop = session.shop;
-
-  let host = url.searchParams.get("host");
-  if (!host) {
-    const store = shop.replace(".myshopify.com", "");
-    host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
-  }
-
-  const APP_URL = process.env.SHOPIFY_APP_URL!;
-  const returnUrl = `${APP_URL}/api/billing?shop=${shop}&host=${host}`;
-
-  console.log("🚀 Creating subscription");
+  const { billing } = auth;
 
   // ===============================
-  // 💰 STEP 3 — CREATE BILLING
+  // 💰 BILLING FLOW (SHOPIFY HANDLED)
   // ===============================
-  const response = await admin.graphql(`
-    mutation {
-      appSubscriptionCreate(
-        name: "Basic Plan"
-        returnUrl: "${returnUrl}"
-        test: true
-        lineItems: [
-          {
-            plan: {
-              appRecurringPricingDetails: {
-                price: { amount: 6.99, currencyCode: USD }
-                interval: EVERY_30_DAYS
-              }
-            }
-          }
-        ]
-      ) {
-        confirmationUrl
-        userErrors {
-          message
-        }
-      }
-    }
-  `);
+  return billing.require({
+    plans: ["basic"],
+    isTest: true,
 
-  const data = await response.json();
+    onFailure: async () => {
+      console.log("🚀 Creating billing request");
 
-  console.log("🔥 BILLING RESPONSE:", JSON.stringify(data, null, 2));
-
-  const confirmationUrl =
-    data?.data?.appSubscriptionCreate?.confirmationUrl;
-
-  if (!confirmationUrl) {
-    throw new Error("No confirmationUrl");
-  }
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: confirmationUrl,
+      return billing.request({
+        plan: "basic",
+        isTest: true,
+        // trialDays comes from config → no need here
+      });
     },
   });
 };
