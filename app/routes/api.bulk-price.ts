@@ -3,7 +3,6 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
-import { requireActivePlan } from "../utils/activePlan.server";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -13,10 +12,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
-  return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-    status: 405,
-    headers: { "Content-Type": "application/json" },
-  }));
+  return cors(
+    new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    })
+  );
 };
 
 // ================= ACTION =================
@@ -24,40 +25,55 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
+  // 🔐 AUTH
   const auth = await authenticate.admin(request);
+  if (auth instanceof Response) return auth;
 
-  if (!auth?.session) {
-    console.error("[BULK] ❌ NO SESSION FOUND");
-    throw new Response("Unauthorized", { status: 401 });
-  }
-
-  // ✅ UPDATED LINE (billing added)
-  const { admin, session, billing: billingApi } = auth;
+  const { admin, session, billing } = auth;
   const shop = session.shop;
 
   console.log("[BULK] SESSION", { shop });
 
-  // ================= BILLING PROTECTION =================
-try {
-  await requireActivePlan(shop);
-} catch (err) {
-  console.warn("[BULK] BLOCKED - NO ACTIVE PLAN");
+  // ================= 💰 BILLING PROTECTION =================
+  try {
+    const billingCheck = await billing.check({
+      plans: ["basic"],
+      isTest: true,
+    });
 
-  return cors(
-    new Response(
-      JSON.stringify({
-        success: false,
-        error: "Upgrade required to apply pricing",
-      }),
-      {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      }
-    )
-  );
-}
+    const hasActivePlan =
+      billingCheck?.hasActivePayment ||
+      billingCheck?.appSubscriptions?.length > 0;
 
+    if (!hasActivePlan) {
+      console.warn("[BULK] BLOCKED - NO ACTIVE PLAN");
 
+      return cors(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: "Upgrade required to apply pricing",
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+    }
+  } catch (err) {
+    console.error("[BULK] BILLING CHECK ERROR:", err);
+
+    return cors(
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: "Billing validation failed",
+        }),
+        { status: 500 }
+      )
+    );
+  }
 
   // ================= MAIN LOGIC =================
   try {
@@ -65,18 +81,13 @@ try {
     const items = body.items;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      console.warn("[BULK] ⚠️ NO ITEMS PROVIDED");
-
-      return cors(new Response(
-        JSON.stringify({ success: false, error: "No items provided" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      ));
+      return cors(
+        new Response(
+          JSON.stringify({ success: false, error: "No items provided" }),
+          { status: 400 }
+        )
+      );
     }
-
-    console.log("[BULK] START", {
-      shop,
-      itemsCount: items.length,
-    });
 
     const batchId = crypto.randomUUID();
     let successCount = 0;
@@ -85,7 +96,7 @@ try {
 
     // ================= SAVE HISTORY =================
     await prisma.priceHistory.createMany({
-      data: items.map((item) => ({
+      data: items.map((item: any) => ({
         shop,
         variantId: item.variantId,
         oldPrice: parseFloat(item.oldPrice),
@@ -95,19 +106,13 @@ try {
       })),
     });
 
-    console.log("[BULK] HISTORY SAVED", { batchId, count: items.length });
-
     // ================= GROUP PRODUCTS =================
-    const productGroups: Record<string, typeof items> = {};
+    const productGroups: Record<string, any[]> = {};
 
-    items.forEach((item) => {
+    items.forEach((item: any) => {
       if (!item.productId) return;
       if (!productGroups[item.productId]) productGroups[item.productId] = [];
       productGroups[item.productId].push(item);
-    });
-
-    console.log("[BULK] GROUPED", {
-      totalProducts: Object.keys(productGroups).length,
     });
 
     const mutation = `
@@ -123,58 +128,50 @@ try {
     for (let i = 0; i < groupEntries.length; i += 10) {
       const currentBatch = groupEntries.slice(i, i + 10);
 
-      console.log("[BULK] PROCESSING BATCH", {
-        batchIndex: i,
-        batchSize: currentBatch.length,
-      });
-
-      await Promise.all(currentBatch.map(async ([productId, variants]) => {
-        try {
-          const response = await admin.graphql(mutation, {
-            variables: {
-              productId,
-              variants: variants.map(v => ({
-                id: v.variantId,
-                price: v.newPrice
-              })),
-            },
-          });
-
-          const data: any = await response.json();
-          const userErrors = data.data?.productVariantsBulkUpdate?.userErrors || [];
-
-          if (userErrors.length > 0) {
-            console.error("[BULK] GRAPHQL ERROR", {
-              productId,
-              error: userErrors[0].message,
+      await Promise.all(
+        currentBatch.map(async ([productId, variants]) => {
+          try {
+            const response = await admin.graphql(mutation, {
+              variables: {
+                productId,
+                variants: (variants as any[]).map((v) => ({
+                  id: v.variantId,
+                  price: v.newPrice,
+                })),
+              },
             });
 
-            failedCount += variants.length;
-            failedItems.push(...variants.map(v => ({
-              variantId: v.variantId,
-              error: userErrors[0].message
-            })));
+            const data: any = await response.json();
+            const userErrors =
+              data.data?.productVariantsBulkUpdate?.userErrors || [];
 
-          } else {
-            successCount += variants.length;
+            if (userErrors.length > 0) {
+              failedCount += (variants as any[]).length;
+
+              failedItems.push(
+                ...(variants as any[]).map((v) => ({
+                  variantId: v.variantId,
+                  error: userErrors[0].message,
+                }))
+              );
+            } else {
+              successCount += (variants as any[]).length;
+            }
+          } catch (error: any) {
+            failedCount += (variants as any[]).length;
+
+            failedItems.push(
+              ...(variants as any[]).map((v) => ({
+                variantId: v.variantId,
+                error: error.message,
+              }))
+            );
           }
-
-        } catch (error: any) {
-          console.error("[BULK] REQUEST ERROR", {
-            productId,
-            error: error.message,
-          });
-
-          failedCount += variants.length;
-          failedItems.push(...variants.map(v => ({
-            variantId: v.variantId,
-            error: error.message
-          })));
-        }
-      }));
+        })
+      );
 
       if (i + 10 < groupEntries.length) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((r) => setTimeout(r, DELAY_MS));
       }
     }
 
@@ -182,17 +179,8 @@ try {
       failedCount === 0
         ? "BULK_SUCCESS"
         : successCount > 0
-          ? "BULK_PARTIAL_FAILURE"
-          : "BULK_TOTAL_FAILURE";
-
-    console.log("[BULK] COMPLETE", {
-      shop,
-      batchId,
-      successCount,
-      failedCount,
-      total: items.length,
-      status,
-    });
+        ? "BULK_PARTIAL_FAILURE"
+        : "BULK_TOTAL_FAILURE";
 
     await logActivity(shop, status, {
       successCount,
@@ -200,19 +188,20 @@ try {
       total: items.length,
     });
 
-    return cors(new Response(
-      JSON.stringify({
-        success: failedCount === 0,
-        successCount,
-        failedCount,
-        failedItems,
-        total: items.length,
-        batchId,
-        updatedAt: new Date().toISOString(),
-      }),
-      { headers: { "Content-Type": "application/json" } },
-    ));
-
+    return cors(
+      new Response(
+        JSON.stringify({
+          success: failedCount === 0,
+          successCount,
+          failedCount,
+          failedItems,
+          total: items.length,
+          batchId,
+          updatedAt: new Date().toISOString(),
+        }),
+        { headers: { "Content-Type": "application/json" } }
+      )
+    );
   } catch (error: any) {
     console.error("[BULK] FATAL ERROR", error);
 
@@ -221,9 +210,14 @@ try {
       message: error.message,
     });
 
-    return cors(new Response(
-      JSON.stringify({ success: false, error: "Something went wrong during bulk update" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
-    ));
+    return cors(
+      new Response(
+        JSON.stringify({
+          success: false,
+          error: "Something went wrong during bulk update",
+        }),
+        { status: 500 }
+      )
+    );
   }
 };
