@@ -20,7 +20,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
 };
 
+
 // ================= ACTION =================
+
 export const action = async ({ request }: ActionFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
