@@ -120,10 +120,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             };
         });
 
-        console.log("RETURNING PRODUCTS:", previews.length);
+        // ruleExists: true only when a real PricingRule DB row exists for this shop
+        // (previews are always returned using defaults if no rule exists)
+        const ruleExists = rule !== null;
+        console.log("RETURNING PRODUCTS:", previews.length, "| ruleExists:", ruleExists);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
-        return cors(new Response(JSON.stringify({ previews, markupPercent }), {
+        return cors(new Response(JSON.stringify({ previews, markupPercent, ruleExists }), {
             headers: { "Content-Type": "application/json" },
         }));
     } catch (error: any) {

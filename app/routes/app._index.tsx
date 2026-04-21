@@ -67,8 +67,8 @@ function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
 
 function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, isBypass?: boolean, currencyCode: string }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
-  // ADDED: rules is the single source of truth for whether pricing rules are configured
-  const [rules, setRules] = useState<PreviewItem[] | null>(null);
+  // ADDED: ruleExists = null means not yet fetched; true/false comes from backend DB check
+  const [ruleExists, setRuleExists] = useState<boolean | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -96,8 +96,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [shopify]);
   
   const hasActivePlan = metrics.hasActivePlan;
-  // UPDATED: Use rules as single source of truth (NOT previews)
-  const hasRules = rules !== null && rules.length > 0;
+  // UPDATED: hasRules is driven by backend DB check (ruleExists), NOT previews.length
+  // previews always exist (backend uses defaults), so length is an unreliable signal
+  const hasRules = ruleExists === true;
+  console.log(`[hasRules DEBUG] ruleExists=${ruleExists} → hasRules=${hasRules}, previews.length=${previews.length}`);
   
   const navigate = useNavigate();
   const appFetch = useAppFetch();
@@ -123,8 +125,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       
       const fetchedPreviews = data.previews ?? [];
       setPreviews(fetchedPreviews);
-      // UPDATED: Set rules from fetched previews — single source of truth
-      setRules(fetchedPreviews);
+      // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
+      console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
+      setRuleExists(data.ruleExists === true);
       setActiveMarkup(data.markupPercent ?? 0);
       setMetrics(prev => ({
         ...prev,
@@ -515,7 +518,8 @@ useEffect(() => {
   const SHOW_DEBUG_TOOLS = false;
 
   // ADDED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
-  if (loading && rules === null) {
+  // ruleExists === null means first fetch hasn't completed yet
+  if (loading && ruleExists === null) {
     return <SkeletonPage primaryAction />
   }
 
