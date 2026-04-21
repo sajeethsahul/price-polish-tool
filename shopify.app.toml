@@ -1,8 +1,8 @@
 client_id = "e2c1bc84922ebd0689a4a2c9d512d665"
 name = "price-polish-tool"
 
-# 🔥 MUST include /app (CRITICAL for embedded apps)
-application_url = "https://price-polish-tool.onrender.com/app"
+# 🔥 IMPORTANT: root URL (NOT /app)
+application_url = "https://price-polish-tool.onrender.com"
 
 embedded = true
 
@@ -12,13 +12,13 @@ automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2026-04"
 
-  [[webhooks.subscriptions]]
-  topics = ["app/scopes_update"]
-  uri = "/webhooks/app/scopes_update"
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
 
-  [[webhooks.subscriptions]]
-  topics = ["app/uninstalled"]
-  uri = "/webhooks/app/uninstalled"
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
 scopes = "write_metaobject_definitions,write_metaobjects,write_products"
@@ -29,35 +29,28 @@ redirect_urls = [
   "https://price-polish-tool.onrender.com/auth/shopify/callback"
 ]
 
-# 🔥🔥🔥 CRITICAL BILLING CONFIG (THIS FIXES YOUR 500)
-[billing]
-required = true
-
-  [billing.plans.basic]
-  amount = 499.0
-  currency_code = "INR"
-  interval = "EVERY_30_DAYS"
-
-# 🔥 FIX PROXY (was pointing to example.com ❌)
+# ✅ App proxy (keep if used)
 [app_proxy]
 url = "https://price-polish-tool.onrender.com/api/proxy/settings"
 subpath = "price-polish"
 prefix = "apps"
 
+# ✅ Example metafield
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
 name = "Demo Source Info"
 description = "Tracks products created by the Shopify app template for development"
 
-  [product.metafields.app.demo_info.access]
-  admin = "merchant_read_write"
+[product.metafields.app.demo_info.access]
+admin = "merchant_read_write"
 
+# ✅ Example metaobject
 [metaobjects.app.example]
 name = "Example"
 description = "An example metaobject definition created by this template"
 
-  [metaobjects.app.example.access]
-  admin = "merchant_read_write"
+[metaobjects.app.example.access]
+admin = "merchant_read_write"
 
 [metaobjects.app.example.fields.title]
 name = "Title"

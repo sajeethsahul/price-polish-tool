@@ -93,6 +93,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [shopify]);
   
   const hasActivePlan = metrics.hasActivePlan;
+  const hasRules = previews && previews.length > 0;
   
   const navigate = useNavigate();
   const appFetch = useAppFetch();
@@ -682,6 +683,18 @@ useEffect(() => {
           </Grid>
         )}
 
+        {!hasRules && (
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h3" variant="headingMd">No Pricing Rules Found</Text>
+              <Text as="p">
+                Please configure at least one pricing rule before applying changes to your storefront.
+              </Text>
+              <Button url="/app/rules">Configure Pricing Rules</Button>
+            </BlockStack>
+          </Card>
+        )}
+
         <Card>
           <BlockStack gap="400">
             <InlineStack align="space-between" blockAlign="center">
@@ -714,7 +727,7 @@ useEffect(() => {
                   variant="primary"
                   onClick={() => setShowGoLiveModal(true)}
                   loading={isProcessing}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !hasRules}
                 >
                   Go Live on Storefront
                 </Button>

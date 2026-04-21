@@ -53,6 +53,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         if (!rule) {
+            return cors(new Response(JSON.stringify({
+                success: false,
+                message: "No pricing rules found. Please configure rules first."
+            }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" }
+            }));
+        }
+
+        if (!rule) {
             return cors(new Response(JSON.stringify({ error: "No rules found to push." }), {
                 status: 404,
                 headers: { "Content-Type": "application/json" },
