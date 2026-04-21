@@ -315,69 +315,39 @@ function RulesContent({
                     {/* RIGHT (your preview untouched conceptually) */}
                     <Layout.Section variant="oneThird">
                         <Card>
-                            <BlockStack gap="300">
-                                <Text variant="headingMd">Live Example</Text>
+                            <Text variant="headingMd">Live Example</Text>
 
-                                <Text tone="subdued">
-                                    See exactly how your rules calculate a product price:
-                                </Text>
+                            <BlockStack gap="200">
+                                <InlineStack align="space-between">
+                                    <Text tone="subdued">Base Price</Text>
+                                    <Text>${basePrice.toFixed(2)}</Text>
+                                </InlineStack>
 
-                                {(() => {
-                                    const basePrice = 59.99;
+                                <InlineStack align="space-between">
+                                    <Text tone="subdued">
+                                        {markup >= 0 ? "+" : ""}
+                                        {markup}% Markup
+                                    </Text>
+                                    <Text tone="success" variant="headingSm">
+                                        ${priceAfterMarkup.toFixed(2)}
+                                    </Text>
+                                </InlineStack>
 
-                                    const markup = parseFloat(markupPercent) || 0;
-                                    const rounding = parseFloat(roundingStep) || 0;
+                                <InlineStack align="space-between">
+                                    <Text tone="subdued">Rounded</Text>
+                                    <Text>${roundedPrice.toFixed(2)}</Text>
+                                </InlineStack>
 
-                                    // Step 1: Apply markup
-                                    let priceAfterMarkup = basePrice + (basePrice * markup) / 100;
+                                {charmPricing && (
+                                    <Text tone="subdued">Charm pricing applied (.99)</Text>
+                                )}
 
-                                    // Step 2: Apply rounding
-                                    let roundedPrice =
-                                        rounding > 0
-                                            ? Math.round(priceAfterMarkup / rounding) * rounding
-                                            : priceAfterMarkup;
-
-                                    // Step 3: Charm pricing
-                                    let finalPrice = roundedPrice;
-                                    if (charmPricing) {
-                                        finalPrice = Math.floor(roundedPrice) + 0.99;
-                                    }
-
-                                    return (
-                                        <BlockStack gap="200">
-                                            <InlineStack align="space-between">
-                                                <Text tone="subdued">Base Price</Text>
-                                                <Text>${basePrice.toFixed(2)}</Text>
-                                            </InlineStack>
-
-                                            <InlineStack align="space-between">
-                                                <Text tone="subdued">{markup > 0 ? "+" : ""}{markup}% Markup</Text>
-                                                <Text>${priceAfterMarkup.toFixed(2)}</Text>
-                                            </InlineStack>
-
-                                            <InlineStack align="space-between">
-                                                <Text tone="subdued">
-                                                    {rounding > 0 ? `Rounded (${rounding})` : "No Rounding"}
-                                                </Text>
-                                                <Text>${roundedPrice.toFixed(2)}</Text>
-                                            </InlineStack>
-
-                                            {charmPricing && (
-                                                <InlineStack align="space-between">
-                                                    <Text tone="subdued">Charm Pricing (.99)</Text>
-                                                    <Text>→ .99</Text>
-                                                </InlineStack>
-                                            )}
-
-                                            <InlineStack align="space-between">
-                                                <Text variant="headingSm">Final Price</Text>
-                                                <Text variant="headingSm">
-                                                    ${finalPrice.toFixed(2)}
-                                                </Text>
-                                            </InlineStack>
-                                        </BlockStack>
-                                    );
-                                })()}
+                                <InlineStack align="space-between">
+                                    <Text variant="headingMd">Final Price</Text>
+                                    <Text variant="headingLg" tone="success">
+                                        ${roundedPrice.toFixed(2)}
+                                    </Text>
+                                </InlineStack>
                             </BlockStack>
                         </Card>
                     </Layout.Section>
