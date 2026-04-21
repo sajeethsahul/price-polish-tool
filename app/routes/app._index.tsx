@@ -1,4 +1,4 @@
--import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate, useOutletContext } from "react-router";
 import {
