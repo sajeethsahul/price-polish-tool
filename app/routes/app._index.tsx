@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+-import { useState, useCallback, useMemo, useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate, useOutletContext } from "react-router";
 import {
@@ -37,9 +37,9 @@ interface PreviewItem {
   title: string;
   image: string;
   variantId: string;
-  oldPrice: string; // This is the current price in Shopify
-  newPrice: string; // This is the rule-calculated price
-  originalBasePrice: string; // NEW: The true original price before any polish
+  oldPrice: string;
+  newPrice: string;
+  originalBasePrice: string;
   overriddenPrice?: string;
 }
 
@@ -84,7 +84,6 @@ function DashboardLoader() {
       gap: "28px",
       fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     }}>
-      {/* Inject keyframe animations */}
       <style>{`
         @keyframes pp-bounce {
           0%, 100% { transform: translateY(0) rotate(-5deg); }
@@ -113,9 +112,7 @@ function DashboardLoader() {
         }
       `}</style>
 
-      {/* Coin + orbiting mini-coins */}
       <div style={{ position: "relative", width: 100, height: 100 }}>
-        {/* Main coin */}
         <div style={{
           position: "absolute",
           top: "50%", left: "50%",
@@ -127,7 +124,6 @@ function DashboardLoader() {
           userSelect: "none",
         }}>💰</div>
 
-        {/* Orbiting coin 1 */}
         <div style={{
           position: "absolute",
           top: "50%", left: "50%",
@@ -137,7 +133,6 @@ function DashboardLoader() {
           userSelect: "none",
         }}>🪙</div>
 
-        {/* Orbiting coin 2 */}
         <div style={{
           position: "absolute",
           top: "50%", left: "50%",
@@ -147,7 +142,6 @@ function DashboardLoader() {
           userSelect: "none",
         }}>✨</div>
 
-        {/* Bounce shadow */}
         <div style={{
           position: "absolute",
           bottom: -4, left: "50%",
@@ -159,7 +153,6 @@ function DashboardLoader() {
         }} />
       </div>
 
-      {/* App name */}
       <div style={{
         fontSize: 22,
         fontWeight: 700,
@@ -169,7 +162,6 @@ function DashboardLoader() {
         letterSpacing: "-0.3px",
       }}>Price Polish</div>
 
-      {/* Cycling message */}
       <div
         key={msgIndex}
         style={{
@@ -185,7 +177,6 @@ function DashboardLoader() {
         {LOADER_MESSAGES[msgIndex]}
       </div>
 
-      {/* Shimmer progress bar */}
       <div style={{
         width: 240,
         height: 6,
@@ -202,7 +193,6 @@ function DashboardLoader() {
         }} />
       </div>
 
-      {/* Subtle hint */}
       <div style={{ fontSize: 12, color: "#9ca3af", letterSpacing: "0.4px" }}>
         Fetching your pricing data...
       </div>
@@ -213,7 +203,7 @@ function DashboardLoader() {
 
 export default function Dashboard() {
   const { currencyCode = "USD", isBypass } = useOutletContext<{ currencyCode?: string, isBypass?: boolean }>() || {};
-  
+
   if (isBypass) {
     return <DashboardContent isBypass={true} currencyCode={currencyCode} />;
   }
@@ -228,7 +218,7 @@ function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
 
 function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, isBypass?: boolean, currencyCode: string }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
-  // ADDED: ruleExists = null means not yet fetched; true/false comes from backend DB check
+  // ruleExists = null → not yet fetched; true/false comes from backend DB check
   const [ruleExists, setRuleExists] = useState<boolean | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -236,8 +226,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [progress, setProgress] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showGoLiveModal, setShowGoLiveModal] = useState(false);
-  const [showStopModal, setShowStopModal] = useState(false);
+  const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
+  const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
   const [message, setMessage] = useState<{ type: "success" | "critical" | "warning"; text: string; details?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [minPrice, setMinPrice] = useState("");
@@ -249,22 +239,32 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
-  
-  // Billing placeholders - Set to true by default to allow usage
+
+  // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
     if (shopify) shopify.toast.show("Billing implementation coming soon!");
     else console.log("BYPASS: Upgrade triggered");
   }, [shopify]);
-  
+
   const hasActivePlan = metrics.hasActivePlan;
-  // UPDATED: hasRules is driven by backend DB check (ruleExists), NOT previews.length
-  // previews always exist (backend uses defaults), so length is an unreliable signal
+
+  // UPDATED: hasRules driven by backend DB check (ruleExists), NOT previews.length
   const hasRules = ruleExists === true;
   console.log(`[hasRules DEBUG] ruleExists=${ruleExists} → hasRules=${hasRules}, previews.length=${previews.length}`);
-  
+
   const navigate = useNavigate();
   const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
+
+  // ADDED: Guard helper — shows toast and blocks execution when no rules exist
+  const guardNoRules = useCallback(() => {
+    if (!hasRules) {
+      if (shopify) shopify.toast.show("Please configure pricing rules first", { isError: true });
+      else console.warn("BYPASS: Please configure pricing rules first");
+      return true; // blocked
+    }
+    return false; // allowed
+  }, [hasRules, shopify]);
 
   const handlePreview = useCallback(async () => {
     console.log("DEBUG: Initializing handlePreview fetch...");
@@ -272,18 +272,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setMessage(null);
     setCurrentPage(1);
     setSelectedItems(new Set());
-    
+
     try {
       const fetcher = await appFetch;
-      
-      // 🚀 OPTIMIZATION: Load metrics and preview in parallel
+
       const [data, metricsData] = await Promise.all([
         fetcher("/api/preview-price"),
         fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true }))
       ]);
-      
+
       console.log("DEBUG: Data received from parallel fetch");
-      
+
       const fetchedPreviews = data.previews ?? [];
       setPreviews(fetchedPreviews);
       // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
@@ -293,10 +292,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setMetrics(prev => ({
         ...prev,
         ...metricsData,
-        // Fallback to true if hasActivePlan is missing
         hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true
       }));
-        
+
       if (fetchedPreviews.length === 0) {
         setFirstVisit(true);
       } else {
@@ -314,41 +312,38 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [shopify]);
 
-useEffect(() => {
-  if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const url = new URL(window.location.href);
-  const params = url.searchParams;
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
 
-  const shop = params.get("shop");
-  const host = params.get("host");
-  const hasChargeId = params.has("charge_id");
+    const shop = params.get("shop");
+    const host = params.get("host");
+    const hasChargeId = params.has("charge_id");
 
-  // ✅ Store shop (safe)
-  if (shop) {
-    localStorage.setItem("shop", shop);
-    console.log("[SHOP STORED]", shop);
-  }
+    if (shop) {
+      localStorage.setItem("shop", shop);
+      console.log("[SHOP STORED]", shop);
+    }
 
-  // 🔥 Billing return — CLEAN ONLY charge_id (KEEP host + shop)
-  if (hasChargeId) {
-    console.log("[BILLING] Payment completed → cleaning URL safely");
+    if (hasChargeId) {
+      console.log("[BILLING] Payment completed → cleaning URL safely");
+      params.delete("charge_id");
+      const newUrl = `${url.pathname}?${params.toString()}`;
+      window.location.replace(newUrl);
+      return;
+    }
 
-    params.delete("charge_id");
+    console.log("DEBUG: Dashboard mounted → fetching preview");
+    handlePreview();
 
-    const newUrl = `${url.pathname}?${params.toString()}`;
-    window.location.replace(newUrl);
-
-    return; // 🚨 stop further execution
-  }
-
-  // ✅ Normal flow
-  console.log("DEBUG: Dashboard mounted → fetching preview");
-  handlePreview();
-
-}, [handlePreview]);
+  }, [handlePreview]);
 
   const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
+    // ADDED: Block execution if no rules exist
+    if (guardNoRules()) return;
+
     console.log(`DEBUG: Initializing handleApplyBatch for ${itemsToUpdate.length} items...`);
     setIsProcessing(true);
     setIsModalOpen(false);
@@ -360,7 +355,7 @@ useEffect(() => {
       variantId: item.variantId,
       oldPrice: item.oldPrice,
       newPrice: item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice,
-      isManual: item.overriddenPrice !== undefined 
+      isManual: item.overriddenPrice !== undefined
     }));
 
     try {
@@ -370,7 +365,7 @@ useEffect(() => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: itemsWithFinalPrices }),
       });
-      
+
       setLastUpdate({
         batchId: data.batchId,
         updatedAt: data.updatedAt,
@@ -381,8 +376,8 @@ useEffect(() => {
 
       if (data.failedCount === 0) {
         if (shopify) shopify.toast.show("Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
-        else console.log("BYPASS: Applied successfully! Remember to 'Go Live' to see changes on your storefront.");
-        handlePreview(); // Auto-refresh the list
+        else console.log("BYPASS: Applied successfully!");
+        handlePreview();
         setSelectedItems(new Set());
       } else {
         if (shopify) shopify.toast.show("Some products failed to update", { isError: true });
@@ -397,30 +392,32 @@ useEffect(() => {
       setIsProcessing(false);
       setProgress(0);
     }
-  }, [shopify, handlePreview, appFetch]);
+  }, [shopify, handlePreview, appFetch, guardNoRules]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     handleApplyBatch([item]);
   }, [handleApplyBatch]);
 
   const handleApplySelected = useCallback(() => {
+    // ADDED: Block execution if no rules exist
+    if (guardNoRules()) return;
     const itemsToUpdate = previews.filter(p => selectedItems.has(p.variantId));
     handleApplyBatch(itemsToUpdate);
-  }, [previews, selectedItems, handleApplyBatch]);
+  }, [previews, selectedItems, handleApplyBatch, guardNoRules]);
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
     console.log(`DEBUG: Initializing handleUndo for batch: ${lastUpdate.batchId}...`);
     setIsProcessing(true);
     setMessage(null);
-    
+
     try {
       const res = await fetch("/api/undo-price", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ batchId: lastUpdate.batchId }),
       });
-      
+
       console.log(`DEBUG: /api/undo-price status: ${res.status}`);
       const data = await res.json();
       console.log("DEBUG: /api/undo-price data received:", !!data);
@@ -429,7 +426,7 @@ useEffect(() => {
         setLastUpdate(null);
         if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
-        handlePreview(); // Auto-refresh the list
+        handlePreview();
         setSelectedItems(new Set());
       } else {
         throw new Error(data.error || "Failed to undo changes.");
@@ -445,18 +442,13 @@ useEffect(() => {
   }, [lastUpdate, shopify, handlePreview]);
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
-    // Prevent typing excessively long strings
     if (value.length > 15) return;
-    // Max 6 numbers before decimal, max 2 decimals
     if (value !== "" && !/^\d{0,6}(\.\d{0,2})?$/.test(value)) return;
-    
+
     setPreviews((prev) =>
       prev.map((item) =>
         item.variantId === variantId
-          ? {
-              ...item,
-              overriddenPrice: value
-            }
+          ? { ...item, overriddenPrice: value }
           : item
       )
     );
@@ -472,20 +464,16 @@ useEffect(() => {
     const dec = isZeroDecimal ? 0 : 2;
 
     previews.forEach(p => {
-        const base = parseFloat(p.originalBasePrice);
-        const final = parseFloat(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
-        
-        const markupAdded = base * (activeMarkup / 100);
-        const roundingAdj = final - (base + markupAdded);
-        const netGain = final - base;
-        
-        totalProfit += netGain;
-
-        const titleSafe = p.title.replace(/"/g, '""');
-
-        csv += `"${titleSafe}","${p.variantId}",${base.toFixed(dec)},${markupAdded.toFixed(dec)},${roundingAdj.toFixed(dec)},${final.toFixed(dec)},${netGain.toFixed(dec)}\n`;
+      const base = parseFloat(p.originalBasePrice);
+      const final = parseFloat(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
+      const markupAdded = base * (activeMarkup / 100);
+      const roundingAdj = final - (base + markupAdded);
+      const netGain = final - base;
+      totalProfit += netGain;
+      const titleSafe = p.title.replace(/"/g, '""');
+      csv += `"${titleSafe}","${p.variantId}",${base.toFixed(dec)},${markupAdded.toFixed(dec)},${roundingAdj.toFixed(dec)},${final.toFixed(dec)},${netGain.toFixed(dec)}\n`;
     });
-    
+
     csv += `,,,,,,,\n`;
     csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(dec)}\n`;
 
@@ -493,7 +481,7 @@ useEffect(() => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const dateStr = new Date().toISOString().split('T')[0];
-    
+
     link.href = url;
     link.setAttribute("download", `PricePolish_Impact_Report_${dateStr}.csv`);
     document.body.appendChild(link);
@@ -505,14 +493,23 @@ useEffect(() => {
     setPreviews((prev) =>
       prev.map((item) =>
         item.variantId === variantId
-          ? {
-              ...item,
-              overriddenPrice: undefined
-            }
+          ? { ...item, overriddenPrice: undefined }
           : item
       )
     );
   }, []);
+
+  // UPDATED: Wrapped with guardNoRules — does NOT change existing handler logic
+  const handleGoLiveClick = useCallback(() => {
+    if (guardNoRules()) return;
+    setShowGoLiveModal(true);
+  }, [guardNoRules]);
+
+  // UPDATED: Wrapped with guardNoRules — does NOT change existing handler logic
+  const handleStopLiveClick = useCallback(() => {
+    if (guardNoRules()) return;
+    setShowStopModal(true);
+  }, [guardNoRules]);
 
   const handlePushStorefront = useCallback(async (clear = false) => {
     console.log(`DEBUG: Initializing handlePushStorefront (clear=${clear})...`);
@@ -521,12 +518,12 @@ useEffect(() => {
     setShowStopModal(false);
 
     try {
-      const res = await fetch("/api/push-storefront", { 
+      const res = await fetch("/api/push-storefront", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clear })
       });
-      
+
       console.log(`DEBUG: /api/push-storefront status: ${res.status}`);
       const data = await res.json();
       console.log("DEBUG: /api/push-storefront data received:", !!data);
@@ -566,12 +563,11 @@ useEffect(() => {
     });
   };
 
-  // Advanced SaaS Analytics
   const insights = useMemo(() => {
     let totalOld = 0;
     let totalNew = 0;
     let count = 0;
-    
+
     previews.forEach(p => {
       const oldP = parseFloat(p.oldPrice);
       const newP = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
@@ -584,13 +580,11 @@ useEffect(() => {
 
     const lift = totalNew - totalOld;
     const liftPercent = totalOld !== 0 ? (lift / totalOld) * 100 : 0;
-
     return { lift, liftPercent, count };
   }, [previews]);
 
   console.log(`DEBUG: Render Cycle - previews.length: ${previews.length}, loading: ${loading}`);
 
-  // Filtering & Sorting Logic
   const filteredPreviews = useMemo(() => {
     console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
     let result = previews.filter(p => {
@@ -599,7 +593,7 @@ useEffect(() => {
       const price = currentNewPrice;
       const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
       const matchesMax = maxPrice === "" || price <= parseFloat(maxPrice);
-      
+
       const oldP = parseFloat(p.oldPrice);
       const newP = currentNewPrice;
       const diffPercent = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
@@ -612,7 +606,6 @@ useEffect(() => {
       return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
     });
 
-    // Apply Sorting
     result.sort((a, b) => {
       const oldA = parseFloat(a.oldPrice);
       const newA = a.overriddenPrice !== undefined ? parseFloat(a.overriddenPrice) || 0 : parseFloat(a.newPrice);
@@ -623,20 +616,13 @@ useEffect(() => {
       const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
 
       switch (sortOrder) {
-        case "name_asc":
-          return a.title.localeCompare(b.title);
-        case "name_desc":
-          return b.title.localeCompare(a.title);
-        case "price_asc":
-          return newA - newB;
-        case "price_desc":
-          return newB - newA;
-        case "change_asc":
-          return diffA - diffB;
-        case "change_desc":
-          return diffB - diffA;
-        default:
-          return 0;
+        case "name_asc": return a.title.localeCompare(b.title);
+        case "name_desc": return b.title.localeCompare(a.title);
+        case "price_asc": return newA - newB;
+        case "price_desc": return newB - newA;
+        case "change_asc": return diffA - diffB;
+        case "change_desc": return diffB - diffA;
+        default: return 0;
       }
     });
 
@@ -660,7 +646,6 @@ useEffect(() => {
     setSearchQuery(value);
   }, []);
 
-  // Pagination Logic
   const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
   const paginatedPreviews = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -675,18 +660,15 @@ useEffect(() => {
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-
     const remainingHours = hours % 24;
     const remainingMinutes = minutes % 60;
-
     const pad = (num: number) => num.toString().padStart(2, '0');
-
     return `${days}d ${pad(remainingHours)}:${pad(remainingMinutes)} ago`;
   };
 
   const SHOW_DEBUG_TOOLS = false;
 
-  // ADDED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
+  // UPDATED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
   // ruleExists === null means first fetch hasn't completed yet
   if (loading && ruleExists === null) {
     return <DashboardLoader />;
@@ -694,6 +676,7 @@ useEffect(() => {
 
   return (
     <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh" }}>
+      {/* ADDED: Global styles including pulse animation for live indicator */}
       <style>{`
         :root {
           --pp-primary: #008060;
@@ -710,305 +693,346 @@ useEffect(() => {
         .Polaris-Card { border: 1px solid var(--pp-border) !important; background-color: var(--pp-card) !important; color: var(--pp-text) !important; }
         .Polaris-Text--headingLg { color: var(--pp-text); font-weight: 700; }
         
-        /* Button Overrides */
         .Polaris-Button--toneSuccess.Polaris-Button--variantPrimary { background: var(--pp-success) !important; }
         .Polaris-Button--toneCritical.Polaris-Button--variantPrimary { background: var(--pp-danger) !important; }
+
+        /* ADDED: Live status pulse animation */
+        @keyframes pp-live-pulse {
+          0%, 100% { transform: scale(1);   opacity: 1; }
+          50%       { transform: scale(1.5); opacity: 0.5; }
+        }
+
+        .pp-live-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+
+        .pp-live-dot--active {
+          background-color: #16a34a;
+          animation: pp-live-pulse 1.6s ease-in-out infinite;
+        }
+
+        .pp-live-dot--inactive {
+          background-color: #dc2626;
+        }
       `}</style>
-      <Page 
-        title="Price Polish Dashboard"
-      >
-      <BlockStack gap="500">
-        {/* NEW: Environment & Handshake Diagnostics */}
-{SHOW_DEBUG_TOOLS && (
-  <>
-    <Card>
-      <BlockStack gap="400">
-        <Text as="h3" variant="headingSm">System Health & Diagnostics</Text>
-        <Divider />
-        <BlockStack gap="200">
-          <InlineStack gap="400" align="space-between">
-            <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
-            <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
-              {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
-            </Badge>
-          </InlineStack>
-          <InlineStack gap="400" align="space-between">
-            <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
-            <Badge tone={currencyCode ? "success" : "attention"}>
-              {currencyCode ? "Connected" : "Initializing..."}
-            </Badge>
-          </InlineStack>
-          <InlineStack gap="400" align="space-between">
-            <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
-            <Text as="span" variant="bodyMd">
-              {typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}
-            </Text>
-          </InlineStack>
-        </BlockStack>
-        <Banner tone="info">
-          <p>
-            If <strong>Is Embedded</strong> is NO, the app is running on its own domain instead of <code>admin.shopify.com</code>. This will cause App Bridge origin mismatches.
-          </p>
-        </Banner>
-      </BlockStack>
-    </Card>
 
-    {/* System Status Card (Debug) */}
-    <Card>
-      <BlockStack gap="200">
-        <Text as="h3" variant="headingSm">System Status (Debug)</Text>
-        <InlineStack gap="400">
-           <Text as="p">Previews: <strong>{previews.length}</strong></Text>
-           <Text as="p">Filtered: <strong>{filteredPreviews.length}</strong></Text>
-           <Text as="p">Loading: <strong>{loading ? "YES" : "NO"}</strong></Text>
-           <Text as="p">Currency: <strong>{currencyCode}</strong></Text>
-        </InlineStack>
-      </BlockStack>
-    </Card>
-  </>
-)}
+      <Page title="Price Polish Dashboard">
+        <BlockStack gap="500">
 
-        {firstVisit && (
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">Welcome to Price Polish! 🚀</Text>
-              <Text as="p">Follow these simple steps to optimize your store pricing:</Text>
-              <Box paddingInlineStart="400">
-                <BlockStack gap="200">
-                  <Text as="p">1️⃣ <strong>Configure:</strong> Set your markup and rounding rules in the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
-                  <Text as="p">2️⃣ <strong>Preview:</strong> Come back here to see how your new prices will look.</Text>
-                  <Text as="p">3️⃣ <strong>Apply:</strong> Review the changes and apply them safely (you can undo anytime).</Text>
-                </BlockStack>
-              </Box>
-            </BlockStack>
-          </Card>
-        )}
-
-        {!hasActivePlan && (
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h3" variant="headingMd">
-                 Start Your 7-Day Free Trial
-              </Text>
-
-              <Text as="p">
-                Apply smart pricing, increase profits, and manage bulk updates safely.
-              </Text>
-
-              <InlineStack gap="200">
-                <Badge tone="success">Bulk Pricing</Badge>
-                <Badge tone="success">Undo Anytime</Badge>
-                <Badge tone="success">Live Store Sync</Badge>
-              </InlineStack>
-
-              <Button variant="primary" onClick={handleUpgrade}>
-                Start Free Trial
-              </Button>
-
-              <Text as="p" variant="bodySm" tone="subdued">
-                No charge today • Cancel anytime
-              </Text>
-            </BlockStack>
-          </Card>
-        )}
-
-        <Banner tone="info">
-          <BlockStack gap="200">
-            <Text as="p">✔️ Safe to use — all changes can be undone anytime</Text>
-            <Text as="p">✔️ Your original prices are preserved and stored securely</Text>
-            <Text as="p">💡 <strong>Tip:</strong> The "Apply" button becomes disabled once your price is perfectly synced with your current Pricing Rules. Change your rules to reactivate it!</Text>
-          </BlockStack>
-        </Banner>
-
-        {metrics.isLive && (
-          <Banner tone="warning">
-            <BlockStack gap="200">
-              <Text as="p">⚠️ <strong>Live Pricing is ON:</strong> Any prices you "Apply" here will permanently change your Shopify database. Because your Live Rules are active, the storefront extension will apply its rules <strong>on top</strong> of these new prices. If you want the "Applied" price to be the final price, please stop Live Pricing or adjust your rules.</Text>
-            </BlockStack>
-          </Banner>
-        )}
-
-        {message && (
-          <Banner
-            title={message.text}
-            tone={message.type}
-            onDismiss={() => setMessage(null)}
-          >
-            {message.details && <p>{message.details}</p>}
-          </Banner>
-        )}
-
-        {/* SAAS INSIGHT CARD */}
-        {previews.length > 0 && !loading && (
-          <Box paddingBlockEnd="400">
-            <Grid>
-              {/* UPDATED UI: Metrics aligned Left, removed heavy text colors, consistent neutral weight */}
-              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-                <Card>
-                  <BlockStack gap="100" align="start">
-                    <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
-                    <Text as="h2" variant="headingLg">
-                      {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
-                    </Text>
-                  </BlockStack>
-                </Card>
-              </Grid.Cell>
-              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-                <Card>
-                  <BlockStack gap="100" align="start">
-                    <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
-                    <Text as="h2" variant="headingLg">
-                      {`${metrics.successRate.toFixed(1)}%`}
-                    </Text>
-                  </BlockStack>
-                </Card>
-              </Grid.Cell>
-              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-                <Card>
-                  <BlockStack gap="100" align="start">
-                    <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
-                    <Text as="h2" variant="headingLg">
-                      {metrics.totalApplied}
-                    </Text>
-                  </BlockStack>
-                </Card>
-              </Grid.Cell>
-              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-                <Card>
-                  <BlockStack gap="100" align="start">
-                    <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
-                    <Text as="h2" variant="headingLg">
-                      {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
-                    </Text>
-                  </BlockStack>
-                </Card>
-              </Grid.Cell>
-            </Grid>
-          </Box>
-        )}
-
-        {/* NEW STRUCTURE: Warning Banner replaces basic Card */}
-        {!hasRules && (
-          <Box paddingBlockStart="200" paddingBlockEnd="500">
-            <Banner tone="warning" title="No Pricing Rules Found">
-              <Box paddingBlockStart="200" paddingBlockEnd="200">
+          {/* Debug Tools */}
+          {SHOW_DEBUG_TOOLS && (
+            <>
+              <Card>
                 <BlockStack gap="400">
-                  <p>
-                    You must configure at least one pricing rule before applying changes or going live.
-                  </p>
-                  <InlineStack>
-                    {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
-                    <Button variant="primary" size="large" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
+                  <Text as="h3" variant="headingSm">System Health & Diagnostics</Text>
+                  <Divider />
+                  <BlockStack gap="200">
+                    <InlineStack gap="400" align="space-between">
+                      <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
+                      <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
+                        {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
+                      </Badge>
+                    </InlineStack>
+                    <InlineStack gap="400" align="space-between">
+                      <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
+                      <Badge tone={currencyCode ? "success" : "attention"}>
+                        {currencyCode ? "Connected" : "Initializing..."}
+                      </Badge>
+                    </InlineStack>
+                    <InlineStack gap="400" align="space-between">
+                      <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
+                      <Text as="span" variant="bodyMd">
+                        {typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}
+                      </Text>
+                    </InlineStack>
+                  </BlockStack>
+                  <Banner tone="info">
+                    <p>If <strong>Is Embedded</strong> is NO, the app is running on its own domain instead of <code>admin.shopify.com</code>. This will cause App Bridge origin mismatches.</p>
+                  </Banner>
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">System Status (Debug)</Text>
+                  <InlineStack gap="400">
+                    <Text as="p">Previews: <strong>{previews.length}</strong></Text>
+                    <Text as="p">Filtered: <strong>{filteredPreviews.length}</strong></Text>
+                    <Text as="p">Loading: <strong>{loading ? "YES" : "NO"}</strong></Text>
+                    <Text as="p">Currency: <strong>{currencyCode}</strong></Text>
                   </InlineStack>
                 </BlockStack>
-              </Box>
-            </Banner>
-          </Box>
-        )}
+              </Card>
+            </>
+          )}
 
-        {/* NEW STRUCTURE: Control Panel UI Cleanup */}
-        <Box paddingBlockEnd="400">
-          <Card>
-            <InlineStack align="space-between" blockAlign="center" wrap={false}>
-              <BlockStack gap="100">
-                <InlineStack gap="200" blockAlign="center">
-                  <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
-                  <Tooltip content="This is a virtual overlay. It changes what customers see on your website instantly without changing your Shopify database.">
-                    <span style={{ cursor: "pointer", display: "inline-flex" }}>
-                      <Icon source={InfoIcon} tone="subdued" />
-                    </span>
-                  </Tooltip>
-                </InlineStack>
-                <Text as="p" variant="bodySm" tone="subdued">Choose when your dynamic pricing rules are active on the storefront. No permanent admin changes.</Text>
-              </BlockStack>
-              
-              <InlineStack gap="300" blockAlign="center">
-                {metrics.isLive ? (
-                  <Badge tone="success">Live Pricing: ON</Badge>
-                ) : (
-                  <Badge tone="critical">Live Pricing: OFF</Badge>
-                )}
-                {/* UPDATED UI: Exclusively show Go Live OR Stop. Hide if no rules configured. */}
-                {hasRules && (
-                  metrics.isLive ? (
-                    <Button
-                      onClick={() => setShowStopModal(true)}
-                      disabled={isProcessing}
-                      tone="critical"
-                      variant="primary"
-                    >
-                      Stop Live Prices
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      tone="success"
-                      onClick={() => setShowGoLiveModal(true)}
-                      loading={isProcessing}
-                      disabled={isProcessing}
-                    >
-                      Go Live on Storefront
-                    </Button>
-                  )
-                )}
-              </InlineStack>
-            </InlineStack>
-          </Card>
-        </Box>
-
-        {!loading && previews.length === 0 && (
-          <Card>
-            <Box padding="500">
-              <BlockStack gap="400" align="center">
-                <Text as="h2" variant="headingMd">No products to polish yet</Text>
-                <Text as="p" tone="subdued">
-                  We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
-                </Text>
-                <Button variant="primary" onClick={handlePreview}>Refresh Now</Button>
-              </BlockStack>
-            </Box>
-          </Card>
-        )}
-
-        {/* NEW STRUCTURE: Opacity dimming if empty state */}
-        <div style={{ opacity: !hasRules ? 0.6 : 1, transition: "opacity 0.2s ease" }}>
-          <Box paddingBlockEnd="400">
+          {/* First Visit Welcome */}
+          {firstVisit && (
             <Card>
               <BlockStack gap="400">
-                <InlineStack gap="300" align="start">
-                  {/* UPDATED UI: Secondary Button Roles For Main Actions. Hidden entirely if !hasRules */}
-                  <Button
-                    onClick={handlePreview}
-                    loading={loading}
-                    disabled={loading || isProcessing || !hasRules}
-                  >
-                    Refresh Previews
-                  </Button>
-                  {hasRules && (
-                    <>
+                <Text as="h2" variant="headingMd">Welcome to Price Polish! 🚀</Text>
+                <Text as="p">Follow these simple steps to optimize your store pricing:</Text>
+                <Box paddingInlineStart="400">
+                  <BlockStack gap="200">
+                    <Text as="p">1️⃣ <strong>Configure:</strong> Set your markup and rounding rules in the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
+                    <Text as="p">2️⃣ <strong>Preview:</strong> Come back here to see how your new prices will look.</Text>
+                    <Text as="p">3️⃣ <strong>Apply:</strong> Review the changes and apply them safely (you can undo anytime).</Text>
+                  </BlockStack>
+                </Box>
+              </BlockStack>
+            </Card>
+          )}
+
+          {/* Billing Upsell */}
+          {!hasActivePlan && (
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingMd">Start Your 7-Day Free Trial</Text>
+                <Text as="p">Apply smart pricing, increase profits, and manage bulk updates safely.</Text>
+                <InlineStack gap="200">
+                  <Badge tone="success">Bulk Pricing</Badge>
+                  <Badge tone="success">Undo Anytime</Badge>
+                  <Badge tone="success">Live Store Sync</Badge>
+                </InlineStack>
+                {/* UPDATED: variant="primary" — Task 5 hierarchy */}
+                <Button variant="primary" onClick={handleUpgrade}>Start Free Trial</Button>
+                <Text as="p" variant="bodySm" tone="subdued">No charge today • Cancel anytime</Text>
+              </BlockStack>
+            </Card>
+          )}
+
+          {/* Safety Info Banner */}
+          <Banner tone="info">
+            <BlockStack gap="200">
+              <Text as="p">✔️ Safe to use — all changes can be undone anytime</Text>
+              <Text as="p">✔️ Your original prices are preserved and stored securely</Text>
+              <Text as="p">💡 <strong>Tip:</strong> The "Apply" button becomes disabled once your price is perfectly synced with your current Pricing Rules. Change your rules to reactivate it!</Text>
+            </BlockStack>
+          </Banner>
+
+          {/* Live Mode Warning */}
+          {metrics.isLive && (
+            <Banner tone="warning">
+              <BlockStack gap="200">
+                <Text as="p">⚠️ <strong>Live Pricing is ON:</strong> Any prices you "Apply" here will permanently change your Shopify database. Because your Live Rules are active, the storefront extension will apply its rules <strong>on top</strong> of these new prices. If you want the "Applied" price to be the final price, please stop Live Pricing or adjust your rules.</Text>
+              </BlockStack>
+            </Banner>
+          )}
+
+          {/* Error / Success Message */}
+          {message && (
+            <Banner
+              title={message.text}
+              tone={message.type}
+              onDismiss={() => setMessage(null)}
+            >
+              {message.details && <p>{message.details}</p>}
+            </Banner>
+          )}
+
+          {/* SAAS Metrics Grid */}
+          {previews.length > 0 && !loading && (
+            <Box paddingBlockEnd="400">
+              <Grid>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Card>
+                    <BlockStack gap="100" align="start">
+                      <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
+                      <Text as="h2" variant="headingLg">
+                        {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
+                      </Text>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Card>
+                    <BlockStack gap="100" align="start">
+                      <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
+                      <Text as="h2" variant="headingLg">
+                        {`${metrics.successRate.toFixed(1)}%`}
+                      </Text>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Card>
+                    <BlockStack gap="100" align="start">
+                      <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
+                      <Text as="h2" variant="headingLg">{metrics.totalApplied}</Text>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Card>
+                    <BlockStack gap="100" align="start">
+                      <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
+                      <Text as="h2" variant="headingLg">
+                        {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
+                      </Text>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+              </Grid>
+            </Box>
+          )}
+
+          {/* UPDATED TASK 2: No Rules Warning Banner — shows when ruleExists is definitively false */}
+          {!hasRules && ruleExists !== null && (
+            <Box paddingBlockStart="200" paddingBlockEnd="500">
+              <Banner tone="warning" title="No Pricing Rules Found">
+                <Box paddingBlockStart="200" paddingBlockEnd="200">
+                  <BlockStack gap="400">
+                    <p>
+                      You must configure at least one pricing rule before applying changes or going live.
+                    </p>
+                    <InlineStack>
+                      {/* UPDATED Task 5: Configure Rules → primary (default) */}
+                      <Button variant="primary" size="large" onClick={() => navigate("/app/rules")}>
+                        Configure Pricing Rules
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Box>
+              </Banner>
+            </Box>
+          )}
+
+          {/* ── TASK 3: Storefront Control Panel with Live Status Indicator ── */}
+          {/* UPDATED Task 6: Opacity dimming when no rules */}
+          <Box paddingBlockEnd="400">
+            <div style={{
+              opacity: !hasRules ? 0.6 : 1,
+              transition: "opacity 0.2s ease",
+              pointerEvents: !hasRules ? "none" : "auto",  // ADDED: block clicks at wrapper level too
+            }}>
+              <Card>
+                <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                  <BlockStack gap="100">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
+                      <Tooltip content="This is a virtual overlay. It changes what customers see on your website instantly without changing your Shopify database.">
+                        <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                          <Icon source={InfoIcon} tone="subdued" />
+                        </span>
+                      </Tooltip>
+                    </InlineStack>
+                    <Text as="p" variant="bodySm" tone="subdued">Choose when your dynamic pricing rules are active on the storefront. No permanent admin changes.</Text>
+                  </BlockStack>
+
+                  <InlineStack gap="300" blockAlign="center">
+                    {/* UPDATED TASK 3: Animated live status dot replaces static Badge */}
+                    <InlineStack gap="200" blockAlign="center">
+                      <span
+                        className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
+                        aria-hidden="true"
+                      />
+                      <Text as="span" variant="bodySm" fontWeight="semibold" tone={metrics.isLive ? "success" : "critical"}>
+                        {metrics.isLive ? "Live Pricing Active" : "Live Pricing Off"}
+                      </Text>
+                    </InlineStack>
+
+                    {/* UPDATED TASK 2 + 4 + 5: Show only one of Go Live / Stop Live. Guard on click. */}
+                    {metrics.isLive ? (
+                      // UPDATED Task 5: Stop → critical (red)
                       <Button
-                        onClick={() => setIsModalOpen(true)}
-                        disabled={!hasActivePlan || isProcessing || previews.length === 0}
+                        onClick={handleStopLiveClick}
+                        disabled={isProcessing || !hasRules}
+                        tone="critical"
+                        variant="primary"
+                      >
+                        Stop Live Prices
+                      </Button>
+                    ) : (
+                      // UPDATED Task 5: Go Live → success (green)
+                      <Button
+                        variant="primary"
+                        tone="success"
+                        onClick={handleGoLiveClick}
+                        loading={isProcessing}
+                        disabled={isProcessing || !hasRules}
+                      >
+                        Go Live on Storefront
+                      </Button>
+                    )}
+                  </InlineStack>
+                </InlineStack>
+              </Card>
+            </div>
+          </Box>
+
+          {/* Empty products state */}
+          {!loading && previews.length === 0 && (
+            <Card>
+              <Box padding="500">
+                <BlockStack gap="400" align="center">
+                  <Text as="h2" variant="headingMd">No products to polish yet</Text>
+                  <Text as="p" tone="subdued">
+                    We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
+                  </Text>
+                  <Button variant="primary" onClick={handlePreview}>Refresh Now</Button>
+                </BlockStack>
+              </Box>
+            </Card>
+          )}
+
+          {/* ── TASK 1 + 6: Apply / Batch panel — opacity-dimmed and disabled when no rules ── */}
+          {/* UPDATED: pointer-events blocked at wrapper level as an extra safety layer */}
+          <div style={{
+            opacity: !hasRules ? 0.6 : 1,
+            transition: "opacity 0.2s ease",
+            pointerEvents: !hasRules ? "none" : "auto",
+          }}>
+            <Box paddingBlockEnd="400">
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack gap="300" align="start">
+                    {/* Refresh is always available regardless of rules */}
+                    <div style={{ pointerEvents: "auto" }}>
+                      <Button
+                        onClick={handlePreview}
+                        loading={loading}
+                        disabled={loading || isProcessing}
+                      >
+                        Refresh Previews
+                      </Button>
+                    </div>
+
+                    {/* UPDATED TASK 1: All action buttons disabled + guarded when no rules */}
+                    <>
+                      {/* UPDATED Task 5: Apply → secondary */}
+                      <Button
+                        onClick={() => {
+                          if (guardNoRules()) return;
+                          setIsModalOpen(true);
+                        }}
+                        disabled={!hasActivePlan || isProcessing || previews.length === 0 || !hasRules}
                       >
                         {`Apply All (${previews.length})`}
                       </Button>
+
                       {previews.length === 0 ? (
                         <Tooltip content="Please refresh previews to generate the latest report.">
-                           <span style={{ display: 'inline-block' }}>
-                             <Button disabled>Download Impact Report</Button>
-                           </span>
+                          <span style={{ display: 'inline-block' }}>
+                            <Button disabled>Download Impact Report</Button>
+                          </span>
                         </Tooltip>
                       ) : (
                         <Button onClick={handleDownloadReport}>
                           Download Impact Report
                         </Button>
                       )}
+
+                      {/* UPDATED Task 5: Apply Selected → secondary */}
                       <Button
                         onClick={handleApplySelected}
-                        disabled={!hasActivePlan || isProcessing || selectedItems.size === 0}
+                        disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
                       >
                         {`Apply Selected (${selectedItems.size})`}
                       </Button>
+
                       {lastUpdate && (
                         <Button
                           onClick={handleUndo}
@@ -1020,320 +1044,313 @@ useEffect(() => {
                         </Button>
                       )}
                     </>
-                  )}
-                </InlineStack>
-
-            {isProcessing && (
-              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="300" align="center">
-                  <InlineStack gap="300" blockAlign="center" align="center">
-                    <Spinner size="small" />
-                    <Text as="p" variant="bodyMd" fontWeight="bold">Processing price updates...</Text>
                   </InlineStack>
-                  <Text as="p" tone="subdued" variant="bodySm">Please do not close this window or navigate away.</Text>
-                  <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+
+                  {/* Processing progress */}
+                  {isProcessing && (
+                    <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                      <BlockStack gap="300" align="center">
+                        <InlineStack gap="300" blockAlign="center" align="center">
+                          <Spinner size="small" />
+                          <Text as="p" variant="bodyMd" fontWeight="bold">Processing price updates...</Text>
+                        </InlineStack>
+                        <Text as="p" tone="subdued" variant="bodySm">Please do not close this window or navigate away.</Text>
+                        <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+                      </BlockStack>
+                    </Box>
+                  )}
+
+                  {/* Filters, Search, Sort — only when products exist */}
+                  {previews.length > 0 && !loading && !isProcessing && (
+                    <BlockStack gap="400">
+                      <Divider />
+                      <Text as="h3" variant="headingMd">Filters & Smart Segments</Text>
+
+                      <InlineStack gap="200">
+                        <Button pressed={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All</Button>
+                        <Button pressed={activeFilter === "increase"} onClick={() => setActiveFilter("increase")}>Price Increase</Button>
+                        <Button pressed={activeFilter === "decrease"} onClick={() => setActiveFilter("decrease")}>Price Decrease</Button>
+                        <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
+                      </InlineStack>
+
+                      <InlineStack gap="400" align="start">
+                        <Box width="300px">
+                          <TextField
+                            label="Search Products"
+                            value={searchQuery}
+                            onChange={handleSearchChange}
+                            autoComplete="off"
+                            placeholder="Product title..."
+                            maxLength={100}
+                          />
+                        </Box>
+                        <Box width="200px">
+                          <Select
+                            label="Sort by"
+                            options={[
+                              { label: "Name (A-Z)", value: "name_asc" },
+                              { label: "Name (Z-A)", value: "name_desc" },
+                              { label: "Price (Low to High)", value: "price_asc" },
+                              { label: "Price (High to Low)", value: "price_desc" },
+                              { label: "% Change (Asc)", value: "change_asc" },
+                              { label: "% Change (Desc)", value: "change_desc" },
+                            ]}
+                            value={sortOrder}
+                            onChange={setSortOrder}
+                          />
+                        </Box>
+                        <Box width="150px">
+                          <TextField
+                            label="Min Price"
+                            type="text"
+                            inputMode="decimal"
+                            value={minPrice}
+                            onChange={handleMinPriceChange}
+                            autoComplete="off"
+                            prefix={currencySymbol}
+                            maxLength={15}
+                          />
+                        </Box>
+                        <Box width="150px">
+                          <TextField
+                            label="Max Price"
+                            type="text"
+                            inputMode="decimal"
+                            value={maxPrice}
+                            onChange={handleMaxPriceChange}
+                            autoComplete="off"
+                            prefix={currencySymbol}
+                            maxLength={15}
+                          />
+                        </Box>
+                      </InlineStack>
+
+                      <Divider />
+
+                      <InlineStack align="space-between">
+                        <InlineStack gap="300">
+                          <Button size="slim" onClick={selectAllVisible}>Select All on Page</Button>
+                          <Button size="slim" onClick={() => setSelectedItems(new Set())}>Clear Selection</Button>
+                        </InlineStack>
+                        <Pagination
+                          hasPrevious={currentPage > 1}
+                          onPrevious={() => setCurrentPage(prev => prev - 1)}
+                          hasNext={currentPage < totalPages}
+                          onNext={() => setCurrentPage(prev => prev + 1)}
+                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                        />
+                      </InlineStack>
+
+                      {/* Product rows */}
+                      <BlockStack gap="200">
+                        {paginatedPreviews.map((p) => {
+                          const currentPrice = parseFloat(p.oldPrice);
+                          const originalPrice = parseFloat(p.originalBasePrice);
+                          const isManual = p.overriddenPrice !== undefined;
+                          const targetPrice = isManual ? parseFloat(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
+                          const isPolished = currentPrice !== originalPrice;
+                          const isChanged = currentPrice !== targetPrice;
+                          const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
+                          const isSelected = selectedItems.has(p.variantId);
+
+                          return (
+                            <Card key={p.variantId} padding="300">
+                              <Box background={isManual ? "bg-surface-caution" : undefined}>
+                                <InlineStack align="space-between" blockAlign="center">
+                                  <InlineStack gap="300" blockAlign="center">
+                                    <Checkbox
+                                      label=""
+                                      labelHidden
+                                      checked={isSelected}
+                                      onChange={() => toggleSelection(p.variantId)}
+                                    />
+                                    <Thumbnail source={p.image || ""} alt={p.title} size="small" />
+                                    <BlockStack gap="100">
+                                      <Text as="span" variant="bodyMd" fontWeight="bold">{p.title}</Text>
+                                      <InlineStack gap="200">
+                                        {isChanged ? (
+                                          <Badge tone={targetPrice > currentPrice ? "success" : "attention"}>
+                                            {targetPrice > currentPrice ? "Profit Optimized" : "Price Reduced"}
+                                          </Badge>
+                                        ) : (
+                                          <Badge tone="info">No change</Badge>
+                                        )}
+                                        {isPolished && <Badge tone="success">Currently Polished</Badge>}
+                                        {isManual && <Badge tone="attention">Manual Override</Badge>}
+                                        {Math.abs(diffFromOriginal) >= 10 && <Badge tone="warning">High Impact</Badge>}
+                                      </InlineStack>
+                                    </BlockStack>
+                                  </InlineStack>
+
+                                  <InlineStack gap="400" blockAlign="center">
+                                    <InlineStack gap="200" blockAlign="center">
+                                      <BlockStack gap="0">
+                                        <Text as="span" variant="bodySm" tone="subdued">Original: {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}</Text>
+                                        <Text as="span" tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
+                                          Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
+                                        </Text>
+                                      </BlockStack>
+                                      <Box width="100px">
+                                        <TextField
+                                          label=""
+                                          labelHidden
+                                          value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
+                                          onChange={(val) => handlePriceChange(p.variantId, val)}
+                                          autoComplete="off"
+                                          prefix={currencySymbol}
+                                          size="slim"
+                                          maxLength={15}
+                                        />
+                                      </Box>
+                                      {(isPolished || isChanged) && (
+                                        <Text as="span" tone={targetPrice > originalPrice ? "success" : "caution"} fontWeight="bold">
+                                          {`${targetPrice > originalPrice ? '+' : ''}${diffFromOriginal.toFixed(1)}%`}
+                                        </Text>
+                                      )}
+                                      {isManual && (
+                                        <Button size="slim" variant="tertiary" onClick={() => resetOverride(p.variantId)}>
+                                          Reset
+                                        </Button>
+                                      )}
+                                    </InlineStack>
+
+                                    {/* UPDATED TASK 1: Row Apply button disabled when no rules */}
+                                    {isChanged ? (
+                                      <Button
+                                        size="slim"
+                                        onClick={() => handleApplySingle(p)}
+                                        loading={updatingItem === p.variantId}
+                                        disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
+                                        tone="success"
+                                      >
+                                        Apply
+                                      </Button>
+                                    ) : (
+                                      <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                                        <span style={{ display: 'inline-block' }}>
+                                          <Button
+                                            size="slim"
+                                            onClick={() => handleApplySingle(p)}
+                                            loading={updatingItem === p.variantId}
+                                            disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
+                                          >
+                                            Apply
+                                          </Button>
+                                        </span>
+                                      </Tooltip>
+                                    )}
+                                  </InlineStack>
+                                </InlineStack>
+                              </Box>
+                            </Card>
+                          );
+                        })}
+                      </BlockStack>
+
+                      <InlineStack align="center">
+                        <Pagination
+                          hasPrevious={currentPage > 1}
+                          onPrevious={() => setCurrentPage(prev => prev - 1)}
+                          hasNext={currentPage < totalPages}
+                          onNext={() => setCurrentPage(prev => prev + 1)}
+                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                        />
+                      </InlineStack>
+                    </BlockStack>
+                  )}
+
+                  {!hasActivePlan && (
+                    <Text as="p" tone="critical">
+                      🔒 Start your free trial to apply pricing changes
+                    </Text>
+                  )}
+                </BlockStack>
+              </Card>
+            </Box>
+          </div>
+
+        </BlockStack>
+
+        {/* ── TASK 4: Confirmation Modals ── */}
+
+        {/* Apply All confirmation modal — unchanged handler */}
+        <Modal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Confirm Bulk Update"
+          primaryAction={{
+            content: 'Apply Changes',
+            onAction: () => handleApplyBatch(previews),
+            loading: isProcessing,
+            disabled: isProcessing
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setIsModalOpen(false) }]}
+        >
+          <Modal.Section>
+            <Text as="p">
+              You are about to update prices for <strong>{previews.length}</strong> products.
+              This action can be undone later using the "Undo Last Update" button.
+            </Text>
+          </Modal.Section>
+        </Modal>
+
+        {/* UPDATED TASK 4: Go Live confirmation modal */}
+        <Modal
+          open={showGoLiveModal}
+          onClose={() => setShowGoLiveModal(false)}
+          title="Go Live with Pricing Rules?"
+          primaryAction={{
+            content: 'Go Live',
+            // UPDATED: wraps existing handler — no logic change
+            onAction: () => handlePushStorefront(false),
+            loading: isProcessing,
+            disabled: isProcessing
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setShowGoLiveModal(false) }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              <Text as="p">Prices will be applied to your storefront.</Text>
+              <Box paddingInlineStart="400">
+                <BlockStack gap="200">
+                  <Text as="p">✔️ This will affect all product prices</Text>
+                  <Text as="p">✔️ You can stop anytime</Text>
                 </BlockStack>
               </Box>
-            )}
+              <Text as="p">Do you want to continue?</Text>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
 
-            {previews.length > 0 && !loading && !isProcessing && (
-              <BlockStack gap="400">
-                <Divider />
-                <Text as="h3" variant="headingMd">Filters & Smart Segments</Text>
-                
-                <InlineStack gap="200">
-                  <Button pressed={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All</Button>
-                  <Button pressed={activeFilter === "increase"} onClick={() => setActiveFilter("increase")}>Price Increase</Button>
-                  <Button pressed={activeFilter === "decrease"} onClick={() => setActiveFilter("decrease")}>Price Decrease</Button>
-                  <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
-                </InlineStack>
-
-                <InlineStack gap="400" align="start">
-                  <Box width="300px">
-                    <TextField
-                      label="Search Products"
-                      value={searchQuery}
-                      onChange={handleSearchChange}
-                      autoComplete="off"
-                      placeholder="Product title..."
-                      maxLength={100}
-                    />
-                  </Box>
-                  <Box width="200px">
-                    <Select
-                      label="Sort by"
-                      options={[
-                        { label: "Name (A-Z)", value: "name_asc" },
-                        { label: "Name (Z-A)", value: "name_desc" },
-                        { label: "Price (Low to High)", value: "price_asc" },
-                        { label: "Price (High to Low)", value: "price_desc" },
-                        { label: "% Change (Asc)", value: "change_asc" },
-                        { label: "% Change (Desc)", value: "change_desc" },
-                      ]}
-                      value={sortOrder}
-                      onChange={setSortOrder}
-                    />
-                  </Box>
-                  <Box width="150px">
-                    <TextField
-                      label="Min Price"
-                      type="text"
-                      inputMode="decimal"
-                      value={minPrice}
-                      onChange={handleMinPriceChange}
-                      autoComplete="off"
-                      prefix={currencySymbol}
-                      maxLength={15}
-                    />
-                  </Box>
-                  <Box width="150px">
-                    <TextField
-                      label="Max Price"
-                      type="text"
-                      inputMode="decimal"
-                      value={maxPrice}
-                      onChange={handleMaxPriceChange}
-                      autoComplete="off"
-                      prefix={currencySymbol}
-                      maxLength={15}
-                    />
-                  </Box>
-                </InlineStack>
-
-                <Divider />
-                
-                <InlineStack align="space-between">
-                  <InlineStack gap="300">
-                    <Button size="slim" onClick={selectAllVisible}>Select All on Page</Button>
-                    <Button size="slim" onClick={() => setSelectedItems(new Set())}>Clear Selection</Button>
-                  </InlineStack>
-                  <Pagination
-                    hasPrevious={currentPage > 1}
-                    onPrevious={() => setCurrentPage(prev => prev - 1)}
-                    hasNext={currentPage < totalPages}
-                    onNext={() => setCurrentPage(prev => prev + 1)}
-                    label={`Page ${currentPage} of ${totalPages || 1}`}
-                  />
-                </InlineStack>
-
+        {/* UPDATED TASK 4: Stop Live confirmation modal — destructive primary */}
+        <Modal
+          open={showStopModal}
+          onClose={() => setShowStopModal(false)}
+          title="Stop Live Pricing?"
+          primaryAction={{
+            content: 'Stop Live',
+            // UPDATED: wraps existing handler — no logic change
+            onAction: () => handlePushStorefront(true),
+            loading: isProcessing,
+            disabled: isProcessing,
+            destructive: true
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setShowStopModal(false) }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="400">
+              <Text as="p">This will disable dynamic pricing on your storefront.</Text>
+              <Box paddingInlineStart="400">
                 <BlockStack gap="200">
-                  {paginatedPreviews.map((p) => {
-                    const currentPrice = parseFloat(p.oldPrice);
-                    const originalPrice = parseFloat(p.originalBasePrice);
-                    const isManual = p.overriddenPrice !== undefined;
-                    const targetPrice = isManual ? parseFloat(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
-                    
-                    const isPolished = currentPrice !== originalPrice;
-                    const isChanged = currentPrice !== targetPrice;
-                    const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
-                    
-                    const isSelected = selectedItems.has(p.variantId);
-                    
-                    return (
-                      <Card key={p.variantId} padding="300">
-                        <Box background={isManual ? "bg-surface-caution" : undefined}>
-                          <InlineStack align="space-between" blockAlign="center">
-                            <InlineStack gap="300" blockAlign="center">
-                              <Checkbox 
-                                label="" 
-                                labelHidden 
-                                checked={isSelected} 
-                                onChange={() => toggleSelection(p.variantId)} 
-                              />
-                              <Thumbnail source={p.image || ""} alt={p.title} size="small" />
-                              <BlockStack gap="100">
-                                <Text as="span" variant="bodyMd" fontWeight="bold">
-                                  {p.title}
-                                </Text>
-                                <InlineStack gap="200">
-                                  {isChanged ? (
-                                    <Badge tone={targetPrice > currentPrice ? "success" : "attention"}>
-                                      {targetPrice > currentPrice ? "Profit Optimized" : "Price Reduced"}
-                                    </Badge>
-                                  ) : (
-                                    <Badge tone="info">No change</Badge>
-                                  )}
-                                  {isPolished && <Badge tone="success">Currently Polished</Badge>}
-                                  {isManual && <Badge tone="attention">Manual Override</Badge>}
-                                  {Math.abs(diffFromOriginal) >= 10 && <Badge tone="warning">High Impact</Badge>}
-                                </InlineStack>
-                              </BlockStack>
-                            </InlineStack>
-
-                            <InlineStack gap="400" blockAlign="center">
-                              <InlineStack gap="200" blockAlign="center">
-                                <BlockStack gap="0">
-                                  <Text as="span" variant="bodySm" tone="subdued">Original: {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}</Text>
-                                  <Text as="span" tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
-                                    Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
-                                  </Text>
-                                </BlockStack>
-                                <Box width="100px">
-                                  <TextField
-                                    label=""
-                                    labelHidden
-                                    value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
-                                    onChange={(val) => handlePriceChange(p.variantId, val)}
-                                    autoComplete="off"
-                                    prefix={currencySymbol}
-                                    size="slim"
-                                    maxLength={15}
-                                  />
-                                </Box>
-                                {(isPolished || isChanged) && (
-                                  <Text as="span" tone={targetPrice > originalPrice ? "success" : "caution"} fontWeight="bold">
-                                    {`${targetPrice > originalPrice ? '+' : ''}${diffFromOriginal.toFixed(1)}%`}
-                                  </Text>
-                                )}
-                                {isManual && (
-                                  <Button size="slim" variant="tertiary" onClick={() => resetOverride(p.variantId)}>
-                                    Reset
-                                  </Button>
-                                )}
-                              </InlineStack>
-                              
-                              {isChanged ? (
-                                <Button 
-                                  size="slim" 
-                                  onClick={() => handleApplySingle(p)}
-                                  loading={updatingItem === p.variantId}
-                                  disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
-                                  tone="success"
-                                >
-                                  Apply
-                                </Button>
-                              ) : (
-                                <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
-                                  <span style={{ display: 'inline-block' }}>
-                                    <Button 
-                                      size="slim" 
-                                      onClick={() => handleApplySingle(p)}
-                                      loading={updatingItem === p.variantId}
-                                      disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "")}
-                                    >
-                                      Apply
-                                    </Button>
-                                  </span>
-                                </Tooltip>
-                              )}
-                            </InlineStack>
-                          </InlineStack>
-                        </Box>
-                      </Card>
-                    );
-                  })}
+                  <Text as="p">✔️ This will remove all live pricing changes</Text>
+                  <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
                 </BlockStack>
+              </Box>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
 
-                <InlineStack align="center">
-                  <Pagination
-                    hasPrevious={currentPage > 1}
-                    onPrevious={() => setCurrentPage(prev => prev - 1)}
-                    hasNext={currentPage < totalPages}
-                    onNext={() => setCurrentPage(prev => prev + 1)}
-                    label={`Page ${currentPage} of ${totalPages || 1}`}
-                  />
-                </InlineStack>
-              </BlockStack>
-              
-            )}
-          </BlockStack>
-        {!hasActivePlan && (
-            <Text as="p" tone="critical">
-              🔒 Start your free trial to apply pricing changes
-            </Text>
-          )}
-            </Card>
-          </Box>
-        </div>
-      </BlockStack>
-
-      <Modal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Confirm Bulk Update"
-        primaryAction={{
-          content: 'Apply Changes',
-          onAction: () => handleApplyBatch(previews),
-          loading: isProcessing,
-          disabled: isProcessing
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setIsModalOpen(false),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <Text as="p">
-            You are about to update prices for <strong>{previews.length}</strong> products.
-            This action can be undone later using the "Undo Last Update" button.
-          </Text>
-        </Modal.Section>
-      </Modal>
-
-      <Modal
-        open={showGoLiveModal}
-        onClose={() => setShowGoLiveModal(false)}
-        title="Confirm Go Live"
-        primaryAction={{
-          content: 'Go Live',
-          onAction: () => handlePushStorefront(false),
-          loading: isProcessing,
-          disabled: isProcessing
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setShowGoLiveModal(false),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Text as="p">You are about to apply pricing rules to your live store.</Text>
-            <Box paddingInlineStart="400">
-              <BlockStack gap="200">
-                <Text as="p">✔️ This will affect all product prices</Text>
-                <Text as="p">✔️ You can stop anytime</Text>
-              </BlockStack>
-            </Box>
-            <Text as="p">Do you want to continue?</Text>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-
-      <Modal
-        open={showStopModal}
-        onClose={() => setShowStopModal(false)}
-        title="Confirm Stop Live Prices"
-        primaryAction={{
-          content: 'Stop Live',
-          onAction: () => handlePushStorefront(true),
-          loading: isProcessing,
-          disabled: isProcessing,
-          destructive: true
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: () => setShowStopModal(false),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="400">
-            <Text as="p">Are you sure you want to restore original prices?</Text>
-            <Box paddingInlineStart="400">
-              <BlockStack gap="200">
-                <Text as="p">✔️ This will remove all live pricing changes</Text>
-                <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
-              </BlockStack>
-            </Box>
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-    </Page>
+      </Page>
     </div>
   );
 }
