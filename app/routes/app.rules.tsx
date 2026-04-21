@@ -82,32 +82,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const fieldErrors: Record<string, string> = {};
 
-    /**
-     * 1. PREVENT "BAD" VALUES VIA REGEX
-     * - markupStr: Optional minus, then 1-2 digits, optional decimal with 1-2 digits (Max 5 chars)
-     * - roundingStr: Must start with 0 or -0, decimal point, then 1-2 digits (e.g., 0.99, -0.50)
-     */
-    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr) || markupStr.length > 5) {
-        fieldErrors.markupPercent = "Enter a valid percentage (e.g., 99.99 or -15.5)";
+    // =============================
+    // 1. STRICT FORMAT VALIDATION
+    // =============================
+
+    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr)) {
+        fieldErrors.markupPercent =
+            "Enter a valid percentage (e.g., 10, -5, 12.5)";
     }
 
-    if (!/^-?0(\.\d{1,2})?$/.test(roundingStr)) {
-        fieldErrors.roundingStep = "Rounding must be a fraction (e.g., 0.99 or -0.5)";
+    if (!/^0(\.\d{1,2})?$/.test(roundingStr)) {
+        fieldErrors.roundingStep =
+            "Rounding must be between 0.00 and 0.99 (e.g., 0.99)";
     }
 
     const markupPercent = Number(markupStr);
-    const roundingStep = Number(roundingStr);
+    let roundingStep = Number(roundingStr);
 
-    /**
-     * 2. STRICT RANGE VALIDATION
-     */
+    // =============================
+    // 2. RANGE VALIDATION
+    // =============================
+
     if (!fieldErrors.markupPercent && (markupPercent < -99.99 || markupPercent > 99.99)) {
-        fieldErrors.markupPercent = "Value must be between -99.99 and 99.99";
+        fieldErrors.markupPercent = "Must be between -99.99 and 99.99";
     }
 
-    if (!fieldErrors.roundingStep && (roundingStep < -0.99 || roundingStep > 0.99)) {
-        fieldErrors.roundingStep = "Value must be between -0.99 and 0.99";
+    if (!fieldErrors.roundingStep && (roundingStep < 0 || roundingStep > 0.99)) {
+        fieldErrors.roundingStep = "Must be between 0.00 and 0.99";
     }
+
+    // =============================
+    // ❌ STOP ON ERROR
+    // =============================
 
     if (Object.keys(fieldErrors).length > 0) {
         return {
@@ -119,8 +125,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         };
     }
 
+    // =============================
+    // 3. 🔥 NORMALIZE ROUNDING
+    // =============================
+
+    // force max 2 decimals (prevents 0.555 → 0.56 issues later)
+    roundingStep = Math.round(roundingStep * 100) / 100;
+
+    // =============================
+    // 4. SAVE (TRANSACTION SAFE)
+    // =============================
+
     try {
-        // ✅ Transactional logic: Save history and update current rule
         await prisma.$transaction([
             prisma.pricingRuleHistory.create({
                 data: {
@@ -130,6 +146,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     roundingStep,
                 },
             }),
+
             prisma.pricingRule.upsert({
                 where: { shop: session.shop },
                 update: { markupPercent, charmPricing, roundingStep },
@@ -150,6 +167,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         };
     } catch (error) {
         console.error("Database error:", error);
+
         return {
             markupPercent,
             charmPricing,
@@ -358,10 +376,12 @@ function RulesContent({
                     {/* RIGHT (your preview untouched conceptually) */}
                     <Layout.Section variant="oneThird">
                         <Card>
-                            <BlockStack gap="300">
-                                <Text variant="headingMd">Live Example</Text>
+                            <BlockStack gap="400">
 
+                                {/* 🔥 LIVE EXAMPLE */}
                                 <BlockStack gap="200">
+                                    <Text variant="headingMd">Live Example</Text>
+
                                     <InlineStack align="space-between">
                                         <Text tone="subdued">Base Price</Text>
                                         <Text variant="headingSm">
@@ -374,7 +394,7 @@ function RulesContent({
                                             {markup >= 0 ? "+" : ""}
                                             {markup}% Markup
                                         </Text>
-                                        <Text variant="headingSm" tone="success">
+                                        <Text tone="success" variant="headingSm">
                                             ${priceAfterMarkup.toFixed(2)}
                                         </Text>
                                     </InlineStack>
@@ -387,9 +407,7 @@ function RulesContent({
                                     </InlineStack>
 
                                     {charmPricing && (
-                                        <Text tone="subdued">
-                                            Charm pricing applied (.99)
-                                        </Text>
+                                        <Text tone="subdued">Charm pricing applied (.99)</Text>
                                     )}
 
                                     <InlineStack align="space-between">
@@ -399,6 +417,32 @@ function RulesContent({
                                         </Text>
                                     </InlineStack>
                                 </BlockStack>
+
+                                {/* 🔥 DIVIDER FEEL */}
+                                <div style={{ borderTop: "1px solid #eee", margin: "8px 0" }} />
+
+                                {/* 🔥 LAST UPDATED */}
+                                {updatedAt && (
+                                    <Text tone="subdued">
+                                        Last updated: {new Date(updatedAt).toLocaleString()}
+                                    </Text>
+                                )}
+
+                                {/* 🔥 RECENT CHANGES */}
+                                {loaderData.history && loaderData.history.length > 0 && (
+                                    <BlockStack gap="100">
+                                        <Text variant="headingSm">Recent Changes</Text>
+
+                                        {loaderData.history.map((h) => (
+                                            <Text key={h.id} tone="subdued">
+                                                {h.markupPercent > 0 ? "+" : ""}
+                                                {h.markupPercent}% markup •{" "}
+                                                {h.charmPricing ? ".99 enabled • " : ""}
+                                                {new Date(h.createdAt).toLocaleString()}
+                                            </Text>
+                                        ))}
+                                    </BlockStack>
+                                )}
                             </BlockStack>
                         </Card>
                     </Layout.Section>
