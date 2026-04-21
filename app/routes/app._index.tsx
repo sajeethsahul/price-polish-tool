@@ -841,68 +841,74 @@ useEffect(() => {
 
         {/* SAAS INSIGHT CARD */}
         {previews.length > 0 && !loading && (
-          <Grid>
-            <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-              <Card>
-                <BlockStack gap="100" align="center">
-                  <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
-                  <Text as="h2" variant="headingLg" tone="success">
-                    {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
-                  </Text>
-                </BlockStack>
-              </Card>
-            </Grid.Cell>
-            <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-              <Card>
-                <BlockStack gap="100" align="center">
-                  <Text as="p" variant="bodySm" tone="subdued">Success Rate (%)</Text>
-                  <Text as="h2" variant="headingLg" tone={metrics.successRate > 90 ? "success" : "caution"}>
-                    {`${metrics.successRate.toFixed(1)}%`}
-                  </Text>
-                </BlockStack>
-              </Card>
-            </Grid.Cell>
-            <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-              <Card>
-                <BlockStack gap="100" align="center">
-                  <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
-                  <Text as="h2" variant="headingLg">
-                    {metrics.totalApplied}
-                  </Text>
-                </BlockStack>
-              </Card>
-            </Grid.Cell>
-            <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
-              <Card>
-                <BlockStack gap="100" align="center">
-                  <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
-                  <Text as="h2" variant="headingLg" fontWeight="bold">
-                    {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
-                  </Text>
-                </BlockStack>
-              </Card>
-            </Grid.Cell>
-          </Grid>
+          <Box paddingBlockEnd="400">
+            <Grid>
+              {/* UPDATED UI: Metrics aligned Left, removed heavy text colors, consistent neutral weight */}
+              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
+                <Card>
+                  <BlockStack gap="100" align="start">
+                    <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
+                    <Text as="h2" variant="headingLg">
+                      {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
+                    </Text>
+                  </BlockStack>
+                </Card>
+              </Grid.Cell>
+              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
+                <Card>
+                  <BlockStack gap="100" align="start">
+                    <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
+                    <Text as="h2" variant="headingLg">
+                      {`${metrics.successRate.toFixed(1)}%`}
+                    </Text>
+                  </BlockStack>
+                </Card>
+              </Grid.Cell>
+              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
+                <Card>
+                  <BlockStack gap="100" align="start">
+                    <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
+                    <Text as="h2" variant="headingLg">
+                      {metrics.totalApplied}
+                    </Text>
+                  </BlockStack>
+                </Card>
+              </Grid.Cell>
+              <Grid.Cell columnSpan={{xs: 6, sm: 3, md: 3, lg: 3, xl: 3}}>
+                <Card>
+                  <BlockStack gap="100" align="start">
+                    <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
+                    <Text as="h2" variant="headingLg">
+                      {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
+                    </Text>
+                  </BlockStack>
+                </Card>
+              </Grid.Cell>
+            </Grid>
+          </Box>
         )}
 
-        {/* UPDATED: Warning card shown ONLY based on !hasRules — independent of loading/preview state */}
+        {/* NEW STRUCTURE: Warning Banner replaces basic Card */}
         {!hasRules && (
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h3" variant="headingMd">⚠️ No Pricing Rules Found</Text>
-              <Text as="p">
-                Please configure at least one pricing rule before applying changes to your storefront.
-                The Apply, Go Live, and Stop Live buttons will be enabled once rules are configured.
-              </Text>
-              {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
-              <Button variant="primary" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
-            </BlockStack>
-          </Card>
+          <Box paddingBlockEnd="400">
+            <Banner tone="warning" title="No Pricing Rules Found">
+              <BlockStack gap="400">
+                <p>
+                  You must configure at least one pricing rule before applying changes or going live.
+                </p>
+                <InlineStack>
+                  {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
+                  <Button variant="primary" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
+                </InlineStack>
+              </BlockStack>
+            </Banner>
+          </Box>
         )}
 
-        <Card>
-          <BlockStack gap="400">
-            <InlineStack align="space-between" blockAlign="center">
+        {/* NEW STRUCTURE: Control Panel UI Cleanup */}
+        <Box paddingBlockEnd="400">
+          <Card>
+            <InlineStack align="space-between" blockAlign="center" wrap={false}>
               <BlockStack gap="100">
                 <InlineStack gap="200" blockAlign="center">
                   <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
@@ -911,16 +917,17 @@ useEffect(() => {
                       <Icon source={InfoIcon} tone="subdued" />
                     </span>
                   </Tooltip>
-                  {metrics.isLive ? (
-                    <Badge tone="success">Live Pricing: ON</Badge>
-                  ) : (
-                    <Badge tone="critical">Live Pricing: OFF</Badge>
-                  )}
                 </InlineStack>
                 <Text as="p" variant="bodySm" tone="subdued">Choose when your dynamic pricing rules are active on the storefront. No permanent admin changes.</Text>
               </BlockStack>
-              <InlineStack gap="300">
-                {/* UPDATED: Stop Live — tone="critical", disabled when no rules OR not live OR processing */}
+              
+              <InlineStack gap="300" blockAlign="center">
+                {metrics.isLive ? (
+                  <Badge tone="success">Live Pricing: ON</Badge>
+                ) : (
+                  <Badge tone="critical">Live Pricing: OFF</Badge>
+                )}
+                {/* UPDATED UI: Single Primary Button + Stop Button Roles */}
                 <Button
                   onClick={() => setShowStopModal(true)}
                   disabled={!hasRules || isProcessing || !metrics.isLive}
@@ -929,7 +936,6 @@ useEffect(() => {
                 >
                   Stop Live Prices
                 </Button>
-                {/* UPDATED: Go Live — tone="success", disabled when no rules OR processing */}
                 <Button
                   variant="primary"
                   tone="success"
@@ -941,8 +947,8 @@ useEffect(() => {
                 </Button>
               </InlineStack>
             </InlineStack>
-          </BlockStack>
-        </Card>
+          </Card>
+        </Box>
 
         {!loading && previews.length === 0 && (
           <Card>
@@ -958,63 +964,66 @@ useEffect(() => {
           </Card>
         )}
 
-        <Card>
-          <BlockStack gap="400">
-            <InlineStack gap="300" align="start">
-              <Button
-                variant="primary"
-                onClick={handlePreview}
-                loading={loading}
-                disabled={loading || isProcessing}
-              >
-                Refresh Previews
-              </Button>
-              {/* UPDATED: Apply All — disabled when no rules OR no plan OR processing */}
-              <Button
-                onClick={() => setIsModalOpen(true)}
-                disabled={!hasRules || !hasActivePlan || isProcessing || previews.length === 0}
-                tone="success"
-                variant="primary"
-              >
-                {`Apply All (${previews.length})`}
-              </Button>
-              {previews.length === 0 ? (
-                <Tooltip content="Please refresh previews to generate the latest report.">
-                   <span style={{ display: 'inline-block' }}>
-                     <Button disabled>Download Impact Report</Button>
-                   </span>
-                </Tooltip>
-              ) : (
-                <Button onClick={handleDownloadReport} variant="secondary">
-                  Download Impact Report
-                </Button>
-              )}
-              {/* UPDATED: Apply Selected — disabled when no rules OR no plan OR processing */}
-              <Button
-                onClick={handleApplySelected}
-                disabled={!hasRules || !hasActivePlan || isProcessing || selectedItems.size === 0}
-                variant="primary"
-                tone="success"
-              >
-                {`Apply Selected (${selectedItems.size})`}
-              </Button>
-              {lastUpdate && (
-                <Button
-                  onClick={handleUndo}
-                  loading={isProcessing}
-                  disabled={isProcessing || !lastUpdate.batchId}
-                  tone="critical"
-                >
-                  Undo Last Update
-                </Button>
-              )}
-            </InlineStack>
+        {/* NEW STRUCTURE: Opacity dimming if empty state */}
+        <div style={{ opacity: !hasRules ? 0.6 : 1, transition: "opacity 0.2s ease" }}>
+          <Box paddingBlockEnd="400">
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack gap="300" align="start">
+                  {/* UPDATED UI: Secondary Button Roles For Main Actions */}
+                  <Button
+                    onClick={handlePreview}
+                    loading={loading}
+                    disabled={loading || isProcessing || !hasRules}
+                  >
+                    Refresh Previews
+                  </Button>
+                  <Button
+                    onClick={() => setIsModalOpen(true)}
+                    disabled={!hasRules || !hasActivePlan || isProcessing || previews.length === 0}
+                  >
+                    {`Apply All (${previews.length})`}
+                  </Button>
+                  {previews.length === 0 ? (
+                    <Tooltip content="Please refresh previews to generate the latest report.">
+                       <span style={{ display: 'inline-block' }}>
+                         <Button disabled>Download Impact Report</Button>
+                       </span>
+                    </Tooltip>
+                  ) : (
+                    <Button onClick={handleDownloadReport}>
+                      Download Impact Report
+                    </Button>
+                  )}
+                  <Button
+                    onClick={handleApplySelected}
+                    disabled={!hasRules || !hasActivePlan || isProcessing || selectedItems.size === 0}
+                  >
+                    {`Apply Selected (${selectedItems.size})`}
+                  </Button>
+                  {lastUpdate && (
+                    <Button
+                      onClick={handleUndo}
+                      loading={isProcessing}
+                      disabled={isProcessing || !lastUpdate.batchId}
+                      tone="critical"
+                    >
+                      Undo Last Update
+                    </Button>
+                  )}
+                </InlineStack>
 
             {isProcessing && (
-              <BlockStack gap="200">
-                <Text as="p">Processing price updates... Please do not close the window.</Text>
-                <ProgressBar progress={progress === 0 ? 10 : progress} animated />
-              </BlockStack>
+              <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="300" align="center">
+                  <InlineStack gap="300" blockAlign="center" align="center">
+                    <Spinner size="small" />
+                    <Text as="p" variant="bodyMd" fontWeight="bold">Processing price updates...</Text>
+                  </InlineStack>
+                  <Text as="p" tone="subdued" variant="bodySm">Please do not close this window or navigate away.</Text>
+                  <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+                </BlockStack>
+              </Box>
             )}
 
             {previews.length > 0 && !loading && !isProcessing && (
@@ -1223,7 +1232,9 @@ useEffect(() => {
               🔒 Start your free trial to apply pricing changes
             </Text>
           )}
-        </Card>
+            </Card>
+          </Box>
+        </div>
       </BlockStack>
 
       <Modal
