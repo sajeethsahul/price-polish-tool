@@ -256,7 +256,22 @@ function RulesContent({
                                         name="markupPercent"
                                         value={markupPercent}
                                         onChange={(value) => {
-                                            if (/^-?\d*\.?\d*$/.test(value)) {
+                                            // allow empty for typing
+                                            if (value === "" || value === "-") {
+                                                setMarkupPercent(value);
+                                                return;
+                                            }
+
+                                            // limit length (max 6 chars: -99.99)
+                                            if (value.length > 6) return;
+
+                                            // strict format: -99.99 to 99.99
+                                            if (!/^-?\d{0,2}(\.\d{0,2})?$/.test(value)) return;
+
+                                            const num = Number(value);
+
+                                            // prevent extreme values
+                                            if (!isNaN(num) && num >= -99 && num <= 99) {
                                                 setMarkupPercent(value);
                                             }
                                         }}
@@ -270,7 +285,20 @@ function RulesContent({
                                         name="roundingStep"
                                         value={roundingStep}
                                         onChange={(value) => {
-                                            if (/^\d*\.?\d*$/.test(value)) {
+                                            if (value === "") {
+                                                setRoundingStep(value);
+                                                return;
+                                            }
+
+                                            // max length (0.99)
+                                            if (value.length > 4) return;
+
+                                            // only decimal like 0.xx
+                                            if (!/^0?(\.\d{0,2})?$/.test(value)) return;
+
+                                            const num = Number(value);
+
+                                            if (!isNaN(num) && num >= 0 && num <= 0.99) {
                                                 setRoundingStep(value);
                                             }
                                         }}
@@ -366,7 +394,7 @@ function RulesContent({
 
                                     <InlineStack align="space-between">
                                         <Text variant="headingMd">Final Price</Text>
-                                        <Text variant="headingLg" tone="success">
+                                        <Text variant="heading2xl" tone="success">
                                             ${roundedPrice.toFixed(2)}
                                         </Text>
                                     </InlineStack>
