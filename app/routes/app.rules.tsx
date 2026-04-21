@@ -76,52 +76,71 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { session } = await authenticate.admin(request);
     const formData = await request.formData();
 
-    const markupPercent = parseFloat(formData.get("markupPercent") as string);
-    const roundingStep = parseFloat(formData.get("roundingStep") as string);
+    const markupStr = formData.get("markupPercent") as string;
+    const roundingStr = formData.get("roundingStep") as string;
     const charmPricing = formData.get("charmPricing") === "true";
 
     const fieldErrors: Record<string, string> = {};
 
-    if (isNaN(markupPercent) || markupPercent < -99 || markupPercent > 99) {
-        fieldErrors.markupPercent = "Markup must be between -99% and +99%";
+    /**
+     * 1. PREVENT "BAD" VALUES VIA REGEX
+     * - markupStr: Optional minus, then 1-2 digits, optional decimal with 1-2 digits (Max 5 chars)
+     * - roundingStr: Must start with 0 or -0, decimal point, then 1-2 digits (e.g., 0.99, -0.50)
+     */
+    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr) || markupStr.length > 5) {
+        fieldErrors.markupPercent = "Enter a valid percentage (e.g., 99.99 or -15.5)";
     }
 
-    if (isNaN(roundingStep) || roundingStep < 0 || roundingStep > 100) {
-        fieldErrors.roundingStep = "Rounding must be between 0 and 100";
+    if (!/^-?0(\.\d{1,2})?$/.test(roundingStr)) {
+        fieldErrors.roundingStep = "Rounding must be a fraction (e.g., 0.99 or -0.5)";
+    }
+
+    const markupPercent = Number(markupStr);
+    const roundingStep = Number(roundingStr);
+
+    /**
+     * 2. STRICT RANGE VALIDATION
+     */
+    if (!fieldErrors.markupPercent && (markupPercent < -99.99 || markupPercent > 99.99)) {
+        fieldErrors.markupPercent = "Value must be between -99.99 and 99.99";
+    }
+
+    if (!fieldErrors.roundingStep && (roundingStep < -0.99 || roundingStep > 0.99)) {
+        fieldErrors.roundingStep = "Value must be between -0.99 and 0.99";
     }
 
     if (Object.keys(fieldErrors).length > 0) {
         return {
-            markupPercent,
+            markupPercent: isNaN(markupPercent) ? markupStr : markupPercent,
             charmPricing,
-            roundingStep,
+            roundingStep: isNaN(roundingStep) ? roundingStr : roundingStep,
             saved: false,
             fieldErrors,
         };
     }
 
     try {
-        // ✅ Save history FIRST
-        await prisma.pricingRuleHistory.create({
-            data: {
-                shop: session.shop,
-                markupPercent,
-                charmPricing,
-                roundingStep,
-            },
-        });
-
-        // ✅ Update rule
-        await prisma.pricingRule.upsert({
-            where: { shop: session.shop },
-            update: { markupPercent, charmPricing, roundingStep },
-            create: {
-                shop: session.shop,
-                markupPercent,
-                charmPricing,
-                roundingStep,
-            },
-        });
+        // ✅ Transactional logic: Save history and update current rule
+        await prisma.$transaction([
+            prisma.pricingRuleHistory.create({
+                data: {
+                    shop: session.shop,
+                    markupPercent,
+                    charmPricing,
+                    roundingStep,
+                },
+            }),
+            prisma.pricingRule.upsert({
+                where: { shop: session.shop },
+                update: { markupPercent, charmPricing, roundingStep },
+                create: {
+                    shop: session.shop,
+                    markupPercent,
+                    charmPricing,
+                    roundingStep,
+                },
+            }),
+        ]);
 
         return {
             markupPercent,
@@ -129,13 +148,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             roundingStep,
             saved: true,
         };
-    } catch {
+    } catch (error) {
+        console.error("Database error:", error);
         return {
             markupPercent,
             charmPricing,
             roundingStep,
             saved: false,
-            error: "Failed to save pricing rules",
+            error: "System error: Could not sync pricing rules.",
         };
     }
 };
@@ -220,18 +240,28 @@ function RulesContent({
                                         label="Markup (%)"
                                         name="markupPercent"
                                         value={markupPercent}
-                                        onChange={setMarkupPercent}
+                                        onChange={(value) => {
+                                            if (/^-?\d*\.?\d*$/.test(value)) {
+                                                setMarkupPercent(value);
+                                            }
+                                        }}
+                                        inputMode="decimal"
                                         autoComplete="off"
-                                        helpText="Increase or decrease prices (e.g., 10 or -5)"
+                                        helpText="Between -99 and +99"
                                     />
 
                                     <TextField
                                         label="Rounding"
                                         name="roundingStep"
                                         value={roundingStep}
-                                        onChange={setRoundingStep}
+                                        onChange={(value) => {
+                                            if (/^\d*\.?\d*$/.test(value)) {
+                                                setRoundingStep(value);
+                                            }
+                                        }}
+                                        inputMode="decimal"
                                         autoComplete="off"
-                                        helpText="Set decimal ending (e.g., 0.88 → $9.88)"
+                                        helpText="0 to 100"
                                     />
 
                                     <input
