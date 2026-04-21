@@ -50,6 +50,167 @@ interface LastUpdateInfo {
   failedCount: number;
 }
 
+// ─── Animated Loader ───────────────────────────────────────────────────────
+const LOADER_MESSAGES = [
+  "Counting your coins... 🪙",
+  "Polishing prices to perfection ✨",
+  "Bribing the pricing gods... 💸",
+  "Calculating your empire's worth... 👑",
+  "Making numbers look their best 💅",
+  "Sharpening pencils & raising margins ✏️",
+  "Teaching prices to stand tall 📈",
+  "Asking Jeff Bezos for advice... 🚀",
+  "Rounding up the usual suspects 🔍",
+  "One moment — we're printing money 🖨️",
+];
+
+function DashboardLoader() {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setMsgIndex(i => (i + 1) % LOADER_MESSAGES.length);
+    }, 1800);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "70vh",
+      gap: "28px",
+      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    }}>
+      {/* Inject keyframe animations */}
+      <style>{`
+        @keyframes pp-bounce {
+          0%, 100% { transform: translateY(0) rotate(-5deg); }
+          40%       { transform: translateY(-22px) rotate(8deg) scale(1.15); }
+          60%       { transform: translateY(-14px) rotate(-3deg) scale(1.08); }
+        }
+        @keyframes pp-shadow-pulse {
+          0%, 100% { transform: scaleX(1);   opacity: 0.35; }
+          40%       { transform: scaleX(0.5); opacity: 0.12; }
+        }
+        @keyframes pp-shimmer {
+          0%   { background-position: -400px 0; }
+          100% { background-position:  400px 0; }
+        }
+        @keyframes pp-fade-slide {
+          0%   { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pp-orbit {
+          from { transform: rotate(0deg)   translateX(38px) rotate(0deg); }
+          to   { transform: rotate(360deg) translateX(38px) rotate(-360deg); }
+        }
+        @keyframes pp-orbit2 {
+          from { transform: rotate(180deg) translateX(38px) rotate(-180deg); }
+          to   { transform: rotate(540deg) translateX(38px) rotate(-540deg); }
+        }
+      `}</style>
+
+      {/* Coin + orbiting mini-coins */}
+      <div style={{ position: "relative", width: 100, height: 100 }}>
+        {/* Main coin */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          transform: "translate(-50%, -50%)",
+          fontSize: 52,
+          animation: "pp-bounce 1.4s cubic-bezier(.36,.07,.19,.97) infinite",
+          filter: "drop-shadow(0 6px 8px rgba(0,0,0,0.18))",
+          zIndex: 2,
+          userSelect: "none",
+        }}>💰</div>
+
+        {/* Orbiting coin 1 */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          fontSize: 18,
+          animation: "pp-orbit 2.2s linear infinite",
+          transformOrigin: "0 0",
+          userSelect: "none",
+        }}>🪙</div>
+
+        {/* Orbiting coin 2 */}
+        <div style={{
+          position: "absolute",
+          top: "50%", left: "50%",
+          fontSize: 14,
+          animation: "pp-orbit2 2.2s linear infinite",
+          transformOrigin: "0 0",
+          userSelect: "none",
+        }}>✨</div>
+
+        {/* Bounce shadow */}
+        <div style={{
+          position: "absolute",
+          bottom: -4, left: "50%",
+          transform: "translateX(-50%)",
+          width: 38, height: 8,
+          borderRadius: "50%",
+          background: "rgba(0,0,0,0.18)",
+          animation: "pp-shadow-pulse 1.4s cubic-bezier(.36,.07,.19,.97) infinite",
+        }} />
+      </div>
+
+      {/* App name */}
+      <div style={{
+        fontSize: 22,
+        fontWeight: 700,
+        background: "linear-gradient(90deg, #4f46e5, #7c3aed, #2563eb)",
+        WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+        letterSpacing: "-0.3px",
+      }}>Price Polish</div>
+
+      {/* Cycling message */}
+      <div
+        key={msgIndex}
+        style={{
+          fontSize: 15,
+          color: "#6b7280",
+          fontWeight: 500,
+          animation: "pp-fade-slide 0.4s ease both",
+          textAlign: "center",
+          maxWidth: 320,
+          lineHeight: 1.5,
+        }}
+      >
+        {LOADER_MESSAGES[msgIndex]}
+      </div>
+
+      {/* Shimmer progress bar */}
+      <div style={{
+        width: 240,
+        height: 6,
+        borderRadius: 99,
+        background: "#e5e7eb",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          height: "100%",
+          borderRadius: 99,
+          background: "linear-gradient(90deg, #e5e7eb 25%, #a5b4fc 50%, #818cf8 60%, #e5e7eb 80%)",
+          backgroundSize: "800px 100%",
+          animation: "pp-shimmer 1.6s linear infinite",
+        }} />
+      </div>
+
+      {/* Subtle hint */}
+      <div style={{ fontSize: 12, color: "#9ca3af", letterSpacing: "0.4px" }}>
+        Fetching your pricing data...
+      </div>
+    </div>
+  );
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const { currencyCode = "USD", isBypass } = useOutletContext<{ currencyCode?: string, isBypass?: boolean }>() || {};
   
@@ -509,10 +670,18 @@ useEffect(() => {
   const totalBatches = useMemo(() => Math.ceil(previews.length / BATCH_SIZE), [previews]);
 
   const timeAgo = (dateStr: string) => {
-    const seconds = Math.floor((new Date().getTime() - new Date(dateStr).getTime()) / 1000);
-    if (seconds < 60) return "just now";
+    const diff = new Date().getTime() - new Date(dateStr).getTime();
+    const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);
-    return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    const remainingHours = hours % 24;
+    const remainingMinutes = minutes % 60;
+
+    const pad = (num: number) => num.toString().padStart(2, '0');
+
+    return `${days}d ${pad(remainingHours)}:${pad(remainingMinutes)} ago`;
   };
 
   const SHOW_DEBUG_TOOLS = false;
@@ -520,13 +689,35 @@ useEffect(() => {
   // ADDED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
   // ruleExists === null means first fetch hasn't completed yet
   if (loading && ruleExists === null) {
-    return <SkeletonPage primaryAction />
+    return <DashboardLoader />;
   }
 
   return (
-    <Page 
-      title="Price Polish Dashboard"
-    >
+    <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh" }}>
+      <style>{`
+        :root {
+          --pp-primary: #008060;
+          --pp-success: #16a34a;
+          --pp-danger: #dc2626;
+          --pp-warning: #f59e0b;
+          --pp-text: #111827;
+          --pp-bg: #f9fafb;
+          --pp-card: #ffffff;
+          --pp-border: #e5e7eb;
+        }
+        
+        .Polaris-Page { background-color: var(--pp-bg); }
+        .Polaris-Card { border: 1px solid var(--pp-border) !important; background-color: var(--pp-card) !important; color: var(--pp-text) !important; }
+        .Polaris-Text--headingLg { color: var(--pp-text); font-weight: 700; }
+        
+        /* Button Overrides */
+        .Polaris-Button--toneSuccess.Polaris-Button--variantPrimary { background: var(--pp-success) !important; }
+        .Polaris-Button--toneCritical.Polaris-Button--variantPrimary { background: var(--pp-danger) !important; }
+        .Polaris-Button--variantPrimary:not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical) { background: var(--pp-primary) !important; }
+      `}</style>
+      <Page 
+        title="Price Polish Dashboard"
+      >
       <BlockStack gap="500">
         {/* NEW: Environment & Handshake Diagnostics */}
 {SHOW_DEBUG_TOOLS && (
@@ -685,7 +876,7 @@ useEffect(() => {
               <Card>
                 <BlockStack gap="100" align="center">
                   <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
-                  <Text as="h2" variant="headingLg" tone="subdued">
+                  <Text as="h2" variant="headingLg" fontWeight="bold">
                     {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
                   </Text>
                 </BlockStack>
@@ -783,6 +974,7 @@ useEffect(() => {
                 onClick={() => setIsModalOpen(true)}
                 disabled={!hasRules || !hasActivePlan || isProcessing || previews.length === 0}
                 tone="success"
+                variant="primary"
               >
                 {`Apply All (${previews.length})`}
               </Button>
@@ -801,7 +993,8 @@ useEffect(() => {
               <Button
                 onClick={handleApplySelected}
                 disabled={!hasRules || !hasActivePlan || isProcessing || selectedItems.size === 0}
-                variant="secondary"
+                variant="primary"
+                tone="success"
               >
                 {`Apply Selected (${selectedItems.size})`}
               </Button>
@@ -1120,5 +1313,6 @@ useEffect(() => {
         </Modal.Section>
       </Modal>
     </Page>
+    </div>
   );
 }
