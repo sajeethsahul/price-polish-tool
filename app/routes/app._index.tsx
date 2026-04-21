@@ -713,7 +713,6 @@ useEffect(() => {
         /* Button Overrides */
         .Polaris-Button--toneSuccess.Polaris-Button--variantPrimary { background: var(--pp-success) !important; }
         .Polaris-Button--toneCritical.Polaris-Button--variantPrimary { background: var(--pp-danger) !important; }
-        .Polaris-Button--variantPrimary:not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical) { background: var(--pp-primary) !important; }
       `}</style>
       <Page 
         title="Price Polish Dashboard"
@@ -890,17 +889,19 @@ useEffect(() => {
 
         {/* NEW STRUCTURE: Warning Banner replaces basic Card */}
         {!hasRules && (
-          <Box paddingBlockEnd="400">
+          <Box paddingBlockStart="200" paddingBlockEnd="500">
             <Banner tone="warning" title="No Pricing Rules Found">
-              <BlockStack gap="400">
-                <p>
-                  You must configure at least one pricing rule before applying changes or going live.
-                </p>
-                <InlineStack>
-                  {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
-                  <Button variant="primary" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
-                </InlineStack>
-              </BlockStack>
+              <Box paddingBlockStart="200" paddingBlockEnd="200">
+                <BlockStack gap="400">
+                  <p>
+                    You must configure at least one pricing rule before applying changes or going live.
+                  </p>
+                  <InlineStack>
+                    {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
+                    <Button variant="primary" size="large" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
+                  </InlineStack>
+                </BlockStack>
+              </Box>
             </Banner>
           </Box>
         )}
@@ -927,24 +928,29 @@ useEffect(() => {
                 ) : (
                   <Badge tone="critical">Live Pricing: OFF</Badge>
                 )}
-                {/* UPDATED UI: Single Primary Button + Stop Button Roles */}
-                <Button
-                  onClick={() => setShowStopModal(true)}
-                  disabled={!hasRules || isProcessing || !metrics.isLive}
-                  tone="critical"
-                  variant="primary"
-                >
-                  Stop Live Prices
-                </Button>
-                <Button
-                  variant="primary"
-                  tone="success"
-                  onClick={() => setShowGoLiveModal(true)}
-                  loading={isProcessing}
-                  disabled={!hasRules || isProcessing}
-                >
-                  Go Live on Storefront
-                </Button>
+                {/* UPDATED UI: Exclusively show Go Live OR Stop. Hide if no rules configured. */}
+                {hasRules && (
+                  metrics.isLive ? (
+                    <Button
+                      onClick={() => setShowStopModal(true)}
+                      disabled={isProcessing}
+                      tone="critical"
+                      variant="primary"
+                    >
+                      Stop Live Prices
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      tone="success"
+                      onClick={() => setShowGoLiveModal(true)}
+                      loading={isProcessing}
+                      disabled={isProcessing}
+                    >
+                      Go Live on Storefront
+                    </Button>
+                  )
+                )}
               </InlineStack>
             </InlineStack>
           </Card>
@@ -970,7 +976,7 @@ useEffect(() => {
             <Card>
               <BlockStack gap="400">
                 <InlineStack gap="300" align="start">
-                  {/* UPDATED UI: Secondary Button Roles For Main Actions */}
+                  {/* UPDATED UI: Secondary Button Roles For Main Actions. Hidden entirely if !hasRules */}
                   <Button
                     onClick={handlePreview}
                     loading={loading}
@@ -978,38 +984,42 @@ useEffect(() => {
                   >
                     Refresh Previews
                   </Button>
-                  <Button
-                    onClick={() => setIsModalOpen(true)}
-                    disabled={!hasRules || !hasActivePlan || isProcessing || previews.length === 0}
-                  >
-                    {`Apply All (${previews.length})`}
-                  </Button>
-                  {previews.length === 0 ? (
-                    <Tooltip content="Please refresh previews to generate the latest report.">
-                       <span style={{ display: 'inline-block' }}>
-                         <Button disabled>Download Impact Report</Button>
-                       </span>
-                    </Tooltip>
-                  ) : (
-                    <Button onClick={handleDownloadReport}>
-                      Download Impact Report
-                    </Button>
-                  )}
-                  <Button
-                    onClick={handleApplySelected}
-                    disabled={!hasRules || !hasActivePlan || isProcessing || selectedItems.size === 0}
-                  >
-                    {`Apply Selected (${selectedItems.size})`}
-                  </Button>
-                  {lastUpdate && (
-                    <Button
-                      onClick={handleUndo}
-                      loading={isProcessing}
-                      disabled={isProcessing || !lastUpdate.batchId}
-                      tone="critical"
-                    >
-                      Undo Last Update
-                    </Button>
+                  {hasRules && (
+                    <>
+                      <Button
+                        onClick={() => setIsModalOpen(true)}
+                        disabled={!hasActivePlan || isProcessing || previews.length === 0}
+                      >
+                        {`Apply All (${previews.length})`}
+                      </Button>
+                      {previews.length === 0 ? (
+                        <Tooltip content="Please refresh previews to generate the latest report.">
+                           <span style={{ display: 'inline-block' }}>
+                             <Button disabled>Download Impact Report</Button>
+                           </span>
+                        </Tooltip>
+                      ) : (
+                        <Button onClick={handleDownloadReport}>
+                          Download Impact Report
+                        </Button>
+                      )}
+                      <Button
+                        onClick={handleApplySelected}
+                        disabled={!hasActivePlan || isProcessing || selectedItems.size === 0}
+                      >
+                        {`Apply Selected (${selectedItems.size})`}
+                      </Button>
+                      {lastUpdate && (
+                        <Button
+                          onClick={handleUndo}
+                          loading={isProcessing}
+                          disabled={isProcessing || !lastUpdate.batchId}
+                          tone="critical"
+                        >
+                          Undo Last Update
+                        </Button>
+                      )}
+                    </>
                   )}
                 </InlineStack>
 
