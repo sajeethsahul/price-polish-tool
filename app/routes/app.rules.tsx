@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import {
     useLoaderData,
@@ -25,27 +25,6 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
-// ================= TYPES =================
-
-interface PricingRuleHistoryItem {
-    id: string;
-    markupPercent: number;
-    charmPricing: boolean;
-    roundingStep: number;
-    createdAt: string;
-}
-
-interface PricingRuleData {
-    markupPercent: number;
-    charmPricing: boolean;
-    roundingStep: number;
-    updatedAt?: string | null;
-    history?: PricingRuleHistoryItem[];
-    saved?: boolean;
-    error?: string;
-    fieldErrors?: Record<string, string>;
-}
-
 // ================= LOADER =================
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -64,7 +43,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return {
         markupPercent: rule?.markupPercent ?? 10,
         charmPricing: rule?.charmPricing ?? true,
-        roundingStep: rule?.roundingStep ?? 1,
+        roundingStep: rule?.roundingStep ?? 0.99,
         updatedAt: rule?.updatedAt ?? null,
         history,
     };
@@ -82,108 +61,72 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const fieldErrors: Record<string, string> = {};
 
-    // =============================
-    // 1. STRICT FORMAT VALIDATION
-    // =============================
-
     if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr)) {
-        fieldErrors.markupPercent =
-            "Enter a valid percentage (e.g., 10, -5, 12.5)";
+        fieldErrors.markupPercent = "Invalid markup";
     }
 
     if (!/^0(\.\d{1,2})?$/.test(roundingStr)) {
-        fieldErrors.roundingStep =
-            "Rounding must be between 0.00 and 0.99 (e.g., 0.99)";
+        fieldErrors.roundingStep = "Invalid rounding (0.00–0.99)";
     }
 
     const markupPercent = Number(markupStr);
     let roundingStep = Number(roundingStr);
 
-    // =============================
-    // 2. RANGE VALIDATION
-    // =============================
-
-    if (!fieldErrors.markupPercent && (markupPercent < -99.99 || markupPercent > 99.99)) {
-        fieldErrors.markupPercent = "Must be between -99.99 and 99.99";
+    if (markupPercent < -99 || markupPercent > 99) {
+        fieldErrors.markupPercent = "Must be -99 to 99";
     }
 
-    if (!fieldErrors.roundingStep && (roundingStep < 0 || roundingStep > 0.99)) {
-        fieldErrors.roundingStep = "Must be between 0.00 and 0.99";
+    if (roundingStep < 0 || roundingStep > 0.99) {
+        fieldErrors.roundingStep = "Must be 0–0.99";
     }
-
-    // =============================
-    // ❌ STOP ON ERROR
-    // =============================
 
     if (Object.keys(fieldErrors).length > 0) {
         return {
-            markupPercent: isNaN(markupPercent) ? markupStr : markupPercent,
+            markupPercent,
+            roundingStep,
             charmPricing,
-            roundingStep: isNaN(roundingStep) ? roundingStr : roundingStep,
             saved: false,
             fieldErrors,
         };
     }
 
-    // =============================
-    // 3. 🔥 NORMALIZE ROUNDING
-    // =============================
-
-    // force max 2 decimals (prevents 0.555 → 0.56 issues later)
     roundingStep = Math.round(roundingStep * 100) / 100;
 
-    // =============================
-    // 4. SAVE (TRANSACTION SAFE)
-    // =============================
+    await prisma.$transaction([
+        prisma.pricingRuleHistory.create({
+            data: {
+                shop: session.shop,
+                markupPercent,
+                charmPricing,
+                roundingStep,
+            },
+        }),
+        prisma.pricingRule.upsert({
+            where: { shop: session.shop },
+            update: { markupPercent, charmPricing, roundingStep },
+            create: {
+                shop: session.shop,
+                markupPercent,
+                charmPricing,
+                roundingStep,
+            },
+        }),
+    ]);
 
-    try {
-        await prisma.$transaction([
-            prisma.pricingRuleHistory.create({
-                data: {
-                    shop: session.shop,
-                    markupPercent,
-                    charmPricing,
-                    roundingStep,
-                },
-            }),
-
-            prisma.pricingRule.upsert({
-                where: { shop: session.shop },
-                update: { markupPercent, charmPricing, roundingStep },
-                create: {
-                    shop: session.shop,
-                    markupPercent,
-                    charmPricing,
-                    roundingStep,
-                },
-            }),
-        ]);
-
-        return {
-            markupPercent,
-            charmPricing,
-            roundingStep,
-            saved: true,
-        };
-    } catch (error) {
-        console.error("Database error:", error);
-
-        return {
-            markupPercent,
-            charmPricing,
-            roundingStep,
-            saved: false,
-            error: "System error: Could not sync pricing rules.",
-        };
-    }
+    return {
+        markupPercent,
+        roundingStep,
+        charmPricing,
+        saved: true,
+    };
 };
 
 // ================= COMPONENT =================
 
 export default function RulesPage() {
-    const loaderData = useLoaderData<PricingRuleData>();
-    const actionData = useActionData<PricingRuleData>();
-    const { currencyCode } = useOutletContext<{ currencyCode: string }>();
+    const loaderData = useLoaderData<any>();
+    const actionData = useActionData<any>();
+    const { currencyCode } = useOutletContext<any>();
 
     return (
         <RulesContent
@@ -196,258 +139,197 @@ export default function RulesPage() {
 
 // ================= UI =================
 
-function RulesContent({
-    loaderData,
-    actionData,
-    currencyCode,
-}: {
-    loaderData: PricingRuleData;
-    actionData?: PricingRuleData;
-    currencyCode: string;
-}) {
+function RulesContent({ loaderData, actionData }: any) {
     const navigate = useNavigate();
     const navigation = useNavigation();
     const shopify = useAppBridge();
 
     const isSubmitting = navigation.state === "submitting";
-    const initialData = actionData || loaderData;
 
+    // ✅ FIX 1: Stable state (no flicker)
     const [markupPercent, setMarkupPercent] = useState(
-        String(initialData.markupPercent)
+        String(loaderData.markupPercent)
     );
-    const [charmPricing, setCharmPricing] = useState(initialData.charmPricing);
     const [roundingStep, setRoundingStep] = useState(
-        String(initialData.roundingStep)
+        String(loaderData.roundingStep)
+    );
+    const [charmPricing, setCharmPricing] = useState(
+        loaderData.charmPricing
     );
 
-    // ✅ toast
+    // toast only (no UI reset)
     useEffect(() => {
         if (actionData?.saved) {
-            shopify.toast.show("Pricing rules saved successfully");
-        } else if (actionData?.error) {
-            shopify.toast.show(actionData.error, { isError: true });
+            shopify.toast.show("Saved successfully");
         }
     }, [actionData, shopify]);
 
-    // ✅ updatedAt fix
-    const updatedAt = actionData?.saved
-        ? new Date().toISOString()
-        : loaderData.updatedAt;
+    // ================= CALC =================
 
     const basePrice = 59.99;
 
-    const markup = parseFloat(markupPercent || "0");
-    const rounding = parseFloat(roundingStep || "0");
+    const markup = Number(markupPercent);
+    const rounding = Number(roundingStep);
 
-    let priceAfterMarkup = basePrice + (basePrice * markup) / 100;
+    const safeMarkup = isFinite(markup) ? markup : 0;
+    const safeRounding = isFinite(rounding) ? rounding : 0;
 
-    // rounding logic
-    let roundedPrice = Math.round(priceAfterMarkup);
+    const priceAfterMarkup =
+        basePrice + (basePrice * safeMarkup) / 100;
 
-    // charm pricing
-    if (charmPricing) {
-        roundedPrice = Math.floor(roundedPrice) + 0.99;
+    let roundedPrice = priceAfterMarkup;
+
+    if (safeRounding > 0) {
+        roundedPrice = Math.floor(priceAfterMarkup) + safeRounding;
+        if (roundedPrice < priceAfterMarkup) {
+            roundedPrice += 1;
+        }
+    } else {
+        roundedPrice = Math.round(priceAfterMarkup);
     }
+
+    if (charmPricing) {
+        roundedPrice = Math.floor(priceAfterMarkup) + 0.99;
+    }
+
+    // ================= UI =================
 
     return (
         <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }}>
-            <BlockStack gap="500">
-                <Card>
-                    <BlockStack gap="300">
-                        <Text as="h2" variant="headingLg">
-                            Pricing Rules
-                        </Text>
-                        <Text tone="subdued">
-                            Automatically adjust your product prices with markup and smart rounding.
-                        </Text>
-                    </BlockStack>
-                </Card>
+            <Layout>
 
-                <Layout>
-                    {/* LEFT */}
-                    <Layout.Section>
-                        <Card>
-                            <Form method="post">
-                                <BlockStack gap="400">
-                                    <TextField
-                                        label="Markup (%)"
-                                        name="markupPercent"
-                                        value={markupPercent}
-                                        onChange={(value) => {
-                                            // allow empty for typing
-                                            if (value === "" || value === "-") {
-                                                setMarkupPercent(value);
-                                                return;
-                                            }
-
-                                            // limit length (max 6 chars: -99.99)
-                                            if (value.length > 6) return;
-
-                                            // strict format: -99.99 to 99.99
-                                            if (!/^-?\d{0,2}(\.\d{0,2})?$/.test(value)) return;
-
-                                            const num = Number(value);
-
-                                            // prevent extreme values
-                                            if (!isNaN(num) && num >= -99 && num <= 99) {
-                                                setMarkupPercent(value);
-                                            }
-                                        }}
-                                        inputMode="decimal"
-                                        autoComplete="off"
-                                        helpText="Between -99 and +99"
-                                    />
-
-                                    <TextField
-                                        label="Rounding"
-                                        name="roundingStep"
-                                        value={roundingStep}
-                                        onChange={(value) => {
-                                            if (value === "") {
-                                                setRoundingStep(value);
-                                                return;
-                                            }
-
-                                            // max length (0.99)
-                                            if (value.length > 4) return;
-
-                                            // only decimal like 0.xx
-                                            if (!/^0?(\.\d{0,2})?$/.test(value)) return;
-
-                                            const num = Number(value);
-
-                                            if (!isNaN(num) && num >= 0 && num <= 0.99) {
-                                                setRoundingStep(value);
-                                            }
-                                        }}
-                                        inputMode="decimal"
-                                        autoComplete="off"
-                                        helpText="Decimal rounding (e.g., 0.99 for charm pricing)"
-                                    />
-
-                                    <input
-                                        type="hidden"
-                                        name="charmPricing"
-                                        value={String(charmPricing)}
-                                    />
-
-                                    <Checkbox
-                                        label="Enable Charm Pricing (.99)"
-                                        checked={charmPricing}
-                                        onChange={setCharmPricing}
-                                        helpText="Prices end in .99 (e.g., $19.99)"
-                                    />
-
-                                    <Button
-                                        submit
-                                        variant="primary"
-                                        loading={isSubmitting}
-                                    >
-                                        Save Rules
-                                    </Button>
-
-                                    {/* ✅ Last updated */}
-                                    {updatedAt && (
-                                        <Text tone="subdued">
-                                            Last updated: {new Date(updatedAt).toLocaleString()}
-                                        </Text>
-                                    )}
-
-                                    {/* ✅ Recent Changes */}
-                                    {loaderData.history && loaderData.history.length > 0 && (
-                                        <BlockStack gap="200">
-                                            <Text variant="headingSm">Recent Changes</Text>
-
-                                            {loaderData.history.map((h) => (
-                                                <Text key={h.id} tone="subdued">
-                                                    {h.markupPercent > 0 ? "+" : ""}
-                                                    {h.markupPercent}% markup •{" "}
-                                                    {h.charmPricing ? ".99 enabled • " : ""}
-                                                    {new Date(h.createdAt).toLocaleString()}
-                                                </Text>
-                                            ))}
-                                        </BlockStack>
-                                    )}
-                                </BlockStack>
-                            </Form>
-                        </Card>
-                    </Layout.Section>
-
-                    {/* RIGHT (your preview untouched conceptually) */}
-                    <Layout.Section variant="oneThird">
-                        <Card>
+                {/* LEFT */}
+                <Layout.Section>
+                    <Card>
+                        <Form method="post">
                             <BlockStack gap="400">
 
-                                {/* 🔥 LIVE EXAMPLE */}
-                                <BlockStack gap="200">
-                                    <Text variant="headingMd">Live Example</Text>
+                                <TextField
+                                    label="Markup (%)"
+                                    name="markupPercent"
+                                    value={markupPercent}
+                                    disabled={isSubmitting}
+                                    onChange={(value) => {
+                                        if (value === "" || value === "-") {
+                                            setMarkupPercent(value);
+                                            return;
+                                        }
+                                        if (value.length > 6) return;
+                                        if (!/^-?\d{0,2}(\.\d{0,2})?$/.test(value)) return;
 
-                                    <InlineStack align="space-between">
-                                        <Text tone="subdued">Base Price</Text>
-                                        <Text variant="headingSm">
-                                            ${basePrice.toFixed(2)}
-                                        </Text>
-                                    </InlineStack>
+                                        const num = Number(value);
+                                        if (!isNaN(num) && num >= -99 && num <= 99) {
+                                            setMarkupPercent(value);
+                                        }
+                                    }}
+                                    helpText="Between -99 and +99"
+                                />
 
-                                    <InlineStack align="space-between">
-                                        <Text tone="subdued">
-                                            {markup >= 0 ? "+" : ""}
-                                            {markup}% Markup
-                                        </Text>
-                                        <Text tone="success" variant="headingSm">
-                                            ${priceAfterMarkup.toFixed(2)}
-                                        </Text>
-                                    </InlineStack>
+                                <TextField
+                                    label="Rounding"
+                                    name="roundingStep"
+                                    value={roundingStep}
+                                    disabled={isSubmitting}
+                                    onChange={(value) => {
+                                        if (value === "") {
+                                            setRoundingStep(value);
+                                            return;
+                                        }
+                                        if (value.length > 4) return;
+                                        if (!/^0?(\.\d{0,2})?$/.test(value)) return;
 
-                                    <InlineStack align="space-between">
-                                        <Text tone="subdued">Rounded</Text>
-                                        <Text>
-                                            ${roundedPrice.toFixed(2)}
-                                        </Text>
-                                    </InlineStack>
+                                        const num = Number(value);
+                                        if (!isNaN(num) && num >= 0 && num <= 0.99) {
+                                            setRoundingStep(value);
+                                        }
+                                    }}
+                                    helpText="Decimal rounding (e.g., 0.99)"
+                                />
 
-                                    {charmPricing && (
-                                        <Text tone="subdued">Charm pricing applied (.99)</Text>
-                                    )}
+                                <input
+                                    type="hidden"
+                                    name="charmPricing"
+                                    value={String(charmPricing)}
+                                />
 
-                                    <InlineStack align="space-between">
-                                        <Text variant="headingMd">Final Price</Text>
-                                        <Text variant="heading2xl" tone="success">
-                                            ${roundedPrice.toFixed(2)}
-                                        </Text>
-                                    </InlineStack>
-                                </BlockStack>
+                                <Checkbox
+                                    label="Enable Charm Pricing (.99)"
+                                    checked={charmPricing}
+                                    disabled={isSubmitting}
+                                    onChange={setCharmPricing}
+                                />
 
-                                {/* 🔥 DIVIDER FEEL */}
-                                <div style={{ borderTop: "1px solid #eee", margin: "8px 0" }} />
+                                <Button submit loading={isSubmitting} variant="primary">
+                                    Save Rules
+                                </Button>
 
-                                {/* 🔥 LAST UPDATED */}
-                                {updatedAt && (
-                                    <Text tone="subdued">
-                                        Last updated: {new Date(updatedAt).toLocaleString()}
-                                    </Text>
-                                )}
-
-                                {/* 🔥 RECENT CHANGES */}
-                                {loaderData.history && loaderData.history.length > 0 && (
-                                    <BlockStack gap="100">
-                                        <Text variant="headingSm">Recent Changes</Text>
-
-                                        {loaderData.history.map((h) => (
-                                            <Text key={h.id} tone="subdued">
-                                                {h.markupPercent > 0 ? "+" : ""}
-                                                {h.markupPercent}% markup •{" "}
-                                                {h.charmPricing ? ".99 enabled • " : ""}
-                                                {new Date(h.createdAt).toLocaleString()}
-                                            </Text>
-                                        ))}
-                                    </BlockStack>
-                                )}
                             </BlockStack>
-                        </Card>
-                    </Layout.Section>
-                </Layout>
-            </BlockStack>
+                        </Form>
+                    </Card>
+                </Layout.Section>
+
+                {/* RIGHT */}
+                <Layout.Section variant="oneThird">
+                    <Card>
+                        <BlockStack gap="400">
+
+                            <Text variant="headingMd">Live Example</Text>
+
+                            <InlineStack align="space-between">
+                                <Text tone="subdued">Base Price</Text>
+                                <Text>${basePrice.toFixed(2)}</Text>
+                            </InlineStack>
+
+                            <InlineStack align="space-between">
+                                <Text tone="subdued">
+                                    {safeMarkup >= 0 ? "+" : ""}
+                                    {safeMarkup}% Markup
+                                </Text>
+                                <Text tone="success">
+                                    ${priceAfterMarkup.toFixed(2)}
+                                </Text>
+                            </InlineStack>
+
+                            <InlineStack align="space-between">
+                                <Text tone="subdued">Rounded</Text>
+                                <Text>${roundedPrice.toFixed(2)}</Text>
+                            </InlineStack>
+
+                            <InlineStack align="space-between">
+                                <Text variant="headingMd">Final Price</Text>
+                                <Text variant="heading2xl" tone="success">
+                                    ${roundedPrice.toFixed(2)}
+                                </Text>
+                            </InlineStack>
+
+                            <div style={{ borderTop: "1px solid #eee" }} />
+
+                            {loaderData.updatedAt && (
+                                <Text tone="subdued">
+                                    Last updated: {new Date(loaderData.updatedAt).toLocaleString()}
+                                </Text>
+                            )}
+
+                            {loaderData.history?.length > 0 && (
+                                <BlockStack gap="100">
+                                    <Text variant="headingSm">Recent Changes</Text>
+
+                                    {loaderData.history.map((h: any) => (
+                                        <Text key={h.id} tone="subdued">
+                                            {h.markupPercent > 0 ? "+" : ""}
+                                            {h.markupPercent}% •{" "}
+                                            {h.charmPricing ? ".99 • " : ""}
+                                            {new Date(h.createdAt).toLocaleString()}
+                                        </Text>
+                                    ))}
+                                </BlockStack>
+                            )}
+
+                        </BlockStack>
+                    </Card>
+                </Layout.Section>
+
+            </Layout>
         </Page>
     );
 }
