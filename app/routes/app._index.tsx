@@ -23,6 +23,7 @@ import {
   Grid,
   Tooltip,
   Icon,
+  SkeletonPage,
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
@@ -66,6 +67,8 @@ function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
 
 function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, isBypass?: boolean, currencyCode: string }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
+  // ADDED: rules is the single source of truth for whether pricing rules are configured
+  const [rules, setRules] = useState<PreviewItem[] | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -93,7 +96,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [shopify]);
   
   const hasActivePlan = metrics.hasActivePlan;
-  const hasRules = previews && previews.length > 0;
+  // UPDATED: Use rules as single source of truth (NOT previews)
+  const hasRules = rules !== null && rules.length > 0;
   
   const navigate = useNavigate();
   const appFetch = useAppFetch();
@@ -117,7 +121,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       
       console.log("DEBUG: Data received from parallel fetch");
       
-      setPreviews(data.previews ?? []);
+      const fetchedPreviews = data.previews ?? [];
+      setPreviews(fetchedPreviews);
+      // UPDATED: Set rules from fetched previews — single source of truth
+      setRules(fetchedPreviews);
       setActiveMarkup(data.markupPercent ?? 0);
       setMetrics(prev => ({
         ...prev,
@@ -126,13 +133,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true
       }));
         
-      if ((data.previews ?? []).length === 0) {
+      if (fetchedPreviews.length === 0) {
         setFirstVisit(true);
-        setMessage({ 
-          type: "warning", 
-          text: "No products found or no rules configured.", 
-          details: "Please ensure you have products in your store and pricing rules are set up correctly." 
-        });
       } else {
         setFirstVisit(false);
       }
@@ -512,6 +514,11 @@ useEffect(() => {
 
   const SHOW_DEBUG_TOOLS = false;
 
+  // ADDED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
+  if (loading && rules === null) {
+    return <SkeletonPage primaryAction />
+  }
+
   return (
     <Page 
       title="Price Polish Dashboard"
@@ -683,14 +690,16 @@ useEffect(() => {
           </Grid>
         )}
 
+        {/* UPDATED: Warning card shown ONLY based on !hasRules — independent of loading/preview state */}
         {!hasRules && (
           <Card>
             <BlockStack gap="400">
-              <Text as="h3" variant="headingMd">No Pricing Rules Found</Text>
+              <Text as="h3" variant="headingMd">⚠️ No Pricing Rules Found</Text>
               <Text as="p">
                 Please configure at least one pricing rule before applying changes to your storefront.
+                The Apply, Go Live, and Stop Live buttons will be enabled once rules are configured.
               </Text>
-              <Button url="/app/rules">Configure Pricing Rules</Button>
+              <Button variant="primary" url="/app/rules">Configure Pricing Rules</Button>
             </BlockStack>
           </Card>
         )}
@@ -715,19 +724,22 @@ useEffect(() => {
                 <Text as="p" variant="bodySm" tone="subdued">Choose when your dynamic pricing rules are active on the storefront. No permanent admin changes.</Text>
               </BlockStack>
               <InlineStack gap="300">
+                {/* UPDATED: Stop Live — tone="critical", disabled when no rules OR not live OR processing */}
                 <Button
                   onClick={() => setShowStopModal(true)}
-                  disabled={isProcessing || !metrics.isLive}
+                  disabled={!hasRules || isProcessing || !metrics.isLive}
                   tone="critical"
-                  variant="secondary"
+                  variant="primary"
                 >
                   Stop Live Prices
                 </Button>
+                {/* UPDATED: Go Live — tone="success", disabled when no rules OR processing */}
                 <Button
                   variant="primary"
+                  tone="success"
                   onClick={() => setShowGoLiveModal(true)}
                   loading={isProcessing}
-                  disabled={isProcessing || !hasRules}
+                  disabled={!hasRules || isProcessing}
                 >
                   Go Live on Storefront
                 </Button>
@@ -761,9 +773,10 @@ useEffect(() => {
               >
                 Refresh Previews
               </Button>
+              {/* UPDATED: Apply All — disabled when no rules OR no plan OR processing */}
               <Button
                 onClick={() => setIsModalOpen(true)}
-                disabled={!hasActivePlan ||isProcessing || previews.length === 0}
+                disabled={!hasRules || !hasActivePlan || isProcessing || previews.length === 0}
                 tone="success"
               >
                 {`Apply All (${previews.length})`}
@@ -779,9 +792,10 @@ useEffect(() => {
                   Download Impact Report
                 </Button>
               )}
+              {/* UPDATED: Apply Selected — disabled when no rules OR no plan OR processing */}
               <Button
                 onClick={handleApplySelected}
-                disabled={!hasActivePlan ||isProcessing || selectedItems.size === 0}
+                disabled={!hasRules || !hasActivePlan || isProcessing || selectedItems.size === 0}
                 variant="secondary"
               >
                 {`Apply Selected (${selectedItems.size})`}
