@@ -585,7 +585,7 @@ useEffect(() => {
               <Text as="p">Follow these simple steps to optimize your store pricing:</Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
-                  <Text as="p">1️⃣ <strong>Configure:</strong> Set your markup and rounding rules in the <Button variant="tertiary" url="/app/rules">Rules</Button> page.</Text>
+                  <Text as="p">1️⃣ <strong>Configure:</strong> Set your markup and rounding rules in the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
                   <Text as="p">2️⃣ <strong>Preview:</strong> Come back here to see how your new prices will look.</Text>
                   <Text as="p">3️⃣ <strong>Apply:</strong> Review the changes and apply them safely (you can undo anytime).</Text>
                 </BlockStack>
@@ -703,7 +703,8 @@ useEffect(() => {
                 Please configure at least one pricing rule before applying changes to your storefront.
                 The Apply, Go Live, and Stop Live buttons will be enabled once rules are configured.
               </Text>
-              <Button variant="primary" url="/app/rules">Configure Pricing Rules</Button>
+              {/* FIXED: use navigate() not url= — url= causes full page reload → login redirect in embedded app */}
+              <Button variant="primary" onClick={() => navigate("/app/rules")}>Configure Pricing Rules</Button>
             </BlockStack>
           </Card>
         )}
