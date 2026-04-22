@@ -44,9 +44,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     return {
-        markupPercent: rule?.markupPercent ?? 10,
+        markupPercent: rule?.markupPercent ?? 0,
         charmPricing: rule?.charmPricing ?? true,
-        roundingStep: rule?.roundingStep ?? 0.99,
+        roundingStep: rule?.roundingStep ?? 0,
         updatedAt: rule?.updatedAt ?? null,
         history,
     };
@@ -149,7 +149,9 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
     const isSubmitting = navigation.state === "submitting";
 
     const [markupPercent, setMarkupPercent] = useState(String(loaderData.markupPercent));
-    const [roundingStep, setRoundingStep] = useState(String(loaderData.roundingStep));
+    const [roundingStep, setRoundingStep] = useState(
+        loaderData.roundingStep === 0 ? "0.0" : String(loaderData.roundingStep)
+    );
     const [charmPricing, setCharmPricing] = useState(loaderData.charmPricing);
 
     useEffect(() => {
