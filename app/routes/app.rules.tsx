@@ -160,24 +160,38 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
 
     const basePrice = 59.99;
 
-    const markupApplied = basePrice * (1 + (Number(markupPercent) || 0) / 100);
+    const safeMarkup = isNaN(Number(markupPercent)) ? 0 : Number(markupPercent);
+    const safeRounding = isNaN(Number(roundingStep)) ? 0 : Number(roundingStep);
+
+    const markupApplied = basePrice * (1 + safeMarkup / 100);
 
     const finalPrice = calculatePrice(
         basePrice,
-        Number(markupPercent) || 0,
-        Number(roundingStep) || 0,
+        safeMarkup,
+        safeRounding,
         charmPricing
     );
 
     return (
-        <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }}>
+        <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }} fullWidth>
+            <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
             <Layout>
 
                 {/* LEFT */}
                 <Layout.Section>
                     <Card>
+                        <BlockStack gap="200">
+                            <Text as="p" tone="subdued">
+                                Configure how your product prices are adjusted using markup and smart rounding.
+                                Example: Add +10% markup and round to .99 for better conversion pricing.
+                            </Text>
+                        </BlockStack>
+                    </Card>
+
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: "12px", marginTop: "16px" }}>
+                    <Card>
                         <Form method="post">
-                            <BlockStack gap="300">
+                            <BlockStack gap="200">
 
                                 <TextField
                                     label="Markup (%)"
@@ -185,7 +199,11 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                     autoComplete="off"
                                     value={markupPercent}
                                     disabled={isSubmitting}
-                                    onChange={(value) => setMarkupPercent(value)}
+                                    onChange={(value) => {
+                                        if (/^-?\d{0,2}(\.\d{0,2})?$/.test(value) || value === "") {
+                                            setMarkupPercent(value);
+                                        }
+                                    }}
                                     helpText="Between -99 and +99"
                                     error={actionData?.fieldErrors?.markupPercent}
                                 />
@@ -196,7 +214,11 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                     autoComplete="off"
                                     value={roundingStep}
                                     disabled={isSubmitting}
-                                    onChange={(value) => setRoundingStep(value)}
+                                    onChange={(value) => {
+                                        if (/^0?(\.\d{0,2})?$/.test(value) || value === "") {
+                                            setRoundingStep(value);
+                                        }
+                                    }}
                                     helpText="Decimal (e.g., 0.55)"
                                     error={actionData?.fieldErrors?.roundingStep}
                                 />
@@ -221,13 +243,15 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                             </BlockStack>
                         </Form>
                     </Card>
+                    </div>
                 </Layout.Section>
 
                 {/* RIGHT */}
                 <Layout.Section variant="oneThird">
 
+                    <div style={{ background: "linear-gradient(135deg, #f9fafb, #f1f5f9)", border: "1px solid #e5e7eb", borderRadius: "12px" }}>
                     <Card>
-                        <BlockStack gap="300">
+                        <BlockStack gap="200">
 
                             <Text   as="span" variant="headingMd">Live Example</Text>
 
@@ -237,7 +261,7 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                             </InlineStack>
 
                             <InlineStack align="space-between">
-                                <Text   as="span" tone="subdued">+{markupPercent}%</Text>
+                                <Text   as="span" tone="subdued">+{safeMarkup}%</Text>
                                 <Text   as="span">{currencyCode} {markupApplied.toFixed(2)}</Text>
                             </InlineStack>
 
@@ -261,19 +285,19 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
 
                                 {loaderData.history.map((h: any) => (
                                     <Text   as="span" key={h.id} tone="subdued">
-                                        {h.markupPercent > 0 ? "+" : ""}
-                                        {h.markupPercent}% • {h.roundingStep?.toFixed(2)}
-                                        {h.charmPricing && " • .99"} • {new Date(h.createdAt).toLocaleString()}
+                                        {h.markupPercent > 0 ? "+" : ""}{h.markupPercent}% • {h.roundingStep?.toFixed(2)}{h.charmPricing && " • .99"} • {new Date(h.createdAt).toLocaleDateString()}
                                     </Text>
                                 ))}
                             </BlockStack>
 
                         </BlockStack>
                     </Card>
+                    </div>
 
                 </Layout.Section>
 
             </Layout>
+            </div>
         </Page>
     );
 }

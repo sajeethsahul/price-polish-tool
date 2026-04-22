@@ -733,7 +733,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         }
       `}</style>
 
-      <Page title="Price Polish Dashboard">
+      <Page title="Price Polish Dashboard" fullWidth>
+        <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
         <BlockStack gap="500">
 
           {/* Debug Tools */}
@@ -812,7 +813,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   <Badge tone="success">Live Store Sync</Badge>
                 </InlineStack>
                 {/* UPDATED: variant="primary" — Task 5 hierarchy */}
-                <Button variant="primary" onClick={handleUpgrade}>Start Free Trial</Button>
+                <Button variant="primary" tone="success" onClick={handleUpgrade}>Start Free Trial</Button>
                 <Text as="p" variant="bodySm" tone="subdued">No charge today • Cancel anytime</Text>
               </BlockStack>
             </Card>
@@ -852,42 +853,52 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             <Box paddingBlockEnd="400">
               <Grid>
                 <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                  <Card>
-                    <BlockStack gap="100" align="start">
-                      <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
-                      <Text as="h2" variant="headingLg">
-                        {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
-                      </Text>
-                    </BlockStack>
-                  </Card>
+                  <div style={{ background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", border: "1px solid #bbf7d0", borderRadius: 12 }}>
+                    <Card>
+                      <BlockStack gap="100" align="start">
+                        <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
+                        <Text as="h2" variant="headingLg" tone="success">
+                          {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
+                        </Text>
+                      </BlockStack>
+                    </Card>
+                  </div>
                 </Grid.Cell>
                 <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                  <Card>
-                    <BlockStack gap="100" align="start">
-                      <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
-                      <Text as="h2" variant="headingLg">
-                        {`${metrics.successRate.toFixed(1)}%`}
-                      </Text>
-                    </BlockStack>
-                  </Card>
+                  <div style={{ background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1px solid #bfdbfe", borderRadius: 12 }}>
+                    <Card>
+                      <BlockStack gap="100" align="start">
+                        <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
+                        <Text as="h2" variant="headingLg">
+                          {`${metrics.successRate.toFixed(1)}%`}
+                        </Text>
+                      </BlockStack>
+                    </Card>
+                  </div>
                 </Grid.Cell>
                 <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                  <Card>
-                    <BlockStack gap="100" align="start">
-                      <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
-                      <Text as="h2" variant="headingLg">{metrics.totalApplied}</Text>
-                    </BlockStack>
-                  </Card>
+                  <div style={{ background: "linear-gradient(135deg, #faf5ff, #ede9fe)", border: "1px solid #ddd6fe", borderRadius: 12 }}>
+                    <Card>
+                      <BlockStack gap="100" align="start">
+                        <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
+                        <Text as="h2" variant="headingLg">
+                          {metrics.totalApplied}
+                        </Text>
+                      </BlockStack>
+                    </Card>
+                  </div>
                 </Grid.Cell>
                 <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                  <Card>
-                    <BlockStack gap="100" align="start">
-                      <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
-                      <Text as="h2" variant="headingLg">
-                        {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
-                      </Text>
-                    </BlockStack>
-                  </Card>
+                  <div style={{ background: "linear-gradient(135deg, #f9fafb, #f3f4f6)", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+                    <Card>
+                      <BlockStack gap="100" align="start">
+                        <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
+                        <Text as="h2" variant="headingLg">
+                          {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
+                        </Text>
+                      </BlockStack>
+                    </Card>
+                  </div>
                 </Grid.Cell>
               </Grid>
             </Box>
@@ -904,7 +915,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     </p>
                     <InlineStack>
                       {/* UPDATED Task 5: Configure Rules → primary (default) */}
-                      <Button variant="primary" size="large" onClick={() => navigate("/app/rules")}>
+                      <Button variant="primary" tone="success" size="large" onClick={() => navigate("/app/rules")}>
                         Configure Pricing Rules
                       </Button>
                     </InlineStack>
@@ -986,7 +997,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   <Text as="p" tone="subdued">
                     We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
                   </Text>
-                  <Button variant="primary" onClick={handlePreview}>Refresh Now</Button>
+                  <Button variant="primary" tone="success" onClick={handlePreview}>Refresh Now</Button>
                 </BlockStack>
               </Box>
             </Card>
@@ -1001,8 +1012,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           }}>
             <Box paddingBlockEnd="400">
               <InlineStack align="start" gap="300">
-                {/* ================= LEFT SIDE (70%) ================= */}
-                <div style={{ flex: 2 }}>
+                {/* ================= LEFT SIDE (75%) ================= */}
+                <div style={{ flex: 3 }}>
                   <BlockStack gap="300">
                     {/* 🔹 1. ACTION BAR CARD */}
                     <Card>
@@ -1022,6 +1033,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           {/* UPDATED TASK 1: All action buttons disabled + guarded when no rules */}
                           <>
                             <Button
+                              variant="primary"
+                              tone="success"
                               onClick={() => {
                                 if (guardNoRules()) return;
                                 setIsModalOpen(true);
@@ -1034,16 +1047,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             {previews.length === 0 ? (
                               <Tooltip content="Please refresh previews to generate the latest report.">
                                 <span style={{ display: 'inline-block' }}>
-                                  <Button disabled>Download Impact Report</Button>
+                                  <Button variant="secondary" disabled>Download Impact Report</Button>
                                 </span>
                               </Tooltip>
                             ) : (
-                              <Button onClick={handleDownloadReport}>
+                              <Button variant="secondary" onClick={handleDownloadReport}>
                                 Download Impact Report
                               </Button>
                             )}
 
                             <Button
+                              variant="primary"
+                              tone="success"
                               onClick={handleApplySelected}
                               disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
                             >
@@ -1052,6 +1067,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                             {lastUpdate && (
                               <Button
+                                variant="primary"
                                 onClick={handleUndo}
                                 loading={isProcessing}
                                 disabled={isProcessing || !lastUpdate.batchId}
@@ -1091,8 +1107,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
                         </InlineStack>
 
-                        <InlineStack gap="300" align="start">
-                          <Box width="300px">
+                        <InlineStack gap="300" wrap={false} align="start">
+                          <div style={{ flex: 1, minWidth: "180px" }}>
                             <TextField  
                               label="Search Products"
                               value={searchQuery}
@@ -1101,8 +1117,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               placeholder="Product title..."
                               maxLength={100}
                             />
-                          </Box>
-                          <Box width="200px">
+                          </div>
+                          <div style={{ flex: 1, minWidth: "180px" }}>
                             <Select
                               label="Sort by"
                               options={[
@@ -1116,8 +1132,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               value={sortOrder}
                               onChange={setSortOrder}
                             />
-                          </Box>
-                          <Box width="150px">
+                          </div>
+                          <div style={{ flex: 1, minWidth: "180px" }}>
                             <TextField 
                               label="Min Price"
                               type="text"
@@ -1128,8 +1144,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               prefix={currencySymbol}
                               maxLength={15}
                             />
-                          </Box>
-                          <Box width="150px">
+                          </div>
+                          <div style={{ flex: 1, minWidth: "180px" }}>
                             <TextField 
                               label="Max Price"
                               type="text"
@@ -1140,7 +1156,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               prefix={currencySymbol}
                               maxLength={15}
                             />
-                          </Box>
+                          </div>
                         </InlineStack>
                       </BlockStack>
                     </Card>
@@ -1288,26 +1304,50 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   </BlockStack>
                 </div>
 
-                {/* ================= RIGHT SIDE (30%) ================= */}
-                <div style={{ flex: 1, position: "sticky", top: "20px" }}>
+                {/* ================= RIGHT SIDE (25%) ================= */}
+                <div style={{ flex: 1, maxWidth: "320px", position: "sticky", top: "20px" }}>
                   <Card>
-                    <BlockStack gap="300">
+                    <BlockStack gap="200">
 
                       <Text as="h3" variant="headingMd">
                         Pricing Actions
                       </Text>
 
-                      <Select
-                        label="Apply pricing to"
-                        options={[
-                          { label: "All products", value: "all" },
-                          { label: "Selected products", value: "selected" },
-                          { label: "Filtered results", value: "filtered" },
-                          { label: "Collection", value: "collection" }
-                        ]}
-                        value={applyMode}
-                        onChange={(value) => setApplyMode(value as any)}
-                      />
+                      <InlineStack gap="200" blockAlign="end" wrap={false}>
+                        <div style={{ flex: 1 }}>
+                          <Select
+                            label="Apply pricing to"
+                            options={[
+                              { label: "All products", value: "all" },
+                              { label: "Selected products", value: "selected" },
+                              { label: "Filtered results", value: "filtered" },
+                              { label: "Collection", value: "collection" }
+                            ]}
+                            value={applyMode}
+                            onChange={(value) => setApplyMode(value as any)}
+                          />
+                        </div>
+                        <Button
+                          variant="primary"
+                          tone="success"
+                          loading={isProcessing}
+                          disabled={
+                            !hasActivePlan ||
+                            isProcessing ||
+                            !hasRules ||
+                            (applyMode === "all" && previews.length === 0) ||
+                            (applyMode === "selected" && selectedItems.size === 0)
+                          }
+                          onClick={() => handleApplyBatch(previews)}
+                        >
+                          {`Apply (${applyMode === "all"
+                            ? previews.length
+                            : applyMode === "selected"
+                              ? selectedItems.size
+                              : previews.length
+                            })`}
+                        </Button>
+                      </InlineStack>
 
                       {applyMode === "selected" && (
                         <Text as="p" tone="subdued">
@@ -1325,56 +1365,39 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                         />
                       )}
 
-                      <Button
-                        variant="primary"
-                        loading={isProcessing}
-                        disabled={
-                          !hasActivePlan ||
-                          isProcessing ||
-                          !hasRules ||
-                          (applyMode === "all" && previews.length === 0) ||
-                          (applyMode === "selected" && selectedItems.size === 0)
-                        }
-                        onClick={() => handleApplyBatch(previews)}
-                      >
-                        {`Apply (${applyMode === "all"
-                          ? previews.length
-                          : applyMode === "selected"
-                            ? selectedItems.size
-                            : previews.length
-                          })`}
-                      </Button>
-
                       <Divider />
 
-                      <TextField
-                        label="Schedule Time"
-                        type="datetime-local"
-                        value={scheduleTime}
-                        onChange={setScheduleTime}
-                        autoComplete="off"
-                      />
-
-                      <Button
-                        onClick={async () => {
-                          if (!scheduleTime) {
-                            shopify.toast.show("Select time", { isError: true });
-                            return;
+                      <InlineStack gap="200" blockAlign="end" wrap={false}>
+                        <div style={{ flex: 1 }}>
+                          <TextField
+                            label="Schedule Time"
+                            type="datetime-local"
+                            value={scheduleTime}
+                            onChange={setScheduleTime}
+                            autoComplete="off"
+                          />
+                        </div>
+                        <Button
+                          onClick={async () => {
+                            if (!scheduleTime) {
+                              shopify.toast.show("Select time", { isError: true });
+                              return;
                             }
 
-                          await fetch("/api/schedule-pricing", {
-                            method: "POST",
-                            headers: {
-                              "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({ runAt: scheduleTime }),
-                          });
+                            await fetch("/api/schedule-pricing", {
+                              method: "POST",
+                              headers: {
+                                "Content-Type": "application/json",
+                              },
+                              body: JSON.stringify({ runAt: scheduleTime }),
+                            });
 
-                          shopify.toast.show("Scheduled successfully");
-                        }}
-                      >
-                        Schedule Pricing
-                      </Button>
+                            shopify.toast.show("Scheduled successfully");
+                          }}
+                        >
+                          Schedule
+                        </Button>
+                      </InlineStack>
 
                     </BlockStack>
                   </Card>
@@ -1384,6 +1407,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           </div>
 
         </BlockStack>
+        </div>
 
         {/* ── TASK 4: Confirmation Modals ── */}
 
