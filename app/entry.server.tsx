@@ -4,9 +4,12 @@ import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import type { EntryContext } from "react-router";
 import { isbot } from "isbot";
+import { startWorker } from "./utils/worker.server";
 
+startWorker();
 
 export const streamTimeout = 5000;
+
 
 export default function handleRequest(
   request: Request,
@@ -27,7 +30,6 @@ export default function handleRequest(
 
 
 
-
   const userAgent = request.headers.get("user-agent");
 
   const callbackName = isbot(userAgent ?? "")
@@ -43,7 +45,7 @@ export default function handleRequest(
           const stream = createReadableStreamFromReadable(body);
 
           responseHeaders.set("Content-Type", "text/html");
-          
+
           // 🔥 MANDATORY SHOPIFY CSP
           responseHeaders.set(
             "Content-Security-Policy",
@@ -73,3 +75,4 @@ export default function handleRequest(
     setTimeout(abort, streamTimeout + 1000);
   });
 }
+

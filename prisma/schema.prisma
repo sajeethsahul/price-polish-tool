@@ -84,3 +84,32 @@ model PricingRuleHistory {
   roundingStep  Float
   createdAt     DateTime @default(now())
 }
+model StagedPrice {
+  id          String   @id @default(uuid())
+  shop        String
+  variantId   String
+  stagedPrice Float
+  originalPrice Float
+  createdAt   DateTime @default(now())
+}
+model AppState {
+  shop   String @id
+  isLive Boolean @default(false)
+}
+model PushJob {
+  id         String   @id @default(uuid())
+  shop       String
+  total      Int
+  processed  Int      @default(0)
+  success    Int      @default(0)
+  failed     Int      @default(0)
+  status     String   @default("running") // running | done
+  createdAt  DateTime @default(now())
+}
+model ScheduledJob {
+  id        String   @id @default(uuid())
+  shop      String
+  runAt     DateTime
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+}

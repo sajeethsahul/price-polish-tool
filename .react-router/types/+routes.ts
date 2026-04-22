@@ -32,6 +32,15 @@ type Pages = {
   "/api/preview-price": {
     params: {};
   };
+  "/api/staging-price": {
+    params: {};
+  };
+  "/api/retry-failed": {
+    params: {};
+  };
+  "/api/push-status": {
+    params: {};
+  };
   "/api/bulk-price": {
     params: {};
   };
@@ -84,7 +93,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -109,6 +118,18 @@ type RouteFiles = {
   "routes/api.preview-price.ts": {
     id: "routes/api.preview-price";
     page: "/api/preview-price";
+  };
+  "routes/api.staging-price.ts": {
+    id: "routes/api.staging-price";
+    page: "/api/staging-price";
+  };
+  "routes/api.retry-failed.ts": {
+    id: "routes/api.retry-failed";
+    page: "/api/retry-failed";
+  };
+  "routes/api.push-status.ts": {
+    id: "routes/api.push-status";
+    page: "/api/push-status";
   };
   "routes/api.bulk-price.ts": {
     id: "routes/api.bulk-price";
@@ -188,6 +209,9 @@ type RouteModules = {
   "routes/api.proxy.settings": typeof import("./app/routes/api.proxy.settings.ts");
   "routes/auth.session-token": typeof import("./app/routes/auth.session-token.ts");
   "routes/api.preview-price": typeof import("./app/routes/api.preview-price.ts");
+  "routes/api.staging-price": typeof import("./app/routes/api.staging-price.ts");
+  "routes/api.retry-failed": typeof import("./app/routes/api.retry-failed.ts");
+  "routes/api.push-status": typeof import("./app/routes/api.push-status.ts");
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
   "routes/api.products": typeof import("./app/routes/api.products.ts");

@@ -24,6 +24,7 @@ import {
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { calculatePrice } from "../utils/pricing";
 
 // ================= LOADER =================
 
@@ -139,14 +140,13 @@ export default function RulesPage() {
 
 // ================= UI =================
 
-function RulesContent({ loaderData, actionData }: any) {
+function RulesContent({ loaderData, actionData, currencyCode }: any) {
     const navigate = useNavigate();
     const navigation = useNavigation();
     const shopify = useAppBridge();
 
     const isSubmitting = navigation.state === "submitting";
 
-    // ✅ FIX 1: Stable state (no flicker)
     const [markupPercent, setMarkupPercent] = useState(
         String(loaderData.markupPercent)
     );
@@ -157,40 +157,65 @@ function RulesContent({ loaderData, actionData }: any) {
         loaderData.charmPricing
     );
 
-    // toast only (no UI reset)
+    const [impact, setImpact] = useState({ gain: 0, percent: 0 });
+
     useEffect(() => {
         if (actionData?.saved) {
             shopify.toast.show("Saved successfully");
         }
     }, [actionData, shopify]);
 
+    // 🔥 Impact Preview
+    useEffect(() => {
+        let isMounted = true;
+
+        const fetchImpact = async () => {
+            try {
+                const res = await fetch("/api/staged-preview");
+                const data = await res.json();
+
+                if (!isMounted) return;
+
+                if (!data || data.length === 0) {
+                    setImpact({ gain: 0, percent: 0 });
+                    return;
+                }
+
+                let totalOriginal = 0;
+                let totalNew = 0;
+
+                for (const item of data) {
+                    totalOriginal += Number(item.originalPrice);
+                    totalNew += Number(item.stagedPrice);
+                }
+
+                const gain = totalNew - totalOriginal;
+                const percent =
+                    totalOriginal > 0 ? (gain / totalOriginal) * 100 : 0;
+
+                setImpact({ gain, percent });
+            } catch (err) {
+                console.error("Impact fetch failed", err);
+            }
+        };
+
+        fetchImpact();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     // ================= CALC =================
 
     const basePrice = 59.99;
 
-    const markup = Number(markupPercent);
-    const rounding = Number(roundingStep);
-
-    const safeMarkup = isFinite(markup) ? markup : 0;
-    const safeRounding = isFinite(rounding) ? rounding : 0;
-
-    const priceAfterMarkup =
-        basePrice + (basePrice * safeMarkup) / 100;
-
-    let roundedPrice = priceAfterMarkup;
-
-    if (safeRounding > 0) {
-        roundedPrice = Math.floor(priceAfterMarkup) + safeRounding;
-        if (roundedPrice < priceAfterMarkup) {
-            roundedPrice += 1;
-        }
-    } else {
-        roundedPrice = Math.round(priceAfterMarkup);
-    }
-
-    if (charmPricing) {
-        roundedPrice = Math.floor(priceAfterMarkup) + 0.99;
-    }
+    const finalPrice = calculatePrice(
+        basePrice,
+        Number(markupPercent) || 0,
+        Number(roundingStep) || 0,
+        charmPricing
+    );
 
     // ================= UI =================
 
@@ -207,42 +232,20 @@ function RulesContent({ loaderData, actionData }: any) {
                                 <TextField
                                     label="Markup (%)"
                                     name="markupPercent"
+                                    autoComplete="off"
                                     value={markupPercent}
                                     disabled={isSubmitting}
-                                    onChange={(value) => {
-                                        if (value === "" || value === "-") {
-                                            setMarkupPercent(value);
-                                            return;
-                                        }
-                                        if (value.length > 6) return;
-                                        if (!/^-?\d{0,2}(\.\d{0,2})?$/.test(value)) return;
-
-                                        const num = Number(value);
-                                        if (!isNaN(num) && num >= -99 && num <= 99) {
-                                            setMarkupPercent(value);
-                                        }
-                                    }}
+                                    onChange={(value) => setMarkupPercent(value)}
                                     helpText="Between -99 and +99"
                                 />
 
                                 <TextField
                                     label="Rounding"
                                     name="roundingStep"
+                                    autoComplete="off"
                                     value={roundingStep}
                                     disabled={isSubmitting}
-                                    onChange={(value) => {
-                                        if (value === "") {
-                                            setRoundingStep(value);
-                                            return;
-                                        }
-                                        if (value.length > 4) return;
-                                        if (!/^0?(\.\d{0,2})?$/.test(value)) return;
-
-                                        const num = Number(value);
-                                        if (!isNaN(num) && num >= 0 && num <= 0.99) {
-                                            setRoundingStep(value);
-                                        }
-                                    }}
+                                    onChange={(value) => setRoundingStep(value)}
                                     helpText="Decimal rounding (e.g., 0.99)"
                                 />
 
@@ -270,56 +273,40 @@ function RulesContent({ loaderData, actionData }: any) {
 
                 {/* RIGHT */}
                 <Layout.Section variant="oneThird">
+
                     <Card>
                         <BlockStack gap="400">
 
-                            <Text variant="headingMd">Live Example</Text>
+                            <Text as="h2" variant="headingMd">Live Example</Text>
 
                             <InlineStack align="space-between">
-                                <Text tone="subdued">Base Price</Text>
-                                <Text>${basePrice.toFixed(2)}</Text>
+                                <Text as="span" tone="subdued">Base Price</Text>
+                                <Text as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
                             </InlineStack>
 
                             <InlineStack align="space-between">
-                                <Text tone="subdued">
-                                    {safeMarkup >= 0 ? "+" : ""}
-                                    {safeMarkup}% Markup
-                                </Text>
-                                <Text tone="success">
-                                    ${priceAfterMarkup.toFixed(2)}
-                                </Text>
-                            </InlineStack>
-
-                            <InlineStack align="space-between">
-                                <Text tone="subdued">Rounded</Text>
-                                <Text>${roundedPrice.toFixed(2)}</Text>
-                            </InlineStack>
-
-                            <InlineStack align="space-between">
-                                <Text variant="headingMd">Final Price</Text>
-                                <Text variant="heading2xl" tone="success">
-                                    ${roundedPrice.toFixed(2)}
+                                <Text as="span" tone="subdued">Final Price</Text>
+                                <Text as="span" variant="heading2xl" tone="success">
+                                    {currencyCode} {finalPrice.toFixed(2)}
                                 </Text>
                             </InlineStack>
 
                             <div style={{ borderTop: "1px solid #eee" }} />
 
                             {loaderData.updatedAt && (
-                                <Text tone="subdued">
+                                <Text as="span" tone="subdued">
                                     Last updated: {new Date(loaderData.updatedAt).toLocaleString()}
                                 </Text>
                             )}
 
                             {loaderData.history?.length > 0 && (
                                 <BlockStack gap="100">
-                                    <Text variant="headingSm">Recent Changes</Text>
+                                    <Text as="span" variant="headingSm">Recent Changes</Text>
 
                                     {loaderData.history.map((h: any) => (
-                                        <Text key={h.id} tone="subdued">
+                                        <Text as="span" key={h.id} tone="subdued">
                                             {h.markupPercent > 0 ? "+" : ""}
-                                            {h.markupPercent}% •{" "}
-                                            {h.charmPricing ? ".99 • " : ""}
-                                            {new Date(h.createdAt).toLocaleString()}
+                                            {h.markupPercent}% • {new Date(h.createdAt).toLocaleString()}
                                         </Text>
                                     ))}
                                 </BlockStack>
@@ -327,6 +314,56 @@ function RulesContent({ loaderData, actionData }: any) {
 
                         </BlockStack>
                     </Card>
+
+                    {/* 🔥 Impact Preview */}
+                    <div style={{ marginTop: "16px" }}>
+                        <Card>
+                            <BlockStack gap="300">
+
+                                <Text as="h3" variant="headingMd">
+                                    Impact Preview
+                                </Text>
+
+                                {impact.gain === 0 ? (
+                                    <Text as="p" tone="subdued">
+                                        Apply pricing rules to preview revenue impact.
+                                    </Text>
+                                ) : (
+                                    <>
+                                        <InlineStack align="space-between">
+                                            <Text as="span" tone="subdued">
+                                                Revenue Change
+                                            </Text>
+                                            <Text
+                                                as="span"
+                                                variant="headingLg"
+                                                tone={impact.gain >= 0 ? "success" : "critical"}
+                                            >
+                                                {currencyCode} {impact.gain.toLocaleString(undefined, {
+                                                    minimumFractionDigits: 2,
+                                                })}
+                                            </Text>
+                                        </InlineStack>
+
+                                        <InlineStack align="space-between">
+                                            <Text as="span" tone="subdued">
+                                                Growth
+                                            </Text>
+                                            <Text
+                                                as="span"
+                                                tone={impact.gain >= 0 ? "success" : "critical"}
+                                            >
+                                                {impact.gain >= 0 ? "+" : ""}
+                                                {impact.percent.toFixed(2)}%
+                                            </Text>
+                                        </InlineStack>
+                                    </>
+                                )}
+
+                            </BlockStack>
+                        </Card>
+                    </div>
+
                 </Layout.Section>
 
             </Layout>

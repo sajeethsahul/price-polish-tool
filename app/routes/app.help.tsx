@@ -30,7 +30,7 @@ export default function HelpPage() {
 
         <Card>
           <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">1. The Dashboard Workflow</Text>
+            <Text  as="h2"  variant="headingMd">1. The Dashboard Workflow</Text>
             <List type="number">
               <List.Item>
                 <strong>Set Rules:</strong> Go to the Rules page to define your Markup % and Rounding (Fixed Decimal).
@@ -47,7 +47,7 @@ export default function HelpPage() {
 
         <Card>
           <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">2. Understanding the Apply Button Status</Text>
+            <Text  as="h2"  variant="headingMd">2. Understanding the Apply Button Status</Text>
             <Text as="p">
               The "Apply" button is your tool to push changes to your Shopify Database. It respects the underlying product pricing statuses:
             </Text>
@@ -74,7 +74,7 @@ export default function HelpPage() {
         </Card>
 
         <BlockStack gap="400">
-          <Text as="h2" variant="headingMd">3. Admin Update vs. Storefront Live Control</Text>
+          <Text  as="h2"  variant="headingMd">3. Admin Update vs. Storefront Live Control</Text>
           <Layout>
             <Layout.Section variant="oneHalf">
               <Card>
@@ -106,7 +106,7 @@ export default function HelpPage() {
           <BlockStack gap="400">
             <InlineStack gap="200" blockAlign="center">
               <Icon source={ShieldCheckMarkIcon} tone="success" />
-              <Text as="h2" variant="headingMd">4. Safety & Trust</Text>
+              <Text  as="h2"  variant="headingMd">4. Safety & Trust</Text>
             </InlineStack>
             <Text as="p"><strong>Undo Last Update:</strong> All bulk updates to your Shopify database can be reversed with a single click using the "Undo Last Update" button. Your original prices are always backed up before any changes are made!</Text>
             <Text as="p"><strong>Safety Audit Manifest:</strong> Use the "Download Impact Report" button on the Dashboard to export a complete CSV audit of exactly how rules impact your net profit gain.</Text>
@@ -116,7 +116,7 @@ export default function HelpPage() {
 
         <Card>
           <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">5. Profit Audit & Impact Reports</Text>
+            <Text  as="h2"  variant="headingMd">5. Profit Audit & Impact Reports</Text>
             <List>
               <List.Item>
                 <strong>Download Report:</strong> The "Download Impact Report" button generates a CSV file showing a side-by-side comparison of "Original Price" vs. "Optimized Price."

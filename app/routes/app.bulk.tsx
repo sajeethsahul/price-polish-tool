@@ -64,7 +64,7 @@ export default function BulkEditorPage() {
                 {hasRules && (
                     <Card>
                         <BlockStack gap="300">
-                            <Text as="h2" variant="headingLg">
+                            <Text  as="h2"  variant="headingLg">
                                 Bulk Price Editor
                             </Text>
                             <Text as="p" variant="bodyMd">

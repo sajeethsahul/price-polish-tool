@@ -134,7 +134,7 @@ export default function AppLayout() {
               <Page title="Start Free Trial">
                 <Card>
                   <BlockStack gap="300">
-                    <Text as="h2" variant="headingMd">
+                    <Text  as="h2"  variant="headingMd">
                       Unlock Price Polish
                     </Text>
                     <Text as="p">
