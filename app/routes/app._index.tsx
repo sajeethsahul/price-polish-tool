@@ -740,23 +740,23 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           {SHOW_DEBUG_TOOLS && (
             <>
               <Card>
-                <BlockStack gap="400">
+                <BlockStack gap="300">
                   <Text as="h3" variant="headingSm">System Health & Diagnostics</Text>
                   <Divider />
                   <BlockStack gap="200">
-                    <InlineStack gap="400" align="space-between">
+                    <InlineStack gap="300" align="space-between">
                       <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
                       <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
                         {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
                       </Badge>
                     </InlineStack>
-                    <InlineStack gap="400" align="space-between">
+                    <InlineStack gap="300" align="space-between">
                       <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
                       <Badge tone={currencyCode ? "success" : "attention"}>
                         {currencyCode ? "Connected" : "Initializing..."}
                       </Badge>
                     </InlineStack>
-                    <InlineStack gap="400" align="space-between">
+                    <InlineStack gap="300" align="space-between">
                       <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
                       <Text as="span" variant="bodyMd">
                         {typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}
@@ -772,7 +772,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               <Card>
                 <BlockStack gap="200">
                   <Text as="h3" variant="headingSm">System Status (Debug)</Text>
-                  <InlineStack gap="400">
+                  <InlineStack gap="300">
                     <Text as="p">Previews: <strong>{previews.length}</strong></Text>
                     <Text as="p">Filtered: <strong>{filteredPreviews.length}</strong></Text>
                     <Text as="p">Loading: <strong>{loading ? "YES" : "NO"}</strong></Text>
@@ -786,7 +786,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           {/* First Visit Welcome */}
           {firstVisit && (
             <Card>
-              <BlockStack gap="400">
+              <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">Welcome to Price Polish! 🚀</Text>
                 <Text as="p">Follow these simple steps to optimize your store pricing:</Text>
                 <Box paddingInlineStart="400">
@@ -898,7 +898,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             <Box paddingBlockStart="200" paddingBlockEnd="500">
               <Banner tone="warning" title="No Pricing Rules Found">
                 <Box paddingBlockStart="200" paddingBlockEnd="200">
-                  <BlockStack gap="400">
+                  <BlockStack gap="300">
                     <p>
                       You must configure at least one pricing rule before applying changes or going live.
                     </p>
@@ -981,7 +981,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           {!loading && previews.length === 0 && (
             <Card>
               <Box padding="500">
-                <BlockStack gap="400" align="center">
+                <BlockStack gap="300" align="center">
                   <Text as="h2" variant="headingMd">No products to polish yet</Text>
                   <Text as="p" tone="subdued">
                     We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
@@ -1000,106 +1000,386 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             pointerEvents: !hasRules ? "none" : "auto",
           }}>
             <Box paddingBlockEnd="400">
-              {/* ── APPLY PANEL WITH SCOPE */}
-              <Card>
-                <BlockStack gap="300">
+              <InlineStack align="start" gap="300">
+                {/* ================= LEFT SIDE (70%) ================= */}
+                <div style={{ flex: 2 }}>
+                  <BlockStack gap="300">
+                    {/* 🔹 1. ACTION BAR CARD */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <InlineStack gap="300" align="start">
+                          {/* Refresh is always available regardless of rules */}
+                          <div style={{ pointerEvents: "auto" }}>
+                            <Button
+                              onClick={handlePreview}
+                              loading={loading}
+                              disabled={loading || isProcessing}
+                            >
+                              Refresh Previews
+                            </Button>
+                          </div>
 
-                  <Text as="h3" variant="headingMd">
-                    Apply Pricing
-                  </Text>
+                          {/* UPDATED TASK 1: All action buttons disabled + guarded when no rules */}
+                          <>
+                            <Button
+                              onClick={() => {
+                                if (guardNoRules()) return;
+                                setIsModalOpen(true);
+                              }}
+                              disabled={!hasActivePlan || isProcessing || previews.length === 0 || !hasRules}
+                            >
+                              {`Apply All (${previews.length})`}
+                            </Button>
 
-                  {/* 🔥 Apply Scope */}
-                  <Select
-                    label="Apply pricing to"
-                    options={[
-                      { label: "All products", value: "all" },
-                      { label: "Selected products", value: "selected" },
-                      { label: "Filtered results", value: "filtered" },
-                      { label: "Collection", value: "collection" }
-                    ]}
-                    value={applyMode}
-                    onChange={(value) => setApplyMode(value as any)}
-                  />
+                            {previews.length === 0 ? (
+                              <Tooltip content="Please refresh previews to generate the latest report.">
+                                <span style={{ display: 'inline-block' }}>
+                                  <Button disabled>Download Impact Report</Button>
+                                </span>
+                              </Tooltip>
+                            ) : (
+                              <Button onClick={handleDownloadReport}>
+                                Download Impact Report
+                              </Button>
+                            )}
 
-                  {applyMode === "selected" && (
-                    <Text as="p" tone="subdued">
-                      {selectedItems.size} products selected
-                    </Text>
-                  )}
+                            <Button
+                              onClick={handleApplySelected}
+                              disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
+                            >
+                              {`Apply Selected (${selectedItems.size})`}
+                            </Button>
 
-                  {applyMode === "collection" && (
-                    <TextField
-                      label="Collection ID"
-                      value={collectionId}
-                      onChange={setCollectionId}
-                      autoComplete="off"
-                      helpText="Enter Shopify Collection ID"
-                    />
-                  )}
+                            {lastUpdate && (
+                              <Button
+                                onClick={handleUndo}
+                                loading={isProcessing}
+                                disabled={isProcessing || !lastUpdate.batchId}
+                                tone="critical"
+                              >
+                                Undo Last Update
+                              </Button>
+                            )}
+                          </>
+                        </InlineStack>
 
-                  {/* 🔥 Apply Button */}
-                  <Button
-                    variant="primary"
-                    loading={isProcessing}
-                    disabled={
-                      !hasActivePlan ||
-                      isProcessing ||
-                      !hasRules ||
-                      (applyMode === "all" && previews.length === 0) ||
-                      (applyMode === "selected" && selectedItems.size === 0)
-                    }
-                    onClick={() => handleApplyBatch(previews)}
-                  >
-                    {`Apply (${applyMode === "all"
-                      ? previews.length
-                      : applyMode === "selected"
-                        ? selectedItems.size
-                        : previews.length
-                      })`}
-                  </Button>
+                        {/* Processing progress */}
+                        {isProcessing && (
+                          <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                            <BlockStack gap="300" align="center">
+                              <InlineStack gap="300" blockAlign="center" align="center">
+                                <Spinner size="small" />
+                                <Text as="p" variant="bodyMd" fontWeight="bold">Processing price updates...</Text>
+                              </InlineStack>
+                              <Text as="p" tone="subdued" variant="bodySm">Please do not close this window or navigate away.</Text>
+                              <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+                            </BlockStack>
+                          </Box>
+                        )}
+                      </BlockStack>
+                    </Card>
 
-                </BlockStack>
-              </Card>
-              <div style={{ marginTop: "16px" }}>
-                <Card>
-                  <BlockStack gap="200">
+                    {/* 🔹 2. FILTER CARD */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <Text as="h3" variant="headingMd">Filters & Smart Segments</Text>
 
-                    <Text as="h3" variant="headingMd">
-                      Schedule Pricing
-                    </Text>
+                        <InlineStack gap="200">
+                          <Button pressed={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All</Button>
+                          <Button pressed={activeFilter === "increase"} onClick={() => setActiveFilter("increase")}>Price Increase</Button>
+                          <Button pressed={activeFilter === "decrease"} onClick={() => setActiveFilter("decrease")}>Price Decrease</Button>
+                          <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
+                        </InlineStack>
 
-                    <TextField
-                      label="Schedule Time"
-                      type="datetime-local"
-                      value={scheduleTime}
-                      onChange={setScheduleTime}
-                      autoComplete="off"
-                    />
+                        <InlineStack gap="300" align="start">
+                          <Box width="300px">
+                            <TextField  
+                              label="Search Products"
+                              value={searchQuery}
+                              onChange={handleSearchChange}
+                              autoComplete="off"
+                              placeholder="Product title..."
+                              maxLength={100}
+                            />
+                          </Box>
+                          <Box width="200px">
+                            <Select
+                              label="Sort by"
+                              options={[
+                                { label: "Name (A-Z)", value: "name_asc" },
+                                { label: "Name (Z-A)", value: "name_desc" },
+                                { label: "Price (Low to High)", value: "price_asc" },
+                                { label: "Price (High to Low)", value: "price_desc" },
+                                { label: "% Change (Asc)", value: "change_asc" },
+                                { label: "% Change (Desc)", value: "change_desc" },
+                              ]}
+                              value={sortOrder}
+                              onChange={setSortOrder}
+                            />
+                          </Box>
+                          <Box width="150px">
+                            <TextField 
+                              label="Min Price"
+                              type="text"
+                              inputMode="decimal"
+                              value={minPrice}
+                              onChange={handleMinPriceChange}
+                              autoComplete="off"
+                              prefix={currencySymbol}
+                              maxLength={15}
+                            />
+                          </Box>
+                          <Box width="150px">
+                            <TextField 
+                              label="Max Price"
+                              type="text"
+                              inputMode="decimal"
+                              value={maxPrice}
+                              onChange={handleMaxPriceChange}
+                              autoComplete="off"
+                              prefix={currencySymbol}
+                              maxLength={15}
+                            />
+                          </Box>
+                        </InlineStack>
+                      </BlockStack>
+                    </Card>
 
-                    <Button
-                      onClick={async () => {
-                        if (!scheduleTime) {
-                          shopify.toast.show("Select time", { isError: true });
-                          return;
-                        }
+                    {/* 🔹 3. PRODUCT GRID CARD */}
+                    <Card>
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between">
+                          <InlineStack gap="300" blockAlign="center">
+                            <Text as="h3" variant="headingMd">Products</Text>
+                            <Button size="slim" onClick={selectAllVisible}>Select All on Page</Button>
+                            <Button size="slim" onClick={() => setSelectedItems(new Set())}>Clear Selection</Button>
+                          </InlineStack>
+                          <Pagination
+                            hasPrevious={currentPage > 1}
+                            onPrevious={() => setCurrentPage(prev => prev - 1)}
+                            hasNext={currentPage < totalPages}
+                            onNext={() => setCurrentPage(prev => prev + 1)}
+                            label={`Page ${currentPage} of ${totalPages || 1}`}
+                          />
+                        </InlineStack>
 
-                        await fetch("/api/schedule-pricing", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({ runAt: scheduleTime }),
-                        });
+                        {/* Product rows */}
+                        <BlockStack gap="200">
+                          {paginatedPreviews.map((p) => {
+                            const currentPrice = parseFloat(p.oldPrice);
+                            const originalPrice = parseFloat(p.originalBasePrice);
+                            const isManual = p.overriddenPrice !== undefined;
+                            const targetPrice = isManual ? parseFloat(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
+                            const isPolished = currentPrice !== originalPrice;
+                            const isChanged = currentPrice !== targetPrice;
+                            const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
+                            const isSelected = selectedItems.has(p.variantId);
 
-                        shopify.toast.show("Scheduled successfully");
-                      }}
-                    >
-                      Schedule Pricing
-                    </Button>
+                            return (
+                              <Box key={p.variantId} padding="300" borderBlockEndWidth="025">
+                                <Box background={isManual ? "bg-surface-caution" : undefined}>
+                                  <InlineStack align="space-between" blockAlign="center">
+                                    <InlineStack gap="300" blockAlign="center">
+                                      <Checkbox
+                                        label=""
+                                        labelHidden
+                                        checked={isSelected}
+                                        onChange={() => toggleSelection(p.variantId)}
+                                      />
+                                      <Thumbnail source={p.image || ""} alt={p.title} size="small" />
+                                      <BlockStack gap="100">
+                                        <Text as="span"  variant="bodyMd" fontWeight="bold">{p.title}</Text>
+                                        <InlineStack gap="200">
+                                          {isChanged ? (
+                                            <Badge tone={targetPrice > currentPrice ? "success" : "attention"}>
+                                              {targetPrice > currentPrice ? "Profit Optimized" : "Price Reduced"}
+                                            </Badge>
+                                          ) : (
+                                            <Badge tone="info">No change</Badge>
+                                          )}
+                                          {isPolished && <Badge tone="success">Currently Polished</Badge>}
+                                          {isManual && <Badge tone="attention">Manual Override</Badge>}
+                                          {Math.abs(diffFromOriginal) >= 10 && <Badge tone="warning">High Impact</Badge>}
+                                        </InlineStack>
+                                      </BlockStack>
+                                    </InlineStack>
 
+                                    <InlineStack gap="300" blockAlign="center">
+                                      <InlineStack gap="200" blockAlign="center">
+                                        <BlockStack gap="0">
+                                          <Text as="span"  variant="bodySm" tone="subdued">Original: {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}</Text>
+                                          <Text as="span"  tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
+                                            Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
+                                          </Text>
+                                        </BlockStack>
+                                        <Box width="100px">
+                                          <TextField 
+                                            label=""
+                                            labelHidden
+                                            value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
+                                            onChange={(val) => handlePriceChange(p.variantId, val)}
+                                            autoComplete="off"
+                                            prefix={currencySymbol}
+                                            size="slim"
+                                            maxLength={15}
+                                          />
+                                        </Box>
+                                        {(isPolished || isChanged) && (
+                                          <Text as="span"  tone={targetPrice > originalPrice ? "success" : "caution"} fontWeight="bold">
+                                            {`${targetPrice > originalPrice ? '+' : ''}${diffFromOriginal.toFixed(1)}%`}
+                                          </Text>
+                                        )}
+                                        {isManual && (
+                                          <Button size="slim" variant="tertiary" onClick={() => resetOverride(p.variantId)}>
+                                            Reset
+                                          </Button>
+                                        )}
+                                      </InlineStack>
+
+                                      {isChanged ? (
+                                        <Button
+                                          size="slim"
+                                          onClick={() => handleApplySingle(p)}
+                                          loading={updatingItem === p.variantId}
+                                          disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
+                                          tone="success"
+                                        >
+                                          Apply
+                                        </Button>
+                                      ) : (
+                                        <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                                          <span style={{ display: 'inline-block' }}>
+                                            <Button
+                                              size="slim"
+                                              onClick={() => handleApplySingle(p)}
+                                              loading={updatingItem === p.variantId}
+                                              disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
+                                            >
+                                              Apply
+                                            </Button>
+                                          </span>
+                                        </Tooltip>
+                                      )}
+                                    </InlineStack>
+                                  </InlineStack>
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                        </BlockStack>
+
+                        <InlineStack align="center">
+                          <Pagination
+                            hasPrevious={currentPage > 1}
+                            onPrevious={() => setCurrentPage(prev => prev - 1)}
+                            hasNext={currentPage < totalPages}
+                            onNext={() => setCurrentPage(prev => prev + 1)}
+                            label={`Page ${currentPage} of ${totalPages || 1}`}
+                          />
+                        </InlineStack>
+
+                        {!hasActivePlan && (
+                          <Text as="p" tone="critical">
+                            🔒 Start your free trial to apply pricing changes
+                          </Text>
+                        )}
+                      </BlockStack>
+                    </Card>
                   </BlockStack>
-                </Card>
-              </div>
+                </div>
+
+                {/* ================= RIGHT SIDE (30%) ================= */}
+                <div style={{ flex: 1, position: "sticky", top: "20px" }}>
+                  <Card>
+                    <BlockStack gap="300">
+
+                      <Text as="h3" variant="headingMd">
+                        Pricing Actions
+                      </Text>
+
+                      <Select
+                        label="Apply pricing to"
+                        options={[
+                          { label: "All products", value: "all" },
+                          { label: "Selected products", value: "selected" },
+                          { label: "Filtered results", value: "filtered" },
+                          { label: "Collection", value: "collection" }
+                        ]}
+                        value={applyMode}
+                        onChange={(value) => setApplyMode(value as any)}
+                      />
+
+                      {applyMode === "selected" && (
+                        <Text as="p" tone="subdued">
+                          {selectedItems.size} products selected
+                        </Text>
+                      )}
+
+                      {applyMode === "collection" && (
+                        <TextField
+                          label="Collection ID"
+                          value={collectionId}
+                          onChange={setCollectionId}
+                          autoComplete="off"
+                          helpText="Enter Shopify Collection ID"
+                        />
+                      )}
+
+                      <Button
+                        variant="primary"
+                        loading={isProcessing}
+                        disabled={
+                          !hasActivePlan ||
+                          isProcessing ||
+                          !hasRules ||
+                          (applyMode === "all" && previews.length === 0) ||
+                          (applyMode === "selected" && selectedItems.size === 0)
+                        }
+                        onClick={() => handleApplyBatch(previews)}
+                      >
+                        {`Apply (${applyMode === "all"
+                          ? previews.length
+                          : applyMode === "selected"
+                            ? selectedItems.size
+                            : previews.length
+                          })`}
+                      </Button>
+
+                      <Divider />
+
+                      <TextField
+                        label="Schedule Time"
+                        type="datetime-local"
+                        value={scheduleTime}
+                        onChange={setScheduleTime}
+                        autoComplete="off"
+                      />
+
+                      <Button
+                        onClick={async () => {
+                          if (!scheduleTime) {
+                            shopify.toast.show("Select time", { isError: true });
+                            return;
+                            }
+
+                          await fetch("/api/schedule-pricing", {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({ runAt: scheduleTime }),
+                          });
+
+                          shopify.toast.show("Scheduled successfully");
+                        }}
+                      >
+                        Schedule Pricing
+                      </Button>
+
+                    </BlockStack>
+                  </Card>
+                </div>
+              </InlineStack>
             </Box>
           </div>
 
@@ -1143,7 +1423,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           secondaryActions={[{ content: 'Cancel', onAction: () => setShowGoLiveModal(false) }]}
         >
           <Modal.Section>
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <Text as="p">Prices will be applied to your storefront.</Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
@@ -1172,7 +1452,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           secondaryActions={[{ content: 'Cancel', onAction: () => setShowStopModal(false) }]}
         >
           <Modal.Section>
-            <BlockStack gap="400">
+            <BlockStack gap="300">
               <Text as="p">This will disable dynamic pricing on your storefront.</Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">

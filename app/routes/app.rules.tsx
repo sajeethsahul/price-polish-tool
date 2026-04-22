@@ -1,3 +1,5 @@
+// SAME IMPORTS (no change)
+
 import { useState, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import {
@@ -62,36 +64,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const fieldErrors: Record<string, string> = {};
 
-    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr)) {
-        fieldErrors.markupPercent = "Invalid markup";
+    // 🔒 STRICT VALIDATION (RESTORED)
+    if (!/^-?\d{1,2}(\.\d{1,2})?$/.test(markupStr) || markupStr.length > 5) {
+        fieldErrors.markupPercent = "Enter valid % (-99.99 to 99.99)";
     }
 
     if (!/^0(\.\d{1,2})?$/.test(roundingStr)) {
-        fieldErrors.roundingStep = "Invalid rounding (0.00–0.99)";
+        fieldErrors.roundingStep = "Use decimal (0.01 to 0.99)";
     }
 
     const markupPercent = Number(markupStr);
-    let roundingStep = Number(roundingStr);
+    const roundingStep = Number(roundingStr);
 
-    if (markupPercent < -99 || markupPercent > 99) {
-        fieldErrors.markupPercent = "Must be -99 to 99";
+    if (!fieldErrors.markupPercent && (markupPercent < -99.99 || markupPercent > 99.99)) {
+        fieldErrors.markupPercent = "Must be between -99.99 and 99.99";
     }
 
-    if (roundingStep < 0 || roundingStep > 0.99) {
-        fieldErrors.roundingStep = "Must be 0–0.99";
+    if (!fieldErrors.roundingStep && (roundingStep < 0 || roundingStep > 0.99)) {
+        fieldErrors.roundingStep = "Must be between 0 and 0.99";
     }
 
     if (Object.keys(fieldErrors).length > 0) {
         return {
-            markupPercent,
-            roundingStep,
+            markupPercent: markupStr,
+            roundingStep: roundingStr,
             charmPricing,
             saved: false,
             fieldErrors,
         };
     }
-
-    roundingStep = Math.round(roundingStep * 100) / 100;
 
     await prisma.$transaction([
         prisma.pricingRuleHistory.create({
@@ -147,68 +148,19 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
 
     const isSubmitting = navigation.state === "submitting";
 
-    const [markupPercent, setMarkupPercent] = useState(
-        String(loaderData.markupPercent)
-    );
-    const [roundingStep, setRoundingStep] = useState(
-        String(loaderData.roundingStep)
-    );
-    const [charmPricing, setCharmPricing] = useState(
-        loaderData.charmPricing
-    );
-
-    const [impact, setImpact] = useState({ gain: 0, percent: 0 });
+    const [markupPercent, setMarkupPercent] = useState(String(loaderData.markupPercent));
+    const [roundingStep, setRoundingStep] = useState(String(loaderData.roundingStep));
+    const [charmPricing, setCharmPricing] = useState(loaderData.charmPricing);
 
     useEffect(() => {
         if (actionData?.saved) {
             shopify.toast.show("Saved successfully");
         }
-    }, [actionData, shopify]);
-
-    // 🔥 Impact Preview
-    useEffect(() => {
-        let isMounted = true;
-
-        const fetchImpact = async () => {
-            try {
-                const res = await fetch("/api/staged-preview");
-                const data = await res.json();
-
-                if (!isMounted) return;
-
-                if (!data || data.length === 0) {
-                    setImpact({ gain: 0, percent: 0 });
-                    return;
-                }
-
-                let totalOriginal = 0;
-                let totalNew = 0;
-
-                for (const item of data) {
-                    totalOriginal += Number(item.originalPrice);
-                    totalNew += Number(item.stagedPrice);
-                }
-
-                const gain = totalNew - totalOriginal;
-                const percent =
-                    totalOriginal > 0 ? (gain / totalOriginal) * 100 : 0;
-
-                setImpact({ gain, percent });
-            } catch (err) {
-                console.error("Impact fetch failed", err);
-            }
-        };
-
-        fetchImpact();
-
-        return () => {
-            isMounted = false;
-        };
-    }, []);
-
-    // ================= CALC =================
+    }, [actionData]);
 
     const basePrice = 59.99;
+
+    const markupApplied = basePrice * (1 + (Number(markupPercent) || 0) / 100);
 
     const finalPrice = calculatePrice(
         basePrice,
@@ -216,8 +168,6 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
         Number(roundingStep) || 0,
         charmPricing
     );
-
-    // ================= UI =================
 
     return (
         <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }}>
@@ -227,7 +177,7 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                 <Layout.Section>
                     <Card>
                         <Form method="post">
-                            <BlockStack gap="400">
+                            <BlockStack gap="300">
 
                                 <TextField
                                     label="Markup (%)"
@@ -237,6 +187,7 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                     disabled={isSubmitting}
                                     onChange={(value) => setMarkupPercent(value)}
                                     helpText="Between -99 and +99"
+                                    error={actionData?.fieldErrors?.markupPercent}
                                 />
 
                                 <TextField
@@ -246,7 +197,8 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                     value={roundingStep}
                                     disabled={isSubmitting}
                                     onChange={(value) => setRoundingStep(value)}
-                                    helpText="Decimal rounding (e.g., 0.99)"
+                                    helpText="Decimal (e.g., 0.55)"
+                                    error={actionData?.fieldErrors?.roundingStep}
                                 />
 
                                 <input
@@ -275,94 +227,49 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                 <Layout.Section variant="oneThird">
 
                     <Card>
-                        <BlockStack gap="400">
+                        <BlockStack gap="300">
 
-                            <Text as="h2" variant="headingMd">Live Example</Text>
+                            <Text   as="span" variant="headingMd">Live Example</Text>
 
                             <InlineStack align="space-between">
-                                <Text as="span" tone="subdued">Base Price</Text>
-                                <Text as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
+                                <Text   as="span" tone="subdued">Base</Text>
+                                <Text   as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
                             </InlineStack>
 
                             <InlineStack align="space-between">
-                                <Text as="span" tone="subdued">Final Price</Text>
-                                <Text as="span" variant="heading2xl" tone="success">
-                                    {currencyCode} {finalPrice.toFixed(2)}
-                                </Text>
+                                <Text   as="span" tone="subdued">+{markupPercent}%</Text>
+                                <Text   as="span">{currencyCode} {markupApplied.toFixed(2)}</Text>
                             </InlineStack>
 
-                            <div style={{ borderTop: "1px solid #eee" }} />
+                            <InlineStack align="space-between">
+                                <Text   as="span" tone="subdued">Rounded</Text>
+                                <Text   as="span">{currencyCode} {finalPrice.toFixed(2)}</Text>
+                            </InlineStack>
+
+                            <Text   as="span" variant="heading2xl" tone="success">
+                                {currencyCode} {finalPrice.toFixed(2)}
+                            </Text>
 
                             {loaderData.updatedAt && (
-                                <Text as="span" tone="subdued">
+                                <Text   as="span" tone="subdued">
                                     Last updated: {new Date(loaderData.updatedAt).toLocaleString()}
                                 </Text>
                             )}
 
-                            {loaderData.history?.length > 0 && (
-                                <BlockStack gap="100">
-                                    <Text as="span" variant="headingSm">Recent Changes</Text>
+                            <BlockStack gap="100">
+                                <Text   as="span" variant="headingSm">Recent Changes</Text>
 
-                                    {loaderData.history.map((h: any) => (
-                                        <Text as="span" key={h.id} tone="subdued">
-                                            {h.markupPercent > 0 ? "+" : ""}
-                                            {h.markupPercent}% • {new Date(h.createdAt).toLocaleString()}
-                                        </Text>
-                                    ))}
-                                </BlockStack>
-                            )}
+                                {loaderData.history.map((h: any) => (
+                                    <Text   as="span" key={h.id} tone="subdued">
+                                        {h.markupPercent > 0 ? "+" : ""}
+                                        {h.markupPercent}% • {h.roundingStep?.toFixed(2)}
+                                        {h.charmPricing && " • .99"} • {new Date(h.createdAt).toLocaleString()}
+                                    </Text>
+                                ))}
+                            </BlockStack>
 
                         </BlockStack>
                     </Card>
-
-                    {/* 🔥 Impact Preview */}
-                    <div style={{ marginTop: "16px" }}>
-                        <Card>
-                            <BlockStack gap="300">
-
-                                <Text as="h3" variant="headingMd">
-                                    Impact Preview
-                                </Text>
-
-                                {impact.gain === 0 ? (
-                                    <Text as="p" tone="subdued">
-                                        Apply pricing rules to preview revenue impact.
-                                    </Text>
-                                ) : (
-                                    <>
-                                        <InlineStack align="space-between">
-                                            <Text as="span" tone="subdued">
-                                                Revenue Change
-                                            </Text>
-                                            <Text
-                                                as="span"
-                                                variant="headingLg"
-                                                tone={impact.gain >= 0 ? "success" : "critical"}
-                                            >
-                                                {currencyCode} {impact.gain.toLocaleString(undefined, {
-                                                    minimumFractionDigits: 2,
-                                                })}
-                                            </Text>
-                                        </InlineStack>
-
-                                        <InlineStack align="space-between">
-                                            <Text as="span" tone="subdued">
-                                                Growth
-                                            </Text>
-                                            <Text
-                                                as="span"
-                                                tone={impact.gain >= 0 ? "success" : "critical"}
-                                            >
-                                                {impact.gain >= 0 ? "+" : ""}
-                                                {impact.percent.toFixed(2)}%
-                                            </Text>
-                                        </InlineStack>
-                                    </>
-                                )}
-
-                            </BlockStack>
-                        </Card>
-                    </div>
 
                 </Layout.Section>
 
