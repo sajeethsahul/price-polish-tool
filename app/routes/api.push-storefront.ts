@@ -44,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (!lastBatch) {
         return cors(
-          new Response(JSON.stringify({ error: "No history found" }), {
+          new Response(JSON.stringify({ error: "No previous price history found." }), {
             status: 400,
             headers: { "Content-Type": "application/json" },
           })
@@ -55,17 +55,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         where: { batchId: lastBatch.batchId },
       });
 
+      let revertedCount = 0;
+
       for (const item of records) {
-        await admin.graphql(`
-          mutation {
-            productVariantUpdate(input: {
-              id: "gid://shopify/ProductVariant/${item.variantId}",
-              price: "${item.oldPrice}"
-            }) {
-              productVariant { id }
+        try {
+          const response = await admin.graphql(`
+            mutation UpdateVariant($input: ProductVariantInput!) {
+              productVariantUpdate(input: $input) {
+                productVariant { id }
+                userErrors { field message }
+              }
             }
+          `, {
+            variables: {
+              input: {
+                id: `gid://shopify/ProductVariant/${item.variantId}`,
+                price: Number(item.oldPrice).toFixed(2),
+              },
+            },
+          });
+
+          const result = await response.json();
+          const userErrors = result?.data?.productVariantUpdate?.userErrors;
+
+          if (userErrors?.length) {
+            console.error("❌ Revert error:", item.variantId, userErrors);
+            continue;
           }
-        `);
+
+          revertedCount++;
+        } catch (err) {
+          console.error("❌ Revert failed:", item.variantId);
+        }
       }
 
       await prisma.appState.upsert({
@@ -77,7 +98,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       await logActivity(shop, "STOP_LIVE");
 
       return cors(
-        new Response(JSON.stringify({ success: true, reverted: true }), {
+        new Response(JSON.stringify({
+          success: true,
+          reverted: revertedCount,
+        }), {
           headers: { "Content-Type": "application/json" },
         })
       );
@@ -94,7 +118,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return cors(
         new Response(JSON.stringify({
           success: false,
-          message: "No staged prices found. Click Apply first.",
+          message: "No staged prices found. Click Apply before going live.",
         }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -107,7 +131,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let successCount = 0;
     let failCount = 0;
     const failedItems: string[] = [];
-    
+
     // 🔥 CREATE JOB
     const job = await prisma.pushJob.create({
       data: {
@@ -120,50 +144,79 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // 🚀 PUSH TO SHOPIFY
     // ============================
     for (const item of staged) {
-        try {
-          await admin.graphql(`
-            mutation {
-              productVariantUpdate(input: {
-                id: "gid://shopify/ProductVariant/${item.variantId}",
-                price: "${item.stagedPrice}"
-              }) {
-                productVariant { id }
-              }
-            }
-          `);
-      
-          await prisma.priceHistory.create({
-            data: {
-              shop,
-              variantId: item.variantId,
-              oldPrice: item.originalPrice,
-              newPrice: item.stagedPrice,
-              batchId,
-            },
-          });
-      
-          successCount++;
-        } catch (err) {
-          console.error("❌ Failed:", item.variantId);
+      try {
+        const price = Number(item.stagedPrice);
+
+        // ✅ Validate price
+        if (!price || isNaN(price) || price <= 0) {
+          console.error("❌ Invalid price:", item);
           failCount++;
           failedItems.push(item.variantId);
+          continue;
         }
-      
-        // 🔥 UPDATE PROGRESS
-        await prisma.pushJob.update({
-          where: { id: job.id },
-          data: {
-            processed: { increment: 1 },
-            success: successCount,
-            failed: failCount,
+
+        const response = await admin.graphql(`
+          mutation UpdateVariant($input: ProductVariantInput!) {
+            productVariantUpdate(input: $input) {
+              productVariant { id }
+              userErrors { field message }
+            }
+          }
+        `, {
+          variables: {
+            input: {
+              id: `gid://shopify/ProductVariant/${item.variantId}`,
+              price: price.toFixed(2),
+            },
           },
         });
+
+        const result = await response.json();
+
+        const userErrors = result?.data?.productVariantUpdate?.userErrors;
+
+        if (userErrors?.length) {
+          console.error("❌ USER ERROR:", item.variantId, userErrors);
+          failCount++;
+          failedItems.push(item.variantId);
+          continue;
+        }
+
+        // ✅ Save history ONLY on success
+        await prisma.priceHistory.create({
+          data: {
+            shop,
+            variantId: item.variantId,
+            oldPrice: item.originalPrice,
+            newPrice: item.stagedPrice,
+            batchId,
+          },
+        });
+
+        successCount++;
+
+      } catch (err) {
+        console.error("❌ Push failed:", item.variantId, err);
+        failCount++;
+        failedItems.push(item.variantId);
       }
 
+      // 🔥 UPDATE PROGRESS
       await prisma.pushJob.update({
         where: { id: job.id },
-        data: { status: "done" },
+        data: {
+          processed: { increment: 1 },
+          success: successCount,
+          failed: failCount,
+        },
       });
+    }
+
+    // ✅ Mark job complete
+    await prisma.pushJob.update({
+      where: { id: job.id },
+      data: { status: "done" },
+    });
 
     // ============================
     // 🔥 MARK LIVE
@@ -180,18 +233,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     return cors(
-        new Response(JSON.stringify({
-          success: true,
-          applied: successCount,
-          failed: failCount,
-          failedItems,
-          jobId: job.id, // 🔥 for progress tracking
-        }), {
-          headers: { "Content-Type": "application/json" },
-        })
-      );
+      new Response(JSON.stringify({
+        success: true,
+        applied: successCount,
+        failed: failCount,
+        failedItems,
+        jobId: job.id,
+      }), {
+        headers: { "Content-Type": "application/json" },
+      })
+    );
 
   } catch (error: any) {
+    console.error("❌ PUSH STORE ERROR:", error);
+
     await logActivity(shop, "ERROR", {
       action: "PUSH_STOREFRONT",
       message: error.message,

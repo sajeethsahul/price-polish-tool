@@ -7,7 +7,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const body = await request.json();
 
-  const { products } = body;
+  const products = body?.products || [];
 
   const rule = await prisma.pricingRule.findUnique({
     where: { shop: session.shop },
@@ -17,10 +17,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(JSON.stringify({ error: "No pricing rule" }), { status: 400 });
   }
 
+  if (!Array.isArray(products) || products.length === 0) {
+    console.warn("⚠️ No products received for staging");
+  
+    return new Response(
+      JSON.stringify({ success: false, message: "No products available to apply pricing changes." }),
+      { status: 400 }
+    );
+  }
+
   const staged = products.map((p: any) => ({
     shop: session.shop,
     variantId: p.variantId,
-    originalPrice: Number(p.price),
+    originalPrice: Number(p.oldPrice),
     stagedPrice: calculatePrice(
         Number(p.price),
         rule.markupPercent,
