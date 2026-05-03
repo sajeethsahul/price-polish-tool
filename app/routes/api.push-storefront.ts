@@ -31,7 +31,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const body = await request.json().catch(() => ({}));
+    console.log("BODY RECEIVED:", body);
     const clear = body.clear === true;
+
+    
 
     // ============================
     // 🛑 STOP LIVE (REVERT)

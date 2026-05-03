@@ -390,7 +390,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          items: itemsWithFinalPrices,
+          products: itemsWithFinalPrices,
           applyMode,
           collectionId,
         })
