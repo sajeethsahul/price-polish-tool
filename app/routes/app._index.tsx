@@ -356,11 +356,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       let scopedItems = itemsToUpdate;
 
       // 🔥 Apply Scope Filtering
-      if (applyMode === "selected") {
-        scopedItems = itemsToUpdate.filter(item =>
-          selectedItems.has(item.variantId)
-        );
-      }
+      scopedItems = itemsToUpdate.filter(item =>
+        selectedItems.has(String(item.variantId)) // ✅ FIX
+      );
 
       if (scopedItems.length === 0) {
         shopify.toast.show("No products selected", { isError: true });
@@ -381,6 +379,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             : item.newPrice,
         isManual: item.overriddenPrice !== undefined,
       }));
+
+      console.log("Selected items:", selectedItems);
+      console.log("Scoped items:", scopedItems);
+      console.log("Sending payload:", itemsWithFinalPrices);
 
       const response = await fetch("/api/staging-price", {
         method: "POST",
