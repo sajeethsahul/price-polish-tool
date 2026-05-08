@@ -344,7 +344,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   }, [handlePreview]);
 
-  const handleApplyBatch = useCallback(async (itemsToUpdate: PreviewItem[]) => {
+  const handleApplyBatch = useCallback(async (
+    itemsToUpdate: PreviewItem[],
+    options?: { bypassSelectedScope?: boolean }
+  ) => {
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules first", { isError: true });
       return;
@@ -355,18 +358,22 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     try {
       let scopedItems = itemsToUpdate;
 
-      // 🔥 Apply Scope Filtering
-      scopedItems = itemsToUpdate.filter(item =>
-        selectedItems.has(String(item.variantId)) // ✅ FIX
-      );
-
-      if (scopedItems.length === 0) {
-        shopify.toast.show("No products selected", { isError: true });
-        return;
+      // Scope selection only when explicitly applying to selected items.
+      if (applyMode === "selected" && !options?.bypassSelectedScope) {
+        scopedItems = itemsToUpdate.filter(item =>
+          selectedItems.has(String(item.variantId))
+        );
+      } else if (applyMode === "filtered") {
+        scopedItems = previews; // already filtered list
       }
 
-      if (applyMode === "filtered") {
-        scopedItems = previews; // already filtered list
+      if (scopedItems.length === 0) {
+        if (applyMode === "selected" && !options?.bypassSelectedScope) {
+          shopify.toast.show("No products selected", { isError: true });
+        } else {
+          shopify.toast.show("No products to apply", { isError: true });
+        }
+        return;
       }
 
       const itemsWithFinalPrices = scopedItems.map(item => ({
@@ -411,7 +418,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [applyMode, selectedItems, hasRules, shopify]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
-    handleApplyBatch([item]);
+    // Row-level apply should not depend on checkbox selection state.
+    handleApplyBatch([item], { bypassSelectedScope: true });
   }, [handleApplyBatch]);
 
   const handleApplySelected = useCallback(() => {
