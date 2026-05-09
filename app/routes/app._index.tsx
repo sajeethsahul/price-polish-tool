@@ -409,13 +409,38 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         throw new Error(result.error || "Failed to apply pricing");
       }
 
-      shopify.toast.show("Pricing applied successfully");
+      // ── Auto-push when Live Pricing is Active ────────────────────────────
+      // Staging always runs first (above). When isLive === true we
+      // immediately follow up with push-storefront so Shopify prices are
+      // updated and PriceHistory is written — exactly as Go Live does.
+      if (metrics.isLive) {
+        const pushRes = await fetch("/api/push-storefront", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clear: false }),
+        });
+
+        const pushData = await pushRes.json();
+
+        if (!pushRes.ok) {
+          // Staging succeeded but live push failed — surface clearly.
+          throw new Error(
+            pushData.error || "Prices staged but failed to push live"
+          );
+        }
+
+        shopify.toast.show("Prices updated and live on storefront");
+      } else {
+        shopify.toast.show("Pricing applied successfully");
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
     } catch (error: any) {
       shopify.toast.show(error.message || "Apply failed", { isError: true });
     } finally {
       setIsProcessing(false);
     }
-  }, [applyMode, selectedItems, hasRules, shopify]);
+  }, [applyMode, selectedItems, hasRules, shopify, metrics.isLive]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     // Row-level apply should not depend on checkbox selection state.
