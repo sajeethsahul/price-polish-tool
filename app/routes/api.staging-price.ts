@@ -31,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     variantId: p.variantId,
     originalPrice: Number(p.oldPrice),
     stagedPrice: calculatePrice(
-        Number(p.price),
+        Number(p.newPrice),
         rule.markupPercent,
         rule.roundingStep,
         rule.charmPricing
