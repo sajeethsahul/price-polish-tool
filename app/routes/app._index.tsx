@@ -1239,7 +1239,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       justifyContent: "space-between",
                                       alignItems: "center",
                                       gap: "16px",
-                                      width: "100%",
+                                      width: "100%", flexWrap: "nowrap"
                                     }}
                                     >
                                       {/* LEFT SIDE */}
@@ -1249,7 +1249,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                           alignItems: "center",
                                           gap: "12px",
                                           minWidth: 0,
-                                          flex: 1,
+                                          flex: 1, overflowX: "hidden"
                                         }}
                                       >
                                         <Checkbox
@@ -1403,70 +1403,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       </div>
                                     </div>
 
-                                    <div style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "12px",
-                                      flexShrink: 0,
-                                      whiteSpace: "nowrap",
-                                    }}
-                                    >
-                                      <InlineStack gap="200" blockAlign="center">
-                                        <BlockStack gap="0">
-                                          <Text as="span" variant="bodySm" tone="subdued">Original: {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}</Text>
-                                          <Text as="span" tone="subdued" textDecorationLine={isPolished || isChanged ? "line-through" : undefined}>
-                                            Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
-                                          </Text>
-                                        </BlockStack>
-                                        <Box width="100px">
-                                          <TextField
-                                            label=""
-                                            labelHidden
-                                            value={p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice}
-                                            onChange={(val) => handlePriceChange(p.variantId, val)}
-                                            autoComplete="off"
-                                            prefix={currencySymbol}
-                                            size="slim"
-                                            maxLength={15}
-                                          />
-                                        </Box>
-                                        {(isPolished || isChanged) && (
-                                          <Text as="span" tone={targetPrice > originalPrice ? "success" : "caution"} fontWeight="bold">
-                                            {`${targetPrice > originalPrice ? '+' : ''}${diffFromOriginal.toFixed(1)}%`}
-                                          </Text>
-                                        )}
-                                        {isManual && (
-                                          <Button size="slim" variant="tertiary" onClick={() => resetOverride(p.variantId)}>
-                                            Reset
-                                          </Button>
-                                        )}
-                                      </InlineStack>
 
-                                      {isChanged ? (
-                                        <Button
-                                          size="slim"
-                                          onClick={() => handleApplySingle(p)}
-                                          loading={updatingItem === p.variantId}
-                                          disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
-                                          tone="success"
-                                        >
-                                          Apply
-                                        </Button>
-                                      ) : (
-                                        <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
-                                          <span style={{ display: 'inline-block' }}>
-                                            <Button
-                                              size="slim"
-                                              onClick={() => handleApplySingle(p)}
-                                              loading={updatingItem === p.variantId}
-                                              disabled={!hasActivePlan || !!updatingItem || isProcessing || (isManual && p.overriddenPrice === "") || !hasRules}
-                                            >
-                                              Apply
-                                            </Button>
-                                          </span>
-                                        </Tooltip>
-                                      )}
-                                    </div>
                                   </Box>
                                 </Box>
 
