@@ -1467,216 +1467,217 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                         </Tooltip>
                                       )}
                                     </div>
-                                  </div>
+                                  </Box>
                                 </Box>
-                                </Box>
-                          );
-                            })}
-                        </BlockStack>
 
-                        <InlineStack align="center">
-                          <Pagination
-                            hasPrevious={currentPage > 1}
-                            onPrevious={() => setCurrentPage(prev => prev - 1)}
-                            hasNext={currentPage < totalPages}
-                            onNext={() => setCurrentPage(prev => prev + 1)}
-                            label={`Page ${currentPage} of ${totalPages || 1}`}
-                          />
+                              );
+                            })}
+                          </BlockStack>
+
+
+                          <InlineStack align="center">
+                            <Pagination
+                              hasPrevious={currentPage > 1}
+                              onPrevious={() => setCurrentPage(prev => prev - 1)}
+                              hasNext={currentPage < totalPages}
+                              onNext={() => setCurrentPage(prev => prev + 1)}
+                              label={`Page ${currentPage} of ${totalPages || 1}`}
+                            />
+                          </InlineStack>
+
+                          {!hasActivePlan && (
+                            <Text as="p" tone="critical">
+                              🔒 Start your free trial to apply pricing changes
+                            </Text>
+                          )}
+                        </BlockStack>
+                      </Card>
+                    </BlockStack>
+                  </div>
+
+                  {/* ================= RIGHT SIDE (25%) ================= */}
+                  <div style={{ flex: 1, maxWidth: "320px", position: "sticky", top: "20px" }}>
+                    <Card>
+                      <BlockStack gap="200">
+
+                        <Text as="h3" variant="headingMd">
+                          Pricing Actions
+                        </Text>
+
+                        <InlineStack gap="200" blockAlign="end" wrap={false}>
+                          <div style={{ flex: 1 }}>
+                            <Select
+                              label="Apply pricing to"
+                              options={[
+                                { label: "All products", value: "all" },
+                                { label: "Selected products", value: "selected" },
+                                { label: "Filtered results", value: "filtered" },
+                                { label: "Collection", value: "collection" }
+                              ]}
+                              value={applyMode}
+                              onChange={(value) => setApplyMode(value as any)}
+                            />
+                          </div>
+                          <Button
+                            variant="primary"
+                            tone="success"
+                            loading={isProcessing}
+                            disabled={
+                              !hasActivePlan ||
+                              isProcessing ||
+                              !hasRules ||
+                              (applyMode === "all" && previews.length === 0) ||
+                              (applyMode === "selected" && selectedItems.size === 0)
+                            }
+                            onClick={() => handleApplyBatch(previews)}
+                          >
+                            {`Apply (${applyMode === "all"
+                              ? previews.length
+                              : applyMode === "selected"
+                                ? selectedItems.size
+                                : previews.length
+                              })`}
+                          </Button>
                         </InlineStack>
 
-                        {!hasActivePlan && (
-                          <Text as="p" tone="critical">
-                            🔒 Start your free trial to apply pricing changes
+                        {applyMode === "selected" && (
+                          <Text as="p" tone="subdued">
+                            {selectedItems.size} products selected
                           </Text>
                         )}
-                    </BlockStack>
-                  </Card>
-                </BlockStack>
+
+                        {applyMode === "collection" && (
+                          <TextField
+                            label="Collection ID"
+                            value={collectionId}
+                            onChange={setCollectionId}
+                            autoComplete="off"
+                            helpText="Enter Shopify Collection ID"
+                          />
+                        )}
+
+                        <Divider />
+
+                        <InlineStack gap="200" blockAlign="end" wrap={false}>
+                          <div style={{ flex: 1 }}>
+                            <TextField
+                              label="Schedule Time"
+                              type="datetime-local"
+                              value={scheduleTime}
+                              onChange={setScheduleTime}
+                              autoComplete="off"
+                            />
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              if (!scheduleTime) {
+                                shopify.toast.show("Select time", { isError: true });
+                                return;
+                              }
+
+                              await fetch("/api/schedule-pricing", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify({ runAt: scheduleTime }),
+                              });
+
+                              shopify.toast.show("Scheduled successfully");
+                            }}
+                          >
+                            Schedule
+                          </Button>
+                        </InlineStack>
+
+                      </BlockStack>
+                    </Card>
+                  </div>
+                </InlineStack>
+              </Box>
             </div>
-
-            {/* ================= RIGHT SIDE (25%) ================= */}
-            <div style={{ flex: 1, maxWidth: "320px", position: "sticky", top: "20px" }}>
-              <Card>
-                <BlockStack gap="200">
-
-                  <Text as="h3" variant="headingMd">
-                    Pricing Actions
-                  </Text>
-
-                  <InlineStack gap="200" blockAlign="end" wrap={false}>
-                    <div style={{ flex: 1 }}>
-                      <Select
-                        label="Apply pricing to"
-                        options={[
-                          { label: "All products", value: "all" },
-                          { label: "Selected products", value: "selected" },
-                          { label: "Filtered results", value: "filtered" },
-                          { label: "Collection", value: "collection" }
-                        ]}
-                        value={applyMode}
-                        onChange={(value) => setApplyMode(value as any)}
-                      />
-                    </div>
-                    <Button
-                      variant="primary"
-                      tone="success"
-                      loading={isProcessing}
-                      disabled={
-                        !hasActivePlan ||
-                        isProcessing ||
-                        !hasRules ||
-                        (applyMode === "all" && previews.length === 0) ||
-                        (applyMode === "selected" && selectedItems.size === 0)
-                      }
-                      onClick={() => handleApplyBatch(previews)}
-                    >
-                      {`Apply (${applyMode === "all"
-                        ? previews.length
-                        : applyMode === "selected"
-                          ? selectedItems.size
-                          : previews.length
-                        })`}
-                    </Button>
-                  </InlineStack>
-
-                  {applyMode === "selected" && (
-                    <Text as="p" tone="subdued">
-                      {selectedItems.size} products selected
-                    </Text>
-                  )}
-
-                  {applyMode === "collection" && (
-                    <TextField
-                      label="Collection ID"
-                      value={collectionId}
-                      onChange={setCollectionId}
-                      autoComplete="off"
-                      helpText="Enter Shopify Collection ID"
-                    />
-                  )}
-
-                  <Divider />
-
-                  <InlineStack gap="200" blockAlign="end" wrap={false}>
-                    <div style={{ flex: 1 }}>
-                      <TextField
-                        label="Schedule Time"
-                        type="datetime-local"
-                        value={scheduleTime}
-                        onChange={setScheduleTime}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <Button
-                      onClick={async () => {
-                        if (!scheduleTime) {
-                          shopify.toast.show("Select time", { isError: true });
-                          return;
-                        }
-
-                        await fetch("/api/schedule-pricing", {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                          },
-                          body: JSON.stringify({ runAt: scheduleTime }),
-                        });
-
-                        shopify.toast.show("Scheduled successfully");
-                      }}
-                    >
-                      Schedule
-                    </Button>
-                  </InlineStack>
-
-                </BlockStack>
-              </Card>
-            </div>
-          </InlineStack>
-        </Box>
-    </div>
 
           </BlockStack >
         </div >
 
-    {/* ── TASK 4: Confirmation Modals ── */ }
+        {/* ── TASK 4: Confirmation Modals ── */}
 
-  {/* Apply All confirmation modal — unchanged handler */ }
-  <Modal
-    open={isModalOpen}
-    onClose={() => setIsModalOpen(false)}
-    title="Confirm Bulk Update"
-    primaryAction={{
-      content: 'Apply Changes',
-      onAction: () => handleApplyBatch(previews),
-      loading: isProcessing,
-      disabled: isProcessing
-    }}
-    secondaryActions={[{ content: 'Cancel', onAction: () => setIsModalOpen(false) }]}
-  >
-    <Modal.Section>
-      <Text as="p">
-        You are about to update prices for <strong>{previews.length}</strong> products.
-        This action can be undone later using the "Undo Last Update" button.
-      </Text>
-    </Modal.Section>
-  </Modal>
+        {/* Apply All confirmation modal — unchanged handler */}
+        <Modal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          title="Confirm Bulk Update"
+          primaryAction={{
+            content: 'Apply Changes',
+            onAction: () => handleApplyBatch(previews),
+            loading: isProcessing,
+            disabled: isProcessing
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setIsModalOpen(false) }]}
+        >
+          <Modal.Section>
+            <Text as="p">
+              You are about to update prices for <strong>{previews.length}</strong> products.
+              This action can be undone later using the "Undo Last Update" button.
+            </Text>
+          </Modal.Section>
+        </Modal>
 
-  {/* UPDATED TASK 4: Go Live confirmation modal */ }
-  <Modal
-    open={showGoLiveModal}
-    onClose={() => setShowGoLiveModal(false)}
-    title="Go Live with Pricing Rules?"
-    primaryAction={{
-      content: 'Go Live',
-      // UPDATED: wraps existing handler — no logic change
-      onAction: () => handlePushStorefront(false),
-      loading: isProcessing,
-      disabled: isProcessing
-    }}
-    secondaryActions={[{ content: 'Cancel', onAction: () => setShowGoLiveModal(false) }]}
-  >
-    <Modal.Section>
-      <BlockStack gap="300">
-        <Text as="p">Prices will be applied to your storefront.</Text>
-        <Box paddingInlineStart="400">
-          <BlockStack gap="200">
-            <Text as="p">✔️ This will affect all product prices</Text>
-            <Text as="p">✔️ You can stop anytime</Text>
-          </BlockStack>
-        </Box>
-        <Text as="p">Do you want to continue?</Text>
-      </BlockStack>
-    </Modal.Section>
-  </Modal>
+        {/* UPDATED TASK 4: Go Live confirmation modal */}
+        <Modal
+          open={showGoLiveModal}
+          onClose={() => setShowGoLiveModal(false)}
+          title="Go Live with Pricing Rules?"
+          primaryAction={{
+            content: 'Go Live',
+            // UPDATED: wraps existing handler — no logic change
+            onAction: () => handlePushStorefront(false),
+            loading: isProcessing,
+            disabled: isProcessing
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setShowGoLiveModal(false) }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              <Text as="p">Prices will be applied to your storefront.</Text>
+              <Box paddingInlineStart="400">
+                <BlockStack gap="200">
+                  <Text as="p">✔️ This will affect all product prices</Text>
+                  <Text as="p">✔️ You can stop anytime</Text>
+                </BlockStack>
+              </Box>
+              <Text as="p">Do you want to continue?</Text>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
 
-  {/* UPDATED TASK 4: Stop Live confirmation modal — destructive primary */ }
-  <Modal
-    open={showStopModal}
-    onClose={() => setShowStopModal(false)}
-    title="Stop Live Pricing?"
-    primaryAction={{
-      content: 'Stop Live',
-      // UPDATED: wraps existing handler — no logic change
-      onAction: () => handlePushStorefront(true),
-      loading: isProcessing,
-      disabled: isProcessing,
-      destructive: true
-    }}
-    secondaryActions={[{ content: 'Cancel', onAction: () => setShowStopModal(false) }]}
-  >
-    <Modal.Section>
-      <BlockStack gap="300">
-        <Text as="p">This will disable dynamic pricing on your storefront.</Text>
-        <Box paddingInlineStart="400">
-          <BlockStack gap="200">
-            <Text as="p">✔️ This will remove all live pricing changes</Text>
-            <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
-          </BlockStack>
-        </Box>
-      </BlockStack>
-    </Modal.Section>
-  </Modal>
+        {/* UPDATED TASK 4: Stop Live confirmation modal — destructive primary */}
+        <Modal
+          open={showStopModal}
+          onClose={() => setShowStopModal(false)}
+          title="Stop Live Pricing?"
+          primaryAction={{
+            content: 'Stop Live',
+            // UPDATED: wraps existing handler — no logic change
+            onAction: () => handlePushStorefront(true),
+            loading: isProcessing,
+            disabled: isProcessing,
+            destructive: true
+          }}
+          secondaryActions={[{ content: 'Cancel', onAction: () => setShowStopModal(false) }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              <Text as="p">This will disable dynamic pricing on your storefront.</Text>
+              <Box paddingInlineStart="400">
+                <BlockStack gap="200">
+                  <Text as="p">✔️ This will remove all live pricing changes</Text>
+                  <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
+                </BlockStack>
+              </Box>
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
 
       </Page >
     </div >
