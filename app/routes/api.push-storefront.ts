@@ -62,26 +62,42 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       for (const item of records) {
         try {
-          const response = await admin.graphql(`
-            mutation UpdateVariant($input: ProductVariantInput!) {
-              productVariantUpdate(input: $input) {
-                productVariant { id }
-                userErrors { field message }
-              }
-            }
-          `, {
-            variables: {
-              input: {
-                id: item.variantId.startsWith("gid://")
-                ? item.variantId
-                : `gid://shopify/ProductVariant/${item.variantId}`,
-                price: Number(item.oldPrice).toFixed(2),
-              },
-            },
-          });
+                const response = await admin.graphql(`
+                  mutation productVariantsBulkUpdate(
+                    $productId: ID!,
+                    $variants: [ProductVariantsBulkInput!]!
+                  ) {
+                    productVariantsBulkUpdate(
+                      productId: $productId,
+                      variants: $variants
+                    ) {
+                      product {
+                        id
+                      }
+                      productVariants {
+                        id
+                        price
+                      }
+                      userErrors {
+                        field
+                        message
+                      }
+                    }
+                  }
+                `, {
+                  variables: {
+                    productId:  item.productId,
+                    variants: [
+                      {
+                        id: item.variantId,
+                        price: String(item.oldPrice),
+                      },
+                    ],
+                  },
+                });
 
           const result = await response.json();
-          const userErrors = result?.data?.productVariantUpdate?.userErrors;
+          const userErrors = result?.data?.productVariantsBulkUpdate?.userErrors;
 
           if (userErrors?.length) {
             console.error("❌ Revert error:", item.variantId, userErrors);
@@ -160,27 +176,45 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           continue;
         }
 
-        const response = await admin.graphql(`
-          mutation UpdateVariant($input: ProductVariantInput!) {
-            productVariantUpdate(input: $input) {
-              productVariant { id }
-              userErrors { field message }
+      const response = await admin.graphql(`
+          mutation productVariantsBulkUpdate(
+            $productId: ID!,
+            $variants: [ProductVariantsBulkInput!]!
+          ) {
+            productVariantsBulkUpdate(
+              productId: $productId,
+              variants: $variants
+            ) {
+              product {
+                id
+              }
+              productVariants {
+                id
+                price
+              }
+              userErrors {
+                field
+                message
+              }
             }
           }
         `, {
           variables: {
-            input: {
-              id: item.variantId.startsWith("gid://")
-                ? item.variantId
-                : `gid://shopify/ProductVariant/${item.variantId}`,
-              price: price.toFixed(2),
-            },
+            productId: item.productId,
+            variants: [
+              {
+                id: item.variantId.startsWith("gid://")
+                        ? item.variantId
+                        : `gid://shopify/ProductVariant/${item.variantId}`,
+                price: String(price),
+              },
+            ],
           },
         });
 
         const result = await response.json();
 
-        const userErrors = result?.data?.productVariantUpdate?.userErrors;
+        const userErrors = result?.data?.productVariantsBulkUpdate?.userErrors;
 
         if (userErrors?.length) {
           console.error("❌ USER ERROR:", item.variantId, userErrors);
@@ -193,6 +227,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await prisma.priceHistory.create({
           data: {
             shop,
+            productId: item.productId,
             variantId: item.variantId,
             oldPrice: item.originalPrice,
             newPrice: item.stagedPrice,

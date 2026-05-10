@@ -29,6 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const staged = products.map((p: any) => ({
     shop: session.shop,
     variantId: p.variantId,
+    productId: p.productId,
     originalPrice: Number(p.oldPrice),
     stagedPrice: calculatePrice(
         Number(p.newPrice),

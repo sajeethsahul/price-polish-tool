@@ -50,6 +50,7 @@ model PricingRule {
 model PriceHistory {
   id        String   @id @default(cuid())
   shop      String
+  productId String?
   variantId String
   oldPrice  Float
   newPrice  Float
@@ -88,6 +89,7 @@ model StagedPrice {
   id          String   @id @default(uuid())
   shop        String
   variantId   String
+  productId String?
   stagedPrice Float
   originalPrice Float
   createdAt   DateTime @default(now())
