@@ -20,6 +20,9 @@ type Pages = {
   "/webhooks/app/uninstalled": {
     params: {};
   };
+  "/api/schedule-pricing": {
+    params: {};
+  };
   "/api/push-storefront": {
     params: {};
   };
@@ -93,7 +96,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -102,6 +105,10 @@ type RouteFiles = {
   "routes/webhooks.app.uninstalled.tsx": {
     id: "routes/webhooks.app.uninstalled";
     page: "/webhooks/app/uninstalled";
+  };
+  "routes/api.schedule-pricing.ts": {
+    id: "routes/api.schedule-pricing";
+    page: "/api/schedule-pricing";
   };
   "routes/api.push-storefront.ts": {
     id: "routes/api.push-storefront";
@@ -205,6 +212,7 @@ type RouteModules = {
   "root": typeof import("./app/root.tsx");
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.tsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.tsx");
+  "routes/api.schedule-pricing": typeof import("./app/routes/api.schedule-pricing.ts");
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");
   "routes/api.proxy.settings": typeof import("./app/routes/api.proxy.settings.ts");
   "routes/auth.session-token": typeof import("./app/routes/auth.session-token.ts");
