@@ -1517,7 +1517,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 headers: {
                                   "Content-Type": "application/json",
                                 },
-                                body: JSON.stringify({ runAt: scheduleTime }),
+                                body: JSON.stringify({
+                                  runAt: new Date(scheduleTime).toISOString(),
+                                }),
                               });
 
                               shopify.toast.show("Scheduled successfully");
