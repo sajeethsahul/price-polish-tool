@@ -19,7 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (!Array.isArray(products) || products.length === 0) {
     console.warn("⚠️ No products received for staging");
-  
+
     return new Response(
       JSON.stringify({ success: false, message: "No products available to apply pricing changes." }),
       { status: 400 }
@@ -32,16 +32,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     productId: p.productId,
     originalPrice: Number(p.oldPrice),
     stagedPrice: calculatePrice(
-        Number(p.newPrice),
-        rule.markupPercent,
-        rule.roundingStep,
-        rule.charmPricing
-      ),
+      Number(p.newPrice),
+      rule.markupPercent,
+      rule.roundingStep,
+      rule.charmPricing
+    ),
   }));
 
   await prisma.stagedPrice.deleteMany({ where: { shop: session.shop } });
 
   await prisma.stagedPrice.createMany({ data: staged });
+
+  const appState = await prisma.appState.findUnique({
+    where: { shop: session.shop },
+  });
+
+  if (!appState?.isLive) {
+    return new Response(
+      JSON.stringify({
+        success: true,
+        stagedOnly: true,
+        message: "Prices staged successfully.",
+      })
+    );
+  }
 
   return new Response(JSON.stringify({ success: true }));
 };

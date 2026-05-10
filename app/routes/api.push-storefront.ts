@@ -34,97 +34,117 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log("BODY RECEIVED:", body);
     const clear = body.clear === true;
 
-    
+
 
     // ============================
     // 🛑 STOP LIVE (REVERT)
     // ============================
+    // if (clear) {
+    //   const lastBatch = await prisma.priceHistory.findFirst({
+    //     where: { shop },
+    //     orderBy: { createdAt: "desc" },
+    //   });
+
+    //   if (!lastBatch) {
+    //     return cors(
+    //       new Response(JSON.stringify({ error: "No previous price history found." }), {
+    //         status: 400,
+    //         headers: { "Content-Type": "application/json" },
+    //       })
+    //     );
+    //   }
+
+    //   const records = await prisma.priceHistory.findMany({
+    //     where: { batchId: lastBatch.batchId },
+    //   });
+
+    //   let revertedCount = 0;
+
+    //   for (const item of records) {
+    //     try {
+    //             const response = await admin.graphql(`
+    //               mutation productVariantsBulkUpdate(
+    //                 $productId: ID!,
+    //                 $variants: [ProductVariantsBulkInput!]!
+    //               ) {
+    //                 productVariantsBulkUpdate(
+    //                   productId: $productId,
+    //                   variants: $variants
+    //                 ) {
+    //                   product {
+    //                     id
+    //                   }
+    //                   productVariants {
+    //                     id
+    //                     price
+    //                   }
+    //                   userErrors {
+    //                     field
+    //                     message
+    //                   }
+    //                 }
+    //               }
+    //             `, {
+    //               variables: {
+    //                 productId:  item.productId,
+    //                 variants: [
+    //                   {
+    //                     id: item.variantId,
+    //                     price: String(item.oldPrice),
+    //                   },
+    //                 ],
+    //               },
+    //             });
+
+    //       const result = await response.json();
+    //       const userErrors = result?.data?.productVariantsBulkUpdate?.userErrors;
+
+    //       if (userErrors?.length) {
+    //         console.error("❌ Revert error:", item.variantId, userErrors);
+    //         continue;
+    //       }
+
+    //       revertedCount++;
+    //     } catch (err) {
+    //       console.error("❌ Revert failed:", item.variantId);
+    //     }
+    //   }
+
+    //   await prisma.appState.upsert({
+    //     where: { shop },
+    //     update: { isLive: false },
+    //     create: { shop, isLive: false },
+    //   });
+
+    //   await logActivity(shop, "STOP_LIVE");
+
+    //   return cors(
+    //     new Response(JSON.stringify({
+    //       success: true,
+    //       reverted: revertedCount,
+    //     }), {
+    //       headers: { "Content-Type": "application/json" },
+    //     })
+    //   );
+    // }
+
     if (clear) {
-      const lastBatch = await prisma.priceHistory.findFirst({
-        where: { shop },
-        orderBy: { createdAt: "desc" },
-      });
-
-      if (!lastBatch) {
-        return cors(
-          new Response(JSON.stringify({ error: "No previous price history found." }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          })
-        );
-      }
-
-      const records = await prisma.priceHistory.findMany({
-        where: { batchId: lastBatch.batchId },
-      });
-
-      let revertedCount = 0;
-
-      for (const item of records) {
-        try {
-                const response = await admin.graphql(`
-                  mutation productVariantsBulkUpdate(
-                    $productId: ID!,
-                    $variants: [ProductVariantsBulkInput!]!
-                  ) {
-                    productVariantsBulkUpdate(
-                      productId: $productId,
-                      variants: $variants
-                    ) {
-                      product {
-                        id
-                      }
-                      productVariants {
-                        id
-                        price
-                      }
-                      userErrors {
-                        field
-                        message
-                      }
-                    }
-                  }
-                `, {
-                  variables: {
-                    productId:  item.productId,
-                    variants: [
-                      {
-                        id: item.variantId,
-                        price: String(item.oldPrice),
-                      },
-                    ],
-                  },
-                });
-
-          const result = await response.json();
-          const userErrors = result?.data?.productVariantsBulkUpdate?.userErrors;
-
-          if (userErrors?.length) {
-            console.error("❌ Revert error:", item.variantId, userErrors);
-            continue;
-          }
-
-          revertedCount++;
-        } catch (err) {
-          console.error("❌ Revert failed:", item.variantId);
-        }
-      }
-
       await prisma.appState.upsert({
         where: { shop },
         update: { isLive: false },
         create: { shop, isLive: false },
       });
 
-      await logActivity(shop, "STOP_LIVE");
-
       return cors(
-        new Response(JSON.stringify({
-          success: true,
-          reverted: revertedCount,
-        }), {
-          headers: { "Content-Type": "application/json" },
-        })
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: "Live storefront pricing disabled.",
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       );
     }
 
@@ -176,7 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           continue;
         }
 
-      const response = await admin.graphql(`
+        const response = await admin.graphql(`
           mutation productVariantsBulkUpdate(
             $productId: ID!,
             $variants: [ProductVariantsBulkInput!]!
@@ -204,8 +224,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             variants: [
               {
                 id: item.variantId.startsWith("gid://")
-                        ? item.variantId
-                        : `gid://shopify/ProductVariant/${item.variantId}`,
+                  ? item.variantId
+                  : `gid://shopify/ProductVariant/${item.variantId}`,
                 price: String(price),
               },
             ],

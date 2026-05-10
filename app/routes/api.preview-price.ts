@@ -54,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       `);
 
         const data: any = await response.json();
-        
+
         console.log(`DEBUG BACKEND: GraphQL response status: ${response.status} for shop: ${shop}`);
         if (data.errors) {
             console.error("DEBUG BACKEND ERRORS: Shopify returned GraphQL errors:", JSON.stringify(data.errors, null, 2));
@@ -62,10 +62,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const totalCount = data?.data?.productsCount?.count ?? 0;
         const nodes = data?.data?.products?.nodes || [];
-        
+
         console.log(`DEBUG BACKEND: [DIAGNOSTIC] Total Count in Store: ${totalCount}`);
         console.log(`DEBUG BACKEND: [DIAGNOSTIC] Accessible Nodes: ${nodes.length}`);
-        
+
         if (totalCount > 0 && nodes.length === 0) {
             console.warn("DEBUG BACKEND: [CRITICAL] Count > 0 but Nodes = 0. Products exist but are NOT accessible to this app.");
         }
@@ -87,6 +87,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             if (!latestHistoryMap[h.variantId]) {
                 latestHistoryMap[h.variantId] = h;
             }
+        });
+
+        const lastUpdate = await prisma.priceHistory.findFirst({
+            where: { shop },
+            orderBy: { createdAt: "desc" },
         });
 
         const previews = nodes.map((product: any) => {
@@ -126,7 +131,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         console.log("RETURNING PRODUCTS:", previews.length, "| ruleExists:", ruleExists);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
-        return cors(new Response(JSON.stringify({ previews, markupPercent, ruleExists }), {
+        return cors(new Response(JSON.stringify({
+            previews,
+            markupPercent,
+            ruleExists,
+            lastUpdate,
+        }), {
             headers: { "Content-Type": "application/json" },
         }));
     } catch (error: any) {
