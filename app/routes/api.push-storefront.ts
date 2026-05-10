@@ -72,7 +72,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           `, {
             variables: {
               input: {
-                id: `gid://shopify/ProductVariant/${item.variantId}`,
+                id: item.variantId.startsWith("gid://")
+                ? item.variantId
+                : `gid://shopify/ProductVariant/${item.variantId}`,
                 price: Number(item.oldPrice).toFixed(2),
               },
             },
@@ -168,7 +170,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         `, {
           variables: {
             input: {
-              id: `gid://shopify/ProductVariant/${item.variantId}`,
+              id: item.variantId.startsWith("gid://")
+                ? item.variantId
+                : `gid://shopify/ProductVariant/${item.variantId}`,
               price: price.toFixed(2),
             },
           },

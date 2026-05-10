@@ -424,14 +424,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
         if (!pushRes.ok) {
           // Staging succeeded but live push failed — surface clearly.
+           console.log("Prices staged but failed to push live : - push data :", pushData);
           throw new Error(
             pushData.error || "Prices staged but failed to push live"
-          );
+          );         
         }
 
         shopify.toast.show("Prices updated and live on storefront");
+        console.log("Prices updated and live on storefront-Sajeeth");
       } else {
         shopify.toast.show("Pricing applied successfully");
+         console.log("Prices updated and live on storefront-Sajeeth");
       }
       // ─────────────────────────────────────────────────────────────────────
 
