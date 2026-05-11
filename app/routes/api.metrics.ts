@@ -45,12 +45,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ? (totalApplied / (totalApplied + totalFailed)) * 100 
             : 100;
 
-        const rule = await prisma.pricingRule.findUnique({
+        // FIX 4: Read isLive from AppState — the authoritative source.
+        // Previous code used rule.liveMarkupPercent which is never written by any
+        // code path, causing the dashboard live indicator to always show OFF.
+        const appState = await prisma.appState.findUnique({
             where: { shop },
-            select: { liveMarkupPercent: true }
         });
 
-        const isLive = !!(rule?.liveMarkupPercent && rule.liveMarkupPercent !== 0);
+        const isLive = appState?.isLive === true;
 
         return cors(new Response(JSON.stringify({
             totalApplied,
