@@ -1488,7 +1488,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             variant="primary"
                             tone="success"
                             loading={isProcessing}
-                            disabled={
+                            disabled={!applyMode ||
                               !hasActivePlan ||
                               isProcessing ||
                               !hasRules ||
@@ -1512,7 +1512,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           </Text>
                         )}
 
-                        {applyMode === "collection" && (
+                        {/* {applyMode === "collection" && (
                           <TextField
                             label="Collection ID"
                             value={collectionId}
@@ -1520,7 +1520,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             autoComplete="off"
                             helpText="Enter Shopify Collection ID"
                           />
-                        )}
+                        )} */}
 
                         <Divider />
 
@@ -1534,7 +1534,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               autoComplete="off"
                             />
                           </div>
-                          <Button
+                          <Button disabled={!applyMode}
                             onClick={async () => {
                               if (!scheduleTime) {
                                 shopify.toast.show("Select time", { isError: true });
