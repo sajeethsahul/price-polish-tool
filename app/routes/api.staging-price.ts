@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
-import { calculatePrice } from "../utils/pricing";
+import { stagePrices } from "../utils/staging.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -9,39 +9,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const products = body?.products || [];
 
-  const rule = await prisma.pricingRule.findUnique({
-    where: { shop: session.shop },
-  });
+  const result = await stagePrices(session.shop, products);
 
-  if (!rule) {
-    return new Response(JSON.stringify({ error: "No pricing rule" }), { status: 400 });
-  }
-
-  if (!Array.isArray(products) || products.length === 0) {
-    console.warn("⚠️ No products received for staging");
-
+  if (!result.success) {
     return new Response(
-      JSON.stringify({ success: false, message: "No products available to apply pricing changes." }),
+      JSON.stringify({ error: result.message }),
       { status: 400 }
     );
   }
-
-  const staged = products.map((p: any) => ({
-    shop: session.shop,
-    variantId: p.variantId,
-    productId: p.productId,
-    originalPrice: Number(p.oldPrice),
-    stagedPrice: calculatePrice(
-      Number(p.newPrice),
-      rule.markupPercent,
-      rule.roundingStep,
-      rule.charmPricing
-    ),
-  }));
-
-  await prisma.stagedPrice.deleteMany({ where: { shop: session.shop } });
-
-  await prisma.stagedPrice.createMany({ data: staged });
 
   const appState = await prisma.appState.findUnique({
     where: { shop: session.shop },
@@ -52,10 +27,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       JSON.stringify({
         success: true,
         stagedOnly: true,
-        message: "Prices staged successfully.",
+        stagedCount: result.successCount,
+        failedCount: result.failedCount,
+        message: result.message,
       })
     );
   }
 
-  return new Response(JSON.stringify({ success: true }));
+  return new Response(JSON.stringify({
+    success: true,
+    stagedCount: result.successCount,
+    failedCount: result.failedCount,
+  }));
 };

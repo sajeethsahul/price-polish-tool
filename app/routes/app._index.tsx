@@ -1541,17 +1541,61 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 return;
                               }
 
-                              await fetch("/api/schedule-pricing", {
-                                method: "POST",
-                                headers: {
-                                  "Content-Type": "application/json",
-                                },
-                                body: JSON.stringify({
-                                  runAt: new Date(scheduleTime).toISOString(),
-                                }),
-                              });
+                              if (!hasRules) {
+                                shopify.toast.show("Configure pricing rules first", { isError: true });
+                                return;
+                              }
 
-                              shopify.toast.show("Scheduled successfully");
+                              // Build scoped products list (same logic as handleApplyBatch)
+                              let scopedItems = previews;
+                              if (applyMode === "selected") {
+                                scopedItems = previews.filter(item =>
+                                  selectedItems.has(String(item.variantId))
+                                );
+                              }
+
+                              if (scopedItems.length === 0) {
+                                shopify.toast.show("No products to schedule", { isError: true });
+                                return;
+                              }
+
+                              const products = scopedItems.map(item => ({
+                                productId: item.productId,
+                                variantId: item.variantId,
+                                oldPrice: item.oldPrice,
+                                newPrice:
+                                  item.overriddenPrice !== undefined
+                                    ? item.overriddenPrice
+                                    : item.newPrice,
+                                isManual: item.overriddenPrice !== undefined,
+                              }));
+
+                              try {
+                                const response = await fetch("/api/schedule-pricing", {
+                                  method: "POST",
+                                  headers: {
+                                    "Content-Type": "application/json",
+                                  },
+                                  body: JSON.stringify({
+                                    runAt: new Date(scheduleTime).toISOString(),
+                                    products,
+                                    applyMode,
+                                    collectionId,
+                                  }),
+                                });
+
+                                const result = await response.json();
+
+                                if (!response.ok) {
+                                  shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+                                  return;
+                                }
+
+                                const count = result.stagedCount || scopedItems.length;
+                                shopify.toast.show(`${count} prices staged and scheduled successfully`);
+                              } catch (err) {
+                                shopify.toast.show("Scheduling failed", { isError: true });
+                              }
                             }}
                           >
                             Schedule
