@@ -240,9 +240,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
-  const [applyMode, setApplyMode] = useState<"all" | "selected" | "filtered" | "collection">("all");
+  const [applyMode, setApplyMode] = useState<"" | "all" | "selected" | "filtered">("");
   const [collectionId, setCollectionId] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+
 
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
@@ -451,12 +452,82 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     handleApplyBatch([item], { bypassSelectedScope: true });
   }, [handleApplyBatch]);
 
+  const filteredPreviews = useMemo(() => {
+    console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
+    let result = previews.filter(p => {
+      const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const currentNewPrice = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
+      const price = currentNewPrice;
+      const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
+      const matchesMax = maxPrice === "" || price <= parseFloat(maxPrice);
+
+      const oldP = parseFloat(p.oldPrice);
+      const newP = currentNewPrice;
+      const diffPercent = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
+
+      let matchesSmartFilter = true;
+      if (activeFilter === "increase") matchesSmartFilter = newP > oldP;
+      else if (activeFilter === "decrease") matchesSmartFilter = newP < oldP;
+      else if (activeFilter === "high_impact") matchesSmartFilter = Math.abs(diffPercent) >= 10;
+
+      return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
+    });
+
+    result.sort((a, b) => {
+      const oldA = parseFloat(a.oldPrice);
+      const newA = a.overriddenPrice !== undefined ? parseFloat(a.overriddenPrice) || 0 : parseFloat(a.newPrice);
+      const diffA = oldA !== 0 ? ((newA - oldA) / oldA) * 100 : 0;
+
+      const oldB = parseFloat(b.oldPrice);
+      const newB = b.overriddenPrice !== undefined ? parseFloat(b.overriddenPrice) || 0 : parseFloat(b.newPrice);
+      const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
+
+      switch (sortOrder) {
+        case "name_asc": return a.title.localeCompare(b.title);
+        case "name_desc": return b.title.localeCompare(a.title);
+        case "price_asc": return newA - newB;
+        case "price_desc": return newB - newA;
+        case "change_asc": return diffA - diffB;
+        case "change_desc": return diffB - diffA;
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
+
   const handleApplySelected = useCallback(() => {
-    // ADDED: Block execution if no rules exist
+
+    if (!applyMode) {
+      shopify.toast.show("Select pricing scope", { isError: true });
+      return;
+    }
+
     if (guardNoRules()) return;
-    const itemsToUpdate = previews.filter(p => selectedItems.has(p.variantId));
+
+    let itemsToUpdate: PreviewItem[] = [];
+
+    if (applyMode === "all") {
+      itemsToUpdate = previews;
+    } else if (applyMode === "selected") {
+      itemsToUpdate = previews.filter(p =>
+        selectedItems.has(p.variantId)
+      );
+    } else if (applyMode === "filtered") {
+      itemsToUpdate = filteredPreviews;
+    }
+
     handleApplyBatch(itemsToUpdate);
-  }, [previews, selectedItems, handleApplyBatch, guardNoRules]);
+
+  }, [
+    applyMode,
+    previews,
+    filteredPreviews,
+    selectedItems,
+    handleApplyBatch,
+    guardNoRules,
+    shopify
+  ]);
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
@@ -492,7 +563,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
     }
-  }, [lastUpdate, shopify, handlePreview]);
+  }, [applyMode, lastUpdate, shopify, handlePreview]);
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
     if (value.length > 15) return;
@@ -638,49 +709,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   console.log(`DEBUG: Render Cycle - previews.length: ${previews.length}, loading: ${loading}`);
 
-  const filteredPreviews = useMemo(() => {
-    console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
-    let result = previews.filter(p => {
-      const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const currentNewPrice = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
-      const price = currentNewPrice;
-      const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
-      const matchesMax = maxPrice === "" || price <= parseFloat(maxPrice);
 
-      const oldP = parseFloat(p.oldPrice);
-      const newP = currentNewPrice;
-      const diffPercent = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
-
-      let matchesSmartFilter = true;
-      if (activeFilter === "increase") matchesSmartFilter = newP > oldP;
-      else if (activeFilter === "decrease") matchesSmartFilter = newP < oldP;
-      else if (activeFilter === "high_impact") matchesSmartFilter = Math.abs(diffPercent) >= 10;
-
-      return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
-    });
-
-    result.sort((a, b) => {
-      const oldA = parseFloat(a.oldPrice);
-      const newA = a.overriddenPrice !== undefined ? parseFloat(a.overriddenPrice) || 0 : parseFloat(a.newPrice);
-      const diffA = oldA !== 0 ? ((newA - oldA) / oldA) * 100 : 0;
-
-      const oldB = parseFloat(b.oldPrice);
-      const newB = b.overriddenPrice !== undefined ? parseFloat(b.overriddenPrice) || 0 : parseFloat(b.newPrice);
-      const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
-
-      switch (sortOrder) {
-        case "name_asc": return a.title.localeCompare(b.title);
-        case "name_desc": return b.title.localeCompare(a.title);
-        case "price_asc": return newA - newB;
-        case "price_desc": return newB - newA;
-        case "change_asc": return diffA - diffB;
-        case "change_desc": return diffB - diffA;
-        default: return 0;
-      }
-    });
-
-    return result;
-  }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
   const handleMinPriceChange = useCallback((value: string) => {
     if (value.length > 15) return;
@@ -1446,10 +1475,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             <Select
                               label="Apply pricing to"
                               options={[
+                                { label: "Select apply mode", value: "" },
                                 { label: "All products", value: "all" },
                                 { label: "Selected products", value: "selected" },
-                                { label: "Filtered results", value: "filtered" },
-                                { label: "Collection", value: "collection" }
+                                { label: "Filtered results", value: "filtered" }
                               ]}
                               value={applyMode}
                               onChange={(value) => setApplyMode(value as any)}
