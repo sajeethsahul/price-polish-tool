@@ -108,18 +108,33 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
 
   return (
     <>
-      <Card padding="0">
+    <Card>
+      <BlockStack gap="400">
+        
         <Box padding="400" paddingBlockEnd="0">
-          <BlockStack gap="200">
-            <Text variant="headingMd" as="h2">Scheduled Pricing History</Text>
+          <BlockStack gap="100">
+            <Text variant="headingMd" as="h2">
+              Scheduled Pricing History
+            </Text>
+
             <Text variant="bodySm" as="p" tone="subdued">
               View and manage your upcoming and past pricing campaigns.
             </Text>
           </BlockStack>
         </Box>
-        <Box paddingBlockStart="400">
+
+        {loading ? (
+          <Box padding="400">
+            <InlineStack align="center">
+              <Spinner size="small" />
+            </InlineStack>
+          </Box>
+        ) : (
           <IndexTable
-            resourceName={{ singular: "schedule", plural: "schedules" }}
+            resourceName={{
+              singular: "schedule",
+              plural: "schedules",
+            }}
             itemCount={jobs.length}
             headings={[
               { title: "Title" },
@@ -128,12 +143,13 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
               { title: "Status" },
             ]}
             selectable={false}
-            loading={loading}
           >
             {rowMarkup}
           </IndexTable>
-        </Box>
-      </Card>
+        )}
+
+      </BlockStack>
+    </Card>
 
       {/* Product Details Modal */}
       <Modal
