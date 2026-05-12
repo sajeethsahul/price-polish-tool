@@ -37,27 +37,36 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const appFetch = useAppFetch();
 
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
-  
-    try {
-      const data = await appFetch("/api/schedule-history");
-  
-      if (data.jobs) {
-        setJobs(data.jobs);
-      }
-    } catch (err) {
-      console.error("Failed to load schedule history", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [appFetch]);
-
   useEffect(() => {
+    let mounted = true;
+  
+    async function fetchJobs() {
+      try {
+        setLoading(true);
+  
+        const data = await appFetch("/api/schedule-history");
+  
+        if (mounted && data.jobs) {
+          setJobs(data.jobs);
+        }
+      } catch (err) {
+        console.error("Failed to load schedule history", err);
+      } finally {
+        if (mounted) {
+          console.log("SETTING LOADING FALSE");
+          setLoading(false);
+        }
+      }
+    }
+  
     fetchJobs();
-    // Poll every 30 seconds for status updates
+  
     const interval = setInterval(fetchJobs, 30000);
-    return () => clearInterval(interval);
+  
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   const getStatusBadge = (status: string) => {
