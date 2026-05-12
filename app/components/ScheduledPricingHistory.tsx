@@ -7,10 +7,11 @@ import {
   BlockStack,
   Button,
   Modal,
-  Box,
+  Box,InlineStack
 } from "@shopify/polaris";
 import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
+import { Spinner } from "@shopify/polaris";
 
 interface ProductSnapshot {
   productId: string;
