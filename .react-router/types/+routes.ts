@@ -20,6 +20,9 @@ type Pages = {
   "/webhooks/app/uninstalled": {
     params: {};
   };
+  "/api/schedule-history": {
+    params: {};
+  };
   "/api/schedule-pricing": {
     params: {};
   };
@@ -96,7 +99,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -105,6 +108,10 @@ type RouteFiles = {
   "routes/webhooks.app.uninstalled.tsx": {
     id: "routes/webhooks.app.uninstalled";
     page: "/webhooks/app/uninstalled";
+  };
+  "routes/api.schedule-history.ts": {
+    id: "routes/api.schedule-history";
+    page: "/api/schedule-history";
   };
   "routes/api.schedule-pricing.ts": {
     id: "routes/api.schedule-pricing";
@@ -212,6 +219,7 @@ type RouteModules = {
   "root": typeof import("./app/root.tsx");
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.tsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.tsx");
+  "routes/api.schedule-history": typeof import("./app/routes/api.schedule-history.ts");
   "routes/api.schedule-pricing": typeof import("./app/routes/api.schedule-pricing.ts");
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");
   "routes/api.proxy.settings": typeof import("./app/routes/api.proxy.settings.ts");

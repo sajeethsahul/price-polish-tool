@@ -28,5 +28,5 @@ export async function loader({ request }: LoaderFunctionArgs) {
     } catch (error) {
         console.error("[Schedule History API] Error fetching jobs:", error);
         return json({ error: "Failed to load schedule history" }, { status: 500 });
-    }
+    }    
 }
