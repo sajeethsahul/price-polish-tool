@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   IndexTable,
@@ -36,11 +36,13 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const appFetch = useAppFetch();
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
+  
     try {
       const fetcher = await appFetch;
       const data = await fetcher("/api/schedule-history");
+  
       if (data.jobs) {
         setJobs(data.jobs);
       }
@@ -49,14 +51,14 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchJobs();
     // Poll every 30 seconds for status updates
     const interval = setInterval(fetchJobs, 30000);
     return () => clearInterval(interval);
-  }, [appFetch]);
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
