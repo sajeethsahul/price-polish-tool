@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Card,
-  IndexTable,
+  DataTable,
   Badge,
   Text,
   BlockStack,
   Button,
   Modal,
-  Box,InlineStack
+  Box,
+  InlineStack,
+  Spinner,
 } from "@shopify/polaris";
 import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
-import { Spinner } from "@shopify/polaris";
+
 
 interface ProductSnapshot {
   productId: string;
@@ -117,50 +119,61 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
 
   return (
     <>
-    <Card>
-      <BlockStack gap="400">
-        
-        <Box padding="400" paddingBlockEnd="0">
-          <BlockStack gap="100">
-            <Text variant="headingMd" as="h2">
-              Scheduled Pricing History
-            </Text>
-
-            <Text variant="bodySm" as="p" tone="subdued">
-              View and manage your upcoming and past pricing campaigns.
-            </Text>
-          </BlockStack>
-        </Box>
-
-        {loading ? (
-          <Box padding="400">
-            <InlineStack align="center">
-              <Spinner size="small" />
-            </InlineStack>
+      <Card>
+        <BlockStack gap="400">
+  
+          <Box padding="400" paddingBlockEnd="0">
+            <BlockStack gap="100">
+              <Text variant="headingMd" as="h2">
+                Scheduled Pricing History
+              </Text>
+  
+              <Text variant="bodySm" as="p" tone="subdued">
+                View and manage your upcoming and past pricing campaigns.
+              </Text>
+            </BlockStack>
           </Box>
-        ) : (
-          <IndexTable
-            resourceName={{
-              singular: "schedule",
-              plural: "schedules",
-            }}
-            itemCount={jobs.length}
-            headings={[
-              { title: "Title" },
-              { title: "Run Time" },
-              { title: "Product Count" },
-              { title: "Status" },
-            ]}
-            selectable={false}
-          >
-            {rowMarkup}
-          </IndexTable>
-        )}
-
-      </BlockStack>
-    </Card>
-
-      {/* Product Details Modal */}
+  
+          {loading ? (
+            <Box padding="400">
+              <InlineStack align="center">
+                <Spinner size="small" />
+              </InlineStack>
+            </Box>
+          ) : (
+            <DataTable
+              columnContentTypes={[
+                "text",
+                "text",
+                "text",
+                "text",
+              ]}
+              headings={[
+                "Title",
+                "Run Time",
+                "Product Count",
+                "Status",
+              ]}
+              rows={jobs.map((job) => [
+                job.title,
+                formatDate(job.runAt),
+  
+                <Button
+                  key={`${job.id}-products`}
+                  variant="plain"
+                  onClick={() => setSelectedJob(job)}
+                >
+                  {`${job.productCount} Products`}
+                </Button>,
+  
+                getStatusBadge(job.status),
+              ])}
+            />
+          )}
+  
+        </BlockStack>
+      </Card>
+  
       <Modal
         open={!!selectedJob}
         onClose={() => setSelectedJob(null)}
@@ -168,46 +181,51 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
         size="large"
       >
         <Modal.Section>
-          {selectedJob?.products && selectedJob.products.length > 0 ? (
-            <IndexTable
-              resourceName={{ singular: "product", plural: "products" }}
-              itemCount={selectedJob.products.length}
-              headings={[
-                { title: "Product" },
-                { title: "Variant" },
-                { title: "Old Price" },
-                { title: "Scheduled Price" },
+  
+          {selectedJob?.products &&
+          selectedJob.products.length > 0 ? (
+  
+            <DataTable
+              columnContentTypes={[
+                "text",
+                "text",
+                "text",
+                "text",
               ]}
-              selectable={false}
-            >
-              {selectedJob.products.map((product, index) => (
-                <IndexTable.Row id={product.variantId} key={product.variantId} position={index}>
-                  <IndexTable.Cell>
-                    <Text variant="bodyMd" fontWeight="bold" as="span">
-                      {product.title}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>{product.variantTitle || "Default Title"}</IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="subdued" textDecorationLine="line-through">
-                      {formatMoney(Number(product.oldPrice), currencyCode)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone="success" fontWeight="bold">
-                      {formatMoney(Number(product.newPrice), currencyCode)}
-                    </Text>
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
+              headings={[
+                "Product",
+                "Variant",
+                "Old Price",
+                "Scheduled Price",
+              ]}
+              rows={selectedJob.products.map((product) => [
+                product.title,
+                product.variantTitle || "Default Title",
+  
+                formatMoney(
+                  Number(product.oldPrice),
+                  currencyCode
+                ),
+  
+                formatMoney(
+                  Number(product.newPrice),
+                  currencyCode
+                ),
+              ])}
+            />
+  
           ) : (
             <Box padding="400">
-              <Text as="p" tone="subdued" alignment="center">
+              <Text
+                as="p"
+                tone="subdued"
+                alignment="center"
+              >
                 No product details available for this schedule.
               </Text>
             </Box>
           )}
+  
         </Modal.Section>
       </Modal>
     </>
