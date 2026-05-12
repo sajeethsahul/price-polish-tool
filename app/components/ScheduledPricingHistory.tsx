@@ -41,8 +41,7 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
     setLoading(true);
   
     try {
-      const fetcher = await appFetch;
-      const data = await fetcher("/api/schedule-history");
+      const data = await appFetch("/api/schedule-history");
   
       if (data.jobs) {
         setJobs(data.jobs);
@@ -52,7 +51,7 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [appFetch]);
 
   useEffect(() => {
     fetchJobs();
