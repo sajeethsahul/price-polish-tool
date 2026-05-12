@@ -28,6 +28,7 @@ import {
 import { InfoIcon } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
+import { ScheduledPricingHistory } from "../components/ScheduledPricingHistory";
 
 
 const BATCH_SIZE = 50;
@@ -243,6 +244,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [applyMode, setApplyMode] = useState<"" | "all" | "selected" | "filtered">("");
   const [collectionId, setCollectionId] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [scheduleTitle, setScheduleTitle] = useState("");
 
 
   // Billing placeholders — do not modify
@@ -1524,93 +1526,107 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                         <Divider />
 
-                        <InlineStack gap="200" blockAlign="end" wrap={false}>
-                          <div style={{ flex: 1 }}>
-                            <TextField
-                              label="Schedule Time"
-                              type="datetime-local"
-                              value={scheduleTime}
-                              onChange={setScheduleTime}
-                              autoComplete="off"
-                            />
-                          </div>
-                          <Button disabled={!applyMode}
-                            onClick={async () => {
-                              if (!scheduleTime) {
-                                shopify.toast.show("Select time", { isError: true });
-                                return;
-                              }
-
-                              if (!hasRules) {
-                                shopify.toast.show("Configure pricing rules first", { isError: true });
-                                return;
-                              }
-
-                              // Build scoped products list (same logic as handleApplyBatch)
-                              let scopedItems = previews;
-                              if (applyMode === "selected") {
-                                scopedItems = previews.filter(item =>
-                                  selectedItems.has(String(item.variantId))
-                                );
-                              }
-
-                              if (scopedItems.length === 0) {
-                                shopify.toast.show("No products to schedule", { isError: true });
-                                return;
-                              }
-
-                              const products = scopedItems.map(item => ({
-                                productId: item.productId,
-                                variantId: item.variantId,
-                                oldPrice: item.oldPrice,
-                                newPrice:
-                                  item.overriddenPrice !== undefined
-                                    ? item.overriddenPrice
-                                    : item.newPrice,
-                                isManual: item.overriddenPrice !== undefined,
-                              }));
-
-                              try {
-                                const response = await fetch("/api/schedule-pricing", {
-                                  method: "POST",
-                                  headers: {
-                                    "Content-Type": "application/json",
-                                  },
-                                  body: JSON.stringify({
-                                    runAt: new Date(scheduleTime).toISOString(),
-                                    products,
-                                    applyMode,
-                                    collectionId,
-                                  }),
-                                });
-
-                                const result = await response.json();
-
-                                if (!response.ok) {
-                                  shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+                        <BlockStack gap="200">
+                          <TextField
+                            label="Campaign Title"
+                            value={scheduleTitle}
+                            onChange={setScheduleTitle}
+                            autoComplete="off"
+                            placeholder="e.g., Weekend Sale"
+                          />
+                          <InlineStack gap="200" blockAlign="end" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                              <TextField
+                                label="Schedule Time"
+                                type="datetime-local"
+                                value={scheduleTime}
+                                onChange={setScheduleTime}
+                                autoComplete="off"
+                              />
+                            </div>
+                            <Button disabled={!applyMode}
+                              onClick={async () => {
+                                if (!scheduleTime) {
+                                  shopify.toast.show("Select time", { isError: true });
                                   return;
                                 }
 
-                                const count = result.stagedCount || scopedItems.length;
-                                shopify.toast.show(`${count} prices staged and scheduled successfully`);
-                              } catch (err) {
-                                shopify.toast.show("Scheduling failed", { isError: true });
-                              }
-                            }}
-                          >
-                            Schedule
-                          </Button>
-                        </InlineStack>
+                                if (!hasRules) {
+                                  shopify.toast.show("Configure pricing rules first", { isError: true });
+                                  return;
+                                }
 
+                                // Build scoped products list (same logic as handleApplyBatch)
+                                let scopedItems = previews;
+                                if (applyMode === "selected") {
+                                  scopedItems = previews.filter(item =>
+                                    selectedItems.has(String(item.variantId))
+                                  );
+                                }
+
+                                if (scopedItems.length === 0) {
+                                  shopify.toast.show("No products to schedule", { isError: true });
+                                  return;
+                                }
+
+                                const products = scopedItems.map(item => ({
+                                  productId: item.productId,
+                                  variantId: item.variantId,
+                                  oldPrice: item.oldPrice,
+                                  newPrice:
+                                    item.overriddenPrice !== undefined
+                                      ? item.overriddenPrice
+                                      : item.newPrice,
+                                  isManual: item.overriddenPrice !== undefined,
+                                }));
+
+                                try {
+                                  const response = await fetch("/api/schedule-pricing", {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                    },
+                                    body: JSON.stringify({
+                                      title: scheduleTitle,
+                                      runAt: new Date(scheduleTime).toISOString(),
+                                      products,
+                                      applyMode,
+                                      collectionId,
+                                    }),
+                                  });
+
+                                  const result = await response.json();
+
+                                  if (!response.ok) {
+                                    shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+                                    return;
+                                  }
+
+                                  const count = result.stagedCount || scopedItems.length;
+                                  shopify.toast.show(`${count} prices staged and scheduled successfully`);
+                                } catch (err) {
+                                  shopify.toast.show("Scheduling failed", { isError: true });
+                                }
+                              }}
+                            >
+                              Schedule
+                            </Button>
+                          </InlineStack>
+
+                        </BlockStack>
                       </BlockStack>
                     </Card>
+
+                    <Box paddingBlockStart="400">
+                      <ScheduledPricingHistory currencyCode={currencyCode} />
+                    </Box>
                   </div>
                 </InlineStack>
               </Box>
             </div>
 
-          </BlockStack >
-        </div >
+          </BlockStack>
+        </div>
 
         {/* ── TASK 4: Confirmation Modals ── */}
 
@@ -1691,7 +1707,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           </Modal.Section>
         </Modal>
 
-      </Page >
-    </div >
+      </Page>
+    </div>
   );
 }

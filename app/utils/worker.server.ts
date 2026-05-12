@@ -18,6 +18,7 @@ type ClaimedJob = {
     runAt: Date;
     status: string;
     createdAt: Date;
+    products?: any;
 };
 
 // ─── Atomic job claim ─────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
             LIMIT  1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, shop, "runAt", status, "createdAt"
+        RETURNING id, shop, "runAt", status, "createdAt", products
     `;
     return result[0] ?? null;
 }
@@ -140,15 +141,34 @@ export function startWorker() {
                 );
 
                 try {
-                    // ── STEP 1: Fetch staged prices ───────────────────────────
-                    const staged = await prisma.stagedPrice.findMany({
-                        where: { shop },
-                    });
+                    // ── STEP 1: Fetch products from snapshot (or fallback) ──
+                    let itemsToProcess = [];
+                    
+                    if (job.products && Array.isArray(job.products) && job.products.length > 0) {
+                        // Use frozen snapshot from schedule creation
+                        itemsToProcess = job.products.map((p: any) => ({
+                            variantId: p.variantId,
+                            productId: p.productId,
+                            stagedPrice: Number(p.newPrice),
+                            originalPrice: Number(p.oldPrice)
+                        }));
+                    } else {
+                        // Fallback: older jobs without snapshot read from StagedPrice
+                        const staged = await prisma.stagedPrice.findMany({
+                            where: { shop },
+                        });
+                        itemsToProcess = staged.map(p => ({
+                            variantId: p.variantId,
+                            productId: p.productId,
+                            stagedPrice: Number(p.stagedPrice),
+                            originalPrice: Number(p.originalPrice)
+                        }));
+                    }
 
-                    if (!staged.length) {
+                    if (!itemsToProcess.length) {
                         console.warn(
-                            `[Worker] ⚠️ No staged prices for shop ${shop}. ` +
-                            `Job ${jobId}: user must click Apply before scheduling. Marking failed.`
+                            `[Worker] ⚠️ No products found for job ${jobId}. ` +
+                            `Marking failed.`
                         );
                         await prisma.scheduledJob.update({
                             where: { id: jobId },
@@ -157,7 +177,7 @@ export function startWorker() {
                         continue;
                     }
 
-                    console.log(`[Worker] 📦 ${staged.length} staged price(s) found for job ${jobId}`);
+                    console.log(`[Worker] 📦 ${itemsToProcess.length} price(s) found for job ${jobId}`);
 
                     // ── STEP 2: Get Shopify admin client (offline token) ───────
                     const { admin } = await unauthenticated.admin(shop);
@@ -168,7 +188,7 @@ export function startWorker() {
                     const failedVariants: string[] = [];
 
                     // ── STEP 3: Push each variant price to Shopify ────────────
-                    for (const item of staged) {
+                    for (const item of itemsToProcess) {
                         try {
                             const price = Number(item.stagedPrice);
 

@@ -109,9 +109,12 @@ model PushJob {
   createdAt  DateTime @default(now())
 }
 model ScheduledJob {
-  id        String   @id @default(uuid())
-  shop      String
-  runAt     DateTime
-  status    String   @default("pending")
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  shop         String
+  runAt        DateTime
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  title        String   @default("Scheduled Campaign")
+  productCount Int      @default(0)
+  products     Json?
 }

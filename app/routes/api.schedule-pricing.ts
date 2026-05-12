@@ -12,7 +12,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const shop = session.shop;
 
     const body = await request.json().catch(() => ({}));
-    const { runAt, products } = body;
+    const { runAt, products, title } = body;
 
     if (!runAt) {
         return json({ error: "runAt required" }, { status: 400 });
@@ -67,6 +67,9 @@ export async function action({ request }: ActionFunctionArgs) {
         data: {
             shop,
             runAt: new Date(runAt),
+            title: title || "Scheduled Campaign",
+            productCount: products ? products.length : 0,
+            products: products || [],
         },
     });
 
