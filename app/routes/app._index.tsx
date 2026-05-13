@@ -295,20 +295,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Data received from parallel fetch");
 
       const fetchedPreviews = data.previews ?? [];
-      setPreviews((prev) => {
-        const overridesByVariantId = new Map<string, string>();
-        prev.forEach((item) => {
-          if (item.overriddenPrice !== undefined) {
-            overridesByVariantId.set(item.variantId, item.overriddenPrice);
-          }
-        });
-
-        return (fetchedPreviews as PreviewItem[]).map((item: PreviewItem) => {
-          const overriddenPrice = overridesByVariantId.get(item.variantId);
-          if (overriddenPrice === undefined) return item;
-          return { ...item, overriddenPrice };
-        });
-      });
+      setPreviews(fetchedPreviews);
       setLastUpdate(data.lastUpdate ?? null);
       // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
       console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
