@@ -897,10 +897,16 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             {/* Safety Info Banner */}
             <Banner tone="info">
               <BlockStack gap="100">
-                <Text as="p" variant="bodyMd">Safe to use — all changes can be undone anytime.</Text>
-                <Text as="p" variant="bodyMd">Your original prices are preserved and stored securely.</Text>
+                <Text as="p" variant="bodyMd">
+                  Safe to use — all pricing changes can be reviewed and undone anytime.
+                </Text>
+
+                <Text as="p" variant="bodyMd">
+                  Your original storefront prices are preserved securely for rollback and recovery.
+                </Text>
+
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Tip: The Apply button is disabled when a row already matches your current pricing rules. Adjust rules or prices to enable it again.
+                  Scheduled pricing updates run automatically at the selected time without requiring manual action.
                 </Text>
               </BlockStack>
             </Banner>

@@ -13,187 +13,295 @@ import {
   Icon,
 } from "@shopify/polaris";
 import { ShieldCheckMarkIcon } from "@shopify/polaris-icons";
+import { useNavigate } from "react-router";
 
 export default function HelpPage() {
-  return (
-    <Page title="User Guide & Help" backAction={{ url: "/app" }} fullWidth>
-      <Box maxWidth="1000px" marginInline="auto">
-        <BlockStack gap="400">
+  const navigate = useNavigate();
 
-          {/* 🔥 SUMMARY */}
-          <Banner tone="info" title="Quick Summary">
-            Price Polish helps you optimize product prices using markup and smart rounding.
-            You can preview changes safely, apply them permanently, or control storefront pricing dynamically.
+  return (
+    <Page
+      title="Help & User Guide"
+      backAction={{ onAction: () => navigate("/app") }}
+      fullWidth
+    >
+      <Box maxWidth="980px" marginInline="auto">
+        <BlockStack gap="500">
+
+          <Banner tone="info" title="Quick Overview">
+            Preview upcoming prices, apply catalog updates instantly, schedule future campaigns, or enable dynamic live storefront pricing.
           </Banner>
 
-          {/* 🔥 WORKFLOW */}
+          <Text as="h2" variant="headingLg">
+            Core Workflow
+          </Text>
+
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">1. Dashboard Workflow</Text>
+              <Text as="h2" variant="headingMd">
+                Recommended Workflow
+              </Text>
+
+              <Text as="p" tone="subdued">
+                A safe and predictable workflow for managing pricing updates.
+              </Text>
+
+              <Divider />
+
               <List type="number">
                 <List.Item>
-                  <strong>Set Rules:</strong> Configure Markup %, Rounding, and Charm Pricing.
+                  <strong>Configure pricing rules:</strong> Set markup, rounding, and charm pricing in Pricing Rules.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Refresh Previews:</strong> See calculated prices before applying.
+                  <strong>Refresh previews:</strong> Load the latest calculated prices on the Dashboard.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Apply Changes:</strong> Update Shopify prices permanently.
+                  <strong>Review changes:</strong> Compare Current vs Textbox before applying updates.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Apply Modes:</strong> Apply to All, Selected, Filtered, or Collection.
+                  <strong>Apply now or Schedule for later:</strong> Apply updates Shopify immediately or schedule automated campaigns.
+                </List.Item>
+
+                <List.Item>
+                  <strong>Undo if needed:</strong> Restore previous prices after bulk updates.
                 </List.Item>
               </List>
             </BlockStack>
           </Card>
 
-          {/* 🔥 STATUS */}
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">2. Apply Button Status</Text>
-
-              <InlineStack gap="300">
-                <Badge tone="success">[SYNCED]</Badge>
-                <Text>Your product matches pricing rules</Text>
-              </InlineStack>
-
-              <InlineStack gap="300">
-                <Badge tone="attention">[MANUAL]</Badge>
-                <Text>Manually overridden price</Text>
-              </InlineStack>
-
-              <InlineStack gap="300">
-                <Badge tone="info">No Change</Badge>
-                <Text>Calculated price equals original</Text>
-              </InlineStack>
-
-              <Text tone="subdued">
-                Tip: Updating rules resets SYNCED status until re-applied.
+              <Text as="h2" variant="headingMd">
+                Understanding Current vs Textbox
               </Text>
+
+              <Text as="p" tone="subdued">
+                These values work together to help you review pricing changes clearly.
+              </Text>
+
+              <Divider />
+
+              <InlineStack gap="200" wrap>
+                <Badge tone="info">Current</Badge>
+
+                <Text as="p">
+                  Your current live product price.
+                </Text>
+              </InlineStack>
+
+              <InlineStack gap="200" wrap>
+                <Badge tone="success">Textbox</Badge>
+
+                <Text as="p">
+                  Your next calculated preview price based on pricing rules or manual input.
+                </Text>
+              </InlineStack>
             </BlockStack>
           </Card>
 
-          {/* 🔥 ADMIN vs LIVE */}
           <Layout>
-            <Layout.Section>
+            <Layout.Section variant="oneHalf">
               <Card>
-                <BlockStack gap="200">
-                  <Text variant="headingSm">Admin Update</Text>
-                  <Badge tone="critical">Hard Update</Badge>
-                  <Text tone="subdued">
-                    Permanently updates Shopify database. All channels reflect this.
+                <BlockStack gap="300">
+                  <Text variant="headingMd" as="h2">
+                    Apply Updates
                   </Text>
+
+                  <Text as="p" tone="subdued">
+                    Apply updates Shopify immediately across your catalog.
+                  </Text>
+
+                  <Divider />
+
+                  <List>
+                    <List.Item>
+                      <strong>Apply All</strong> updates every item in the preview list.
+                    </List.Item>
+
+                    <List.Item>
+                      <strong>Apply Selected</strong> updates only checked products.
+                    </List.Item>
+
+                    <List.Item>
+                      <strong>Filtered workflow</strong> applies updates to filtered results.
+                    </List.Item>
+
+                    <List.Item>
+                      <strong>Collection</strong> applies updates to a selected collection.
+                    </List.Item>
+                  </List>
                 </BlockStack>
               </Card>
             </Layout.Section>
 
-            <Layout.Section>
+            <Layout.Section variant="oneHalf">
               <Card>
-                <BlockStack gap="200">
-                  <Text variant="headingSm">Storefront Live Control</Text>
-                  <Badge tone="success">Virtual Update</Badge>
-                  <Text tone="subdued">
-                    Changes storefront display only. Database remains unchanged.
+                <BlockStack gap="300">
+                  <Text variant="headingMd" as="h2">
+                    Live Pricing
                   </Text>
+
+                  <Text as="p" tone="subdued">
+                    Dynamically adjusts storefront display prices without modifying catalog values.
+                  </Text>
+
+                  <Divider />
+
+                  <List>
+                    <List.Item>
+                      Live Pricing affects storefront display only.
+                    </List.Item>
+
+                    <List.Item>
+                      Apply permanently updates catalog prices.
+                    </List.Item>
+
+                    <List.Item>
+                      Live Pricing rules may layer on top of applied catalog prices.
+                    </List.Item>
+                  </List>
+
+                  <Banner tone="info">
+                    If you want your applied catalog value to remain the final customer-facing price, keep Live Pricing disabled or reduce Live Pricing rules to 0%.
+                  </Banner>
                 </BlockStack>
               </Card>
             </Layout.Section>
           </Layout>
 
-          {/* 🔥 SCHEDULING */}
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">3. Scheduling Pricing</Text>
-              <Text>
-                Schedule pricing updates to run automatically at a specific time.
+              <Text as="h2" variant="headingMd">
+                Manual Overrides
               </Text>
+
+              <Text as="p" tone="subdued">
+                Manual input is designed for one-time pricing overrides.
+              </Text>
+
+              <Divider />
+
               <List>
-                <List.Item>Select date & time</List.Item>
-                <List.Item>Click "Schedule Pricing"</List.Item>
-                <List.Item>System applies rules automatically</List.Item>
+                <List.Item>
+                  Typing a custom value temporarily overrides the calculated preview for that product.
+                </List.Item>
+
+                <List.Item>
+                  When applied, Shopify receives your exact manual value without additional pricing adjustments.
+                </List.Item>
+
+                <List.Item>
+                  After apply, pricing rules resume using the newly updated product price as the baseline.
+                </List.Item>
+
+                <List.Item>
+                  Use Reset to restore pricing-rule control before applying.
+                </List.Item>
               </List>
-              <Text tone="subdued">
-                Ideal for promotions, peak hours, or timed campaigns.
-              </Text>
             </BlockStack>
           </Card>
 
-          {/* 🔥 SAFETY */}
+          <Text as="h2" variant="headingLg">
+            Automation & Safety
+          </Text>
+
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">
+                Scheduling
+              </Text>
+
+              <Text as="p" tone="subdued">
+                Create automated pricing campaigns that run later without manual intervention.
+              </Text>
+
+              <Divider />
+
+              <List>
+                <List.Item>
+                  Scheduling automatically stages and publishes pricing updates.
+                </List.Item>
+
+                <List.Item>
+                  You no longer need to Apply before scheduling.
+                </List.Item>
+
+                <List.Item>
+                  Schedule History tracks campaigns and included products.
+                </List.Item>
+
+                <List.Item>
+                  Ideal for promotions, launch events, and timed campaigns.
+                </List.Item>
+              </List>
+            </BlockStack>
+          </Card>
+
           <Card>
             <BlockStack gap="300">
               <InlineStack gap="200" blockAlign="center">
                 <Icon source={ShieldCheckMarkIcon} tone="success" />
-                <Text as="h2" variant="headingMd">4. Safety & Trust</Text>
+
+                <Text as="h2" variant="headingMd">
+                  Safety & Recovery
+                </Text>
               </InlineStack>
 
-              <Text>
-                <strong>Undo Last Update:</strong> Instantly revert bulk changes.
+              <Text as="p" tone="subdued">
+                All pricing actions are designed to be reviewable and recoverable.
               </Text>
 
-              <Text>
-                <strong>Safe Mode:</strong> Preview changes before applying.
-              </Text>
-
-              <Text>
-                Your original prices are always backed up.
-              </Text>
-            </BlockStack>
-          </Card>
-
-          {/* 🔥 IMPACT */}
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">5. Impact & Profit Insights</Text>
+              <Divider />
 
               <List>
                 <List.Item>
-                  <strong>Impact Preview:</strong> See estimated revenue gain before applying
+                  <strong>Preview first:</strong> Review calculated changes before applying.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Download Report:</strong> CSV with price comparison
+                  <strong>Undo:</strong> Restore previous prices after bulk updates.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Audit Trail:</strong> Includes markup & rounding breakdown
+                  <strong>History:</strong> Original prices are stored securely for rollback and audit purposes.
                 </List.Item>
-              </List>
-
-              <Text tone="subdued">
-                Tip: Always export report before bulk updates.
-              </Text>
-            </BlockStack>
-          </Card>
-
-          {/* 🔥 RELIABILITY */}
-          <Card>
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">6. Bulk Processing</Text>
-
-              <List>
-                <List.Item>Real-time progress tracking</List.Item>
-                <List.Item>Retry failed updates only</List.Item>
-                <List.Item>Safe batch processing system</List.Item>
               </List>
             </BlockStack>
           </Card>
 
-          {/* 🔥 PRICING LOGIC */}
           <Card>
             <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">7. Pricing Logic</Text>
+              <Text as="h2" variant="headingMd">
+                Pricing Rules Basics
+              </Text>
+
+              <Text as="p" tone="subdued">
+                Preview prices are calculated from your current live product prices.
+              </Text>
+
+              <Divider />
 
               <List>
                 <List.Item>
-                  <strong>Markup:</strong> Percentage increase/decrease
+                  <strong>Markup:</strong> Percentage increase or decrease.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Rounding:</strong> Set decimal endings (e.g., .55)
+                  <strong>Rounding:</strong> Set consistent decimal endings.
                 </List.Item>
+
                 <List.Item>
-                  <strong>Charm Pricing:</strong> Ends prices in .99
+                  <strong>Charm Pricing:</strong> Common endings like .99 when enabled.
                 </List.Item>
               </List>
             </BlockStack>
           </Card>
+
+          <Banner tone="success">
+            Refresh previews after updating pricing rules so the dashboard reflects your latest calculations.
+          </Banner>
 
         </BlockStack>
       </Box>
