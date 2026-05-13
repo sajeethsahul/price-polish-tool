@@ -179,7 +179,7 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
                 "Scheduled Price",
               ]}
               rows={selectedJob.products.map((product) => [
-                product.title,
+                product.title || "Untitled Product",
                 product.variantTitle || "Default Title",
   
                 formatMoney(

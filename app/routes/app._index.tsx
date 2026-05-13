@@ -37,6 +37,7 @@ const PAGE_SIZE = 15;
 interface PreviewItem {
   productId: string;
   title: string;
+  variantTitle?: string;
   image: string;
   variantId: string;
   oldPrice: string;
@@ -1572,6 +1573,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 const products = scopedItems.map(item => ({
                                   productId: item.productId,
                                   variantId: item.variantId,
+                                  title: item.title,
+                                  variantTitle: item.variantTitle,
                                   oldPrice: item.oldPrice,
                                   newPrice:
                                     item.overriddenPrice !== undefined

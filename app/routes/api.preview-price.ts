@@ -42,6 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               variants(first: 1) {
                 nodes {
                   id
+                  title
                   price
                 }
               }
@@ -117,6 +118,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return {
                 productId: product.id,
                 title: product.title,
+                variantTitle: variant?.title ?? "",
                 image: product.featuredImage?.url ?? "",
                 variantId: variantId,
                 oldPrice: currentPrice.toFixed(2),
