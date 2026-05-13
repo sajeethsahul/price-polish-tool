@@ -8,6 +8,7 @@ import {
   Text,
   Divider,
 } from "@shopify/polaris";
+import { useState } from "react";
 
 export type ApplyMode = "" | "all" | "selected" | "filtered";
 
@@ -40,8 +41,7 @@ export interface PricingActionsModalProps {
   hasRules: boolean;
   collectionId: string;
   onApplyBatch: (
-    items: PricingActionsPreviewItem[],
-    options?: { bypassSelectedScope?: boolean }
+    items: PricingActionsPreviewItem[]
   ) => void | Promise<void>;
   shopify: {
     toast: {
@@ -68,12 +68,17 @@ export function PricingActionsModal({
   onApplyBatch,
   shopify,
 }: PricingActionsModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        // Prevent modal close during submission
+        if (isSubmitting) return;
+        onClose();
+      }}
       title="Pricing Actions"
-      size="medium"
     >
       <Modal.Section>
         <BlockStack gap="200">
@@ -89,13 +94,15 @@ export function PricingActionsModal({
                 ]}
                 value={applyMode}
                 onChange={(value) => onApplyModeChange(value as ApplyMode)}
+                disabled={isSubmitting}
               />
             </div>
             <Button
               variant="primary"
               tone="success"
-              loading={isProcessing}
+              loading={isProcessing || isSubmitting}
               disabled={
+                isSubmitting ||
                 !applyMode ||
                 !hasActivePlan ||
                 isProcessing ||
@@ -103,7 +110,22 @@ export function PricingActionsModal({
                 (applyMode === "all" && previews.length === 0) ||
                 (applyMode === "selected" && selectedItems.size === 0)
               }
-              onClick={() => onApplyBatch(previews)}
+              onClick={async () => {
+                // Modal Apply respects applyMode scope — same filtering as Schedule
+                let scopedItems = previews;
+                if (applyMode === "selected") {
+                  scopedItems = previews.filter((item) =>
+                    selectedItems.has(String(item.variantId))
+                  );
+                }
+                setIsSubmitting(true);
+                try {
+                  await onApplyBatch(scopedItems);
+                  onClose();
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
             >
               {`Apply (${
                 applyMode === "all"
@@ -130,6 +152,7 @@ export function PricingActionsModal({
               onChange={onScheduleTitleChange}
               autoComplete="off"
               placeholder="e.g., Weekend Sale"
+              disabled={isSubmitting}
             />
             <InlineStack gap="200" blockAlign="end" wrap={false}>
               <div style={{ flex: 1 }}>
@@ -139,10 +162,12 @@ export function PricingActionsModal({
                   value={scheduleTime}
                   onChange={onScheduleTimeChange}
                   autoComplete="off"
+                  disabled={isSubmitting}
                 />
               </div>
               <Button
-                disabled={!applyMode}
+                disabled={isSubmitting || !applyMode}
+                loading={isSubmitting}
                 onClick={async () => {
                   if (!scheduleTime) {
                     shopify.toast.show("Select time", { isError: true });
@@ -183,6 +208,7 @@ export function PricingActionsModal({
                     isManual: item.overriddenPrice !== undefined,
                   }));
 
+                  setIsSubmitting(true);
                   try {
                     const response = await fetch("/api/schedule-pricing", {
                       method: "POST",
@@ -212,8 +238,11 @@ export function PricingActionsModal({
                     shopify.toast.show(
                       `${count} prices staged and scheduled successfully`
                     );
+                    onClose();
                   } catch {
                     shopify.toast.show("Scheduling failed", { isError: true });
+                  } finally {
+                    setIsSubmitting(false);
                   }
                 }}
               >

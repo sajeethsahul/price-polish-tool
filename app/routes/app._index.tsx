@@ -354,7 +354,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const handleApplyBatch = useCallback(async (
     itemsToUpdate: PreviewItem[],
-    options?: { bypassSelectedScope?: boolean }
   ) => {
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules first", { isError: true });
@@ -364,23 +363,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setIsProcessing(true);
 
     try {
-      let scopedItems = itemsToUpdate;
-
-      // Scope selection only when explicitly applying to selected items.
-      if (applyMode === "selected" && !options?.bypassSelectedScope) {
-        scopedItems = itemsToUpdate.filter(item =>
-          selectedItems.has(String(item.variantId))
-        );
-      } else if (applyMode === "filtered") {
-        scopedItems = previews; // already filtered list
-      }
+      // handleApplyBatch ONLY stages the items passed to it.
+      // It does NOT filter based on applyMode.
+      // Callers (row Apply, Apply Selected, Apply All) determine the item list.
+      const scopedItems = itemsToUpdate;
 
       if (scopedItems.length === 0) {
-        if (applyMode === "selected" && !options?.bypassSelectedScope) {
-          shopify.toast.show("No products selected", { isError: true });
-        } else {
-          shopify.toast.show("No products to apply", { isError: true });
-        }
+        shopify.toast.show("No products to apply", { isError: true });
         return;
       }
 
@@ -406,8 +395,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         },
         body: JSON.stringify({
           products: itemsWithFinalPrices,
-          applyMode,
-          collectionId,
         })
       });
 
@@ -418,9 +405,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       }
 
       // ── Auto-push when Live Pricing is Active ────────────────────────────
-      // Staging always runs first (above). When isLive === true we
-      // immediately follow up with push-storefront so Shopify prices are
-      // updated and PriceHistory is written — exactly as Go Live does.
       if (metrics.isLive) {
         const pushRes = await fetch("/api/push-storefront", {
           method: "POST",
@@ -431,7 +415,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         const pushData = await pushRes.json();
 
         if (!pushRes.ok) {
-          // Staging succeeded but live push failed — surface clearly.
           console.log("Prices staged but failed to push live : - push data :", pushData);
           throw new Error(
             pushData.error || "Prices staged but failed to push live"
@@ -451,11 +434,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     } finally {
       setIsProcessing(false);
     }
-  }, [applyMode, selectedItems, hasRules, shopify, metrics.isLive]);
+  }, [hasRules, shopify, metrics.isLive]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
-    // Row-level apply should not depend on checkbox selection state.
-    handleApplyBatch([item], { bypassSelectedScope: true });
+    // Row-level apply — directly passes the single item to handleApplyBatch.
+    handleApplyBatch([item]);
   }, [handleApplyBatch]);
 
   const filteredPreviews = useMemo(() => {
@@ -503,37 +486,21 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
   const handleApplySelected = useCallback(() => {
+    // Apply Selected ONLY uses the current checkbox selection state.
+    // It does NOT depend on applyMode (which is for scheduling scope only).
+    if (guardNoRules()) return;
 
-    if (!applyMode) {
-      shopify.toast.show("Select pricing scope", { isError: true });
+    const selectedPreviews = previews.filter(p =>
+      selectedItems.has(p.variantId)
+    );
+
+    if (selectedPreviews.length === 0) {
+      shopify.toast.show("No products selected", { isError: true });
       return;
     }
 
-    if (guardNoRules()) return;
-
-    let itemsToUpdate: PreviewItem[] = [];
-
-    if (applyMode === "all") {
-      itemsToUpdate = previews;
-    } else if (applyMode === "selected") {
-      itemsToUpdate = previews.filter(p =>
-        selectedItems.has(p.variantId)
-      );
-    } else if (applyMode === "filtered") {
-      itemsToUpdate = filteredPreviews;
-    }
-
-    handleApplyBatch(itemsToUpdate);
-
-  }, [
-    applyMode,
-    previews,
-    filteredPreviews,
-    selectedItems,
-    handleApplyBatch,
-    guardNoRules,
-    shopify
-  ]);
+    handleApplyBatch(selectedPreviews);
+  }, [previews, selectedItems, handleApplyBatch, guardNoRules, shopify]);
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
