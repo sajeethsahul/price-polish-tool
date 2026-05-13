@@ -28,23 +28,18 @@ import {
 import { InfoIcon } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
-import { ScheduledPricingHistory } from "../components/ScheduledPricingHistory";
+import {
+  PricingActionsModal,
+  type ApplyMode,
+  type PricingActionsPreviewItem,
+} from "../components/PricingActionsModal";
+import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
 
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
 
-interface PreviewItem {
-  productId: string;
-  title: string;
-  variantTitle?: string;
-  image: string;
-  variantId: string;
-  oldPrice: string;
-  newPrice: string;
-  originalBasePrice: string;
-  overriddenPrice?: string;
-}
+type PreviewItem = PricingActionsPreviewItem;
 
 interface LastUpdateInfo {
   batchId: string;
@@ -242,11 +237,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
-  const [applyMode, setApplyMode] = useState<"" | "all" | "selected" | "filtered">("");
+  const [applyMode, setApplyMode] = useState<ApplyMode>("");
   const [collectionId, setCollectionId] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [scheduleTitle, setScheduleTitle] = useState("");
-
+  const [pricingActionsModalOpen, setPricingActionsModalOpen] = useState(false);
+  const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] = useState(false);
 
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
@@ -1082,10 +1078,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               pointerEvents: !hasRules ? "none" : "auto",
             }}>
               <Box paddingBlockEnd="400">
-                <InlineStack align="start" gap="300">
-                  {/* ================= LEFT SIDE (75%) ================= */}
-                  <div style={{ flex: 3 }}>
-                    <BlockStack gap="300">
+                <BlockStack gap="300">
                       {/* 🔹 1. ACTION BAR CARD */}
                       <Card>
                         <BlockStack gap="300">
@@ -1115,6 +1108,23 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 {`Apply All (${previews.length})`}
                               </Button>
 
+                              <Button
+                                variant="primary"
+                                tone="success"
+                                onClick={handleApplySelected}
+                                disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
+                              >
+                                {`Apply Selected (${selectedItems.size})`}
+                              </Button>
+
+                              <Button onClick={() => setPricingActionsModalOpen(true)}>
+                                Pricing Actions
+                              </Button>
+
+                              <Button onClick={() => setScheduleHistoryModalOpen(true)}>
+                                Schedule History
+                              </Button>
+
                               {previews.length === 0 ? (
                                 <Tooltip content="Please refresh previews to generate the latest report.">
                                   <span style={{ display: 'inline-block' }}>
@@ -1126,15 +1136,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                   Download Impact Report
                                 </Button>
                               )}
-
-                              <Button
-                                variant="primary"
-                                tone="success"
-                                onClick={handleApplySelected}
-                                disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
-                              >
-                                {`Apply Selected (${selectedItems.size})`}
-                              </Button>
 
                               {lastUpdate && (
                                 <Button
@@ -1461,170 +1462,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           )}
                         </BlockStack>
                       </Card>
-                    </BlockStack>
-                  </div>
-
-                  {/* ================= RIGHT SIDE (25%) ================= */}
-                  <div style={{ flex: 1, maxWidth: "320px", position: "sticky", top: "20px" }}>
-                    <Card>
-                      <BlockStack gap="200">
-
-                        <Text as="h3" variant="headingMd">
-                          Pricing Actions
-                        </Text>
-
-                        <InlineStack gap="200" blockAlign="end" wrap={false}>
-                          <div style={{ flex: 1 }}>
-                            <Select
-                              label="Apply pricing to"
-                              options={[
-                                { label: "Select apply mode", value: "" },
-                                { label: "All products", value: "all" },
-                                { label: "Selected products", value: "selected" },
-                                { label: "Filtered results", value: "filtered" }
-                              ]}
-                              value={applyMode}
-                              onChange={(value) => setApplyMode(value as any)}
-                            />
-                          </div>
-                          <Button
-                            variant="primary"
-                            tone="success"
-                            loading={isProcessing}
-                            disabled={!applyMode ||
-                              !hasActivePlan ||
-                              isProcessing ||
-                              !hasRules ||
-                              (applyMode === "all" && previews.length === 0) ||
-                              (applyMode === "selected" && selectedItems.size === 0)
-                            }
-                            onClick={() => handleApplyBatch(previews)}
-                          >
-                            {`Apply (${applyMode === "all"
-                              ? previews.length
-                              : applyMode === "selected"
-                                ? selectedItems.size
-                                : previews.length
-                              })`}
-                          </Button>
-                        </InlineStack>
-
-                        {applyMode === "selected" && (
-                          <Text as="p" tone="subdued">
-                            {selectedItems.size} products selected
-                          </Text>
-                        )}
-
-                        {/* {applyMode === "collection" && (
-                          <TextField
-                            label="Collection ID"
-                            value={collectionId}
-                            onChange={setCollectionId}
-                            autoComplete="off"
-                            helpText="Enter Shopify Collection ID"
-                          />
-                        )} */}
-
-                        <Divider />
-
-                        <BlockStack gap="200">
-                          <TextField
-                            label="Campaign Title"
-                            value={scheduleTitle}
-                            onChange={setScheduleTitle}
-                            autoComplete="off"
-                            placeholder="e.g., Weekend Sale"
-                          />
-                          <InlineStack gap="200" blockAlign="end" wrap={false}>
-                            <div style={{ flex: 1 }}>
-                              <TextField
-                                label="Schedule Time"
-                                type="datetime-local"
-                                value={scheduleTime}
-                                onChange={setScheduleTime}
-                                autoComplete="off"
-                              />
-                            </div>
-                            <Button disabled={!applyMode}
-                              onClick={async () => {
-                                if (!scheduleTime) {
-                                  shopify.toast.show("Select time", { isError: true });
-                                  return;
-                                }
-
-                                if (!hasRules) {
-                                  shopify.toast.show("Configure pricing rules first", { isError: true });
-                                  return;
-                                }
-
-                                // Build scoped products list (same logic as handleApplyBatch)
-                                let scopedItems = previews;
-                                if (applyMode === "selected") {
-                                  scopedItems = previews.filter(item =>
-                                    selectedItems.has(String(item.variantId))
-                                  );
-                                }
-
-                                if (scopedItems.length === 0) {
-                                  shopify.toast.show("No products to schedule", { isError: true });
-                                  return;
-                                }
-
-                                const products = scopedItems.map(item => ({
-                                  productId: item.productId,
-                                  variantId: item.variantId,
-                                  title: item.title,
-                                  variantTitle: item.variantTitle,
-                                  oldPrice: item.oldPrice,
-                                  newPrice:
-                                    item.overriddenPrice !== undefined
-                                      ? item.overriddenPrice
-                                      : item.newPrice,
-                                  isManual: item.overriddenPrice !== undefined,
-                                }));
-
-                                try {
-                                  const response = await fetch("/api/schedule-pricing", {
-                                    method: "POST",
-                                    headers: {
-                                      "Content-Type": "application/json",
-                                    },
-                                    body: JSON.stringify({
-                                      title: scheduleTitle,
-                                      runAt: new Date(scheduleTime).toISOString(),
-                                      products,
-                                      applyMode,
-                                      collectionId,
-                                    }),
-                                  });
-
-                                  const result = await response.json();
-
-                                  if (!response.ok) {
-                                    shopify.toast.show(result.error || "Scheduling failed", { isError: true });
-                                    return;
-                                  }
-
-                                  const count = result.stagedCount || scopedItems.length;
-                                  shopify.toast.show(`${count} prices staged and scheduled successfully`);
-                                } catch (err) {
-                                  shopify.toast.show("Scheduling failed", { isError: true });
-                                }
-                              }}
-                            >
-                              Schedule
-                            </Button>
-                          </InlineStack>
-
-                        </BlockStack>
-                      </BlockStack>
-                    </Card>
-
-                    <Box paddingBlockStart="400">
-                      <ScheduledPricingHistory currencyCode={currencyCode} />
-                    </Box>
-                  </div>
-                </InlineStack>
+                </BlockStack>
               </Box>
             </div>
 
@@ -1632,6 +1470,33 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         </div>
 
         {/* ── TASK 4: Confirmation Modals ── */}
+
+        {shopify && (
+          <PricingActionsModal
+            open={pricingActionsModalOpen}
+            onClose={() => setPricingActionsModalOpen(false)}
+            applyMode={applyMode}
+            onApplyModeChange={setApplyMode}
+            scheduleTitle={scheduleTitle}
+            onScheduleTitleChange={setScheduleTitle}
+            scheduleTime={scheduleTime}
+            onScheduleTimeChange={setScheduleTime}
+            previews={previews}
+            selectedItems={selectedItems}
+            isProcessing={isProcessing}
+            hasActivePlan={hasActivePlan}
+            hasRules={hasRules}
+            collectionId={collectionId}
+            onApplyBatch={handleApplyBatch}
+            shopify={shopify}
+          />
+        )}
+
+        <ScheduledHistoryModal
+          open={scheduleHistoryModalOpen}
+          onClose={() => setScheduleHistoryModalOpen(false)}
+          currencyCode={currencyCode}
+        />
 
         {/* Apply All confirmation modal — unchanged handler */}
         <Modal

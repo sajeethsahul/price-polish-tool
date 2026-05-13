@@ -1,19 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import {
-  Card,
+  Modal,
   DataTable,
   Badge,
   Text,
   BlockStack,
   Button,
-  Modal,
   Box,
   InlineStack,
   Spinner,
 } from "@shopify/polaris";
 import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
-
 
 interface ProductSnapshot {
   productId: string;
@@ -33,21 +31,41 @@ interface ScheduledJob {
   products: ProductSnapshot[] | null;
 }
 
-export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string }) {
+export interface ScheduledHistoryModalProps {
+  open: boolean;
+  onClose: () => void;
+  currencyCode: string;
+}
+
+export function ScheduledHistoryModal({
+  open,
+  onClose,
+  currencyCode,
+}: ScheduledHistoryModalProps) {
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const appFetch = useAppFetch();
 
+  useLayoutEffect(() => {
+    if (open) {
+      setLoading(true);
+    }
+  }, [open]);
+
   useEffect(() => {
+    if (!open) {
+      setJobs([]);
+      setLoading(false);
+      setSelectedJob(null);
+      return;
+    }
+
     let mounted = true;
-  
+
     async function fetchJobs() {
       try {
-        setLoading(true);
-  
         const data = await appFetch("/api/schedule-history");
-  
         if (mounted && data.jobs) {
           setJobs(data.jobs);
         }
@@ -55,21 +73,18 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
         console.error("Failed to load schedule history", err);
       } finally {
         if (mounted) {
-          console.log("SETTING LOADING FALSE");
           setLoading(false);
         }
       }
     }
-  
+
     fetchJobs();
-  
-    const interval = setInterval(fetchJobs, 30000);
-  
+
     return () => {
       mounted = false;
-      clearInterval(interval);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- appFetch changes every render; fetch keyed by `open` only
+  }, [open]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -95,65 +110,51 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
     });
   };
 
-
-
   return (
     <>
-      <Card>
-        <BlockStack gap="400">
-  
-          <Box padding="400" paddingBlockEnd="0">
-            <BlockStack gap="100">
-              <Text variant="headingMd" as="h2">
-                Scheduled Pricing History
-              </Text>
-  
-              <Text variant="bodySm" as="p" tone="subdued">
-                View and manage your upcoming and past pricing campaigns.
-              </Text>
-            </BlockStack>
-          </Box>
-  
-          {loading ? (
-            <Box padding="400">
-              <InlineStack align="center">
-                <Spinner size="small" />
-              </InlineStack>
-            </Box>
-          ) : (
-            <DataTable
-              columnContentTypes={[
-                "text",
-                "text",
-                "text",
-                "text",
-              ]}
-              headings={[
-                "Title",
-                "Run Time",
-                "Product Count",
-                "Status",
-              ]}
-              rows={jobs.map((job) => [
-                job.title,
-                formatDate(job.runAt),
-  
-                <Button
-                  key={`${job.id}-products`}
-                  variant="plain"
-                  onClick={() => setSelectedJob(job)}
-                >
-                  {`${job.productCount} Products`}
-                </Button>,
-  
-                getStatusBadge(job.status),
-              ])}
-            />
-          )}
-  
-        </BlockStack>
-      </Card>
-  
+      <Modal
+        open={open}
+        onClose={() => {
+          setSelectedJob(null);
+          onClose();
+        }}
+        title="Scheduled Pricing History"
+        size="large"
+      >
+        <Modal.Section>
+          <BlockStack gap="300">
+            <Text variant="bodySm" as="p" tone="subdued">
+              View and manage your upcoming and past pricing campaigns.
+            </Text>
+
+            {loading ? (
+              <Box padding="400">
+                <InlineStack align="center">
+                  <Spinner size="small" />
+                </InlineStack>
+              </Box>
+            ) : (
+              <DataTable
+                columnContentTypes={["text", "text", "text", "text"]}
+                headings={["Title", "Run Time", "Product Count", "Status"]}
+                rows={jobs.map((job) => [
+                  job.title,
+                  formatDate(job.runAt),
+                  <Button
+                    key={`${job.id}-products`}
+                    variant="plain"
+                    onClick={() => setSelectedJob(job)}
+                  >
+                    {`${job.productCount} Products`}
+                  </Button>,
+                  getStatusBadge(job.status),
+                ])}
+              />
+            )}
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+
       <Modal
         open={!!selectedJob}
         onClose={() => setSelectedJob(null)}
@@ -161,17 +162,9 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
         size="large"
       >
         <Modal.Section>
-  
-          {selectedJob?.products &&
-          selectedJob.products.length > 0 ? (
-  
+          {selectedJob?.products && selectedJob.products.length > 0 ? (
             <DataTable
-              columnContentTypes={[
-                "text",
-                "text",
-                "text",
-                "text",
-              ]}
+              columnContentTypes={["text", "text", "text", "text"]}
               headings={[
                 "Product",
                 "Variant",
@@ -181,31 +174,17 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
               rows={selectedJob.products.map((product) => [
                 product.title || "Untitled Product",
                 product.variantTitle || "Default Title",
-  
-                formatMoney(
-                  Number(product.oldPrice),
-                  currencyCode
-                ),
-  
-                formatMoney(
-                  Number(product.newPrice),
-                  currencyCode
-                ),
+                formatMoney(Number(product.oldPrice), currencyCode),
+                formatMoney(Number(product.newPrice), currencyCode),
               ])}
             />
-  
           ) : (
             <Box padding="400">
-              <Text
-                as="p"
-                tone="subdued"
-                alignment="center"
-              >
+              <Text as="p" tone="subdued" alignment="center">
                 No product details available for this schedule.
               </Text>
             </Box>
           )}
-  
         </Modal.Section>
       </Modal>
     </>
