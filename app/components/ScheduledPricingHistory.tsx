@@ -95,27 +95,7 @@ export function ScheduledPricingHistory({ currencyCode }: { currencyCode: string
     });
   };
 
-  const rowMarkup = jobs.map(
-    (job, index) => (
-      <IndexTable.Row id={job.id} key={job.id} position={index}>
-        <IndexTable.Cell>
-          <Text variant="bodyMd" fontWeight="bold" as="span">
-            {job.title}
-          </Text>
-        </IndexTable.Cell>
-        <IndexTable.Cell>{formatDate(job.runAt)}</IndexTable.Cell>
-        <IndexTable.Cell>
-          <Button
-            variant="tertiary"
-            onClick={() => setSelectedJob(job)}
-          >
-            {`${job.productCount} Products`}
-          </Button>
-        </IndexTable.Cell>
-        <IndexTable.Cell>{getStatusBadge(job.status)}</IndexTable.Cell>
-      </IndexTable.Row>
-    )
-  );
+
 
   return (
     <>
