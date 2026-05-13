@@ -142,7 +142,13 @@ export function startWorker() {
 
                 try {
                     // ── STEP 1: Fetch products from snapshot (or fallback) ──
-                    let itemsToProcess = [];
+                    let itemsToProcess: Array<{
+                        variantId: string;
+                        productId: string | null;
+                        stagedPrice: number;
+                        originalPrice: number;
+                        isManual: boolean;
+                    }> = [];
                     
                     if (job.products && Array.isArray(job.products) && job.products.length > 0) {
                         // Use frozen snapshot from schedule creation
@@ -150,7 +156,8 @@ export function startWorker() {
                             variantId: p.variantId,
                             productId: p.productId,
                             stagedPrice: Number(p.newPrice),
-                            originalPrice: Number(p.oldPrice)
+                            originalPrice: Number(p.oldPrice),
+                            isManual: p.isManual === true
                         }));
                     } else {
                         // Fallback: older jobs without snapshot read from StagedPrice
@@ -161,7 +168,8 @@ export function startWorker() {
                             variantId: p.variantId,
                             productId: p.productId,
                             stagedPrice: Number(p.stagedPrice),
-                            originalPrice: Number(p.originalPrice)
+                            originalPrice: Number(p.originalPrice),
+                            isManual: false
                         }));
                     }
 
@@ -252,6 +260,7 @@ export function startWorker() {
                                     variantId: item.variantId,
                                     oldPrice: item.originalPrice,
                                     newPrice: item.stagedPrice,
+                                    isManual: item.isManual === true,
                                     batchId,
                                 },
                             });

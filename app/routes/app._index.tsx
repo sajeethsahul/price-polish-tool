@@ -41,6 +41,7 @@ import {
   type PricingActionsPreviewItem,
 } from "../components/PricingActionsModal";
 import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
+import { calculatePrice } from "../utils/pricing";
 
 
 const BATCH_SIZE = 50;
@@ -243,6 +244,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [sortOrder, setSortOrder] = useState<string>("name_asc");
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
+  const [roundingStep, setRoundingStep] = useState(1);
+  const [charmPricing, setCharmPricing] = useState(true);
   const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
   const [applyMode, setApplyMode] = useState<ApplyMode>("");
   const [collectionId, setCollectionId] = useState("");
@@ -301,6 +304,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
       setRuleExists(data.ruleExists === true);
       setActiveMarkup(data.markupPercent ?? 0);
+      setRoundingStep(data.roundingStep ?? 1);
+      setCharmPricing(data.charmPricing ?? true);
       setMetrics(prev => ({
         ...prev,
         ...metricsData,
@@ -406,10 +411,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       // ── Auto-push when Live Pricing is Active ────────────────────────────
       if (metrics.isLive) {
+        const manualVariantIds = itemsWithFinalPrices
+          .filter((p) => p.isManual)
+          .map((p) => p.variantId);
         const pushRes = await fetch("/api/push-storefront", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clear: false }),
+          body: JSON.stringify({ clear: false, manualVariantIds }),
         });
 
         const pushData = await pushRes.json();
@@ -435,9 +443,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             (p) => p.variantId === item.variantId
           );
           if (!applied) return item;
+          const appliedPriceNum = Number(applied.newPrice);
+          const nextRulePrice = calculatePrice(
+            appliedPriceNum,
+            activeMarkup,
+            roundingStep,
+            charmPricing
+          );
           return {
             ...item,
             oldPrice: String(applied.newPrice),
+            newPrice: applied.isManual ? nextRulePrice.toFixed(2) : String(applied.newPrice),
             overriddenPrice: undefined,
           };
         })

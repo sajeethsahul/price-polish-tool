@@ -101,19 +101,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             const currentPrice = parseFloat(variant?.price ?? "0");
 
             const history = latestHistoryMap[variantId];
-            const basePrice = history ? history.oldPrice : currentPrice;
+            const historyOld = history ? parseFloat(String(history.oldPrice)) : NaN;
+            const historyNew = history ? parseFloat(String(history.newPrice)) : NaN;
 
-            let newPrice;
-            if (history?.isManual && currentPrice === history.newPrice) {
-                newPrice = currentPrice;
-            } else {
-                newPrice = calculatePrice(
-                    basePrice,
-                    markupPercent,
-                    roundingStep,
-                    charmPricing,
-                );
-            }
+            // Baseline rules:
+            // - Normal (rule-based) applies keep using the prior baseline (history.oldPrice) to avoid compounding.
+            // - Manual applies become the NEW storefront baseline once Shopify reflects the manual value.
+            const basePrice =
+                history &&
+                history.isManual === true &&
+                isFinite(historyNew) &&
+                currentPrice === historyNew
+                    ? currentPrice
+                    : (isFinite(historyOld) ? historyOld : currentPrice);
+
+            const newPrice = calculatePrice(
+                basePrice,
+                markupPercent,
+                roundingStep,
+                charmPricing,
+            );
 
             return {
                 productId: product.id,
@@ -136,6 +143,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         return cors(new Response(JSON.stringify({
             previews,
             markupPercent,
+            roundingStep,
+            charmPricing,
             ruleExists,
             lastUpdate,
         }), {

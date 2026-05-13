@@ -33,6 +33,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const body = await request.json().catch(() => ({}));
     console.log("BODY RECEIVED:", body);
     const clear = body.clear === true;
+    const normalizeId = (id: unknown) => String(id ?? "").split("/").pop() ?? "";
+    const manualVariantIds = Array.isArray(body.manualVariantIds) ? body.manualVariantIds : [];
+    const manualVariantIdSet = new Set<string>(manualVariantIds.map(normalizeId));
 
 
     
@@ -252,6 +255,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             variantId: item.variantId,
             oldPrice: item.originalPrice,
             newPrice: item.stagedPrice,
+            isManual: manualVariantIdSet.has(normalizeId(item.variantId)),
             batchId,
           },
         });

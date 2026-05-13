@@ -1,5 +1,4 @@
 import prisma from "../db.server";
-import { calculatePrice } from "./pricing";
 
 type ProductInput = {
   variantId: string;
@@ -71,7 +70,7 @@ export async function stagePrices(
     };
   }
 
-  // Per-item validation + calculation
+  // Per-item validation
   const stagedItems: StagedItem[] = [];
   const failedItems: FailedItem[] = [];
 
@@ -92,24 +91,11 @@ export async function stagePrices(
       continue;
     }
 
-    const stagedPrice = calculatePrice(
-      inputPrice,
-      rule.markupPercent,
-      rule.roundingStep,
-      rule.charmPricing
-    );
-
-    // Validate calculated price
-    if (!isFinite(stagedPrice) || stagedPrice <= 0) {
-      failedItems.push({ variantId: p.variantId, reason: `Invalid calculated price: ${stagedPrice}` });
-      continue;
-    }
-
     stagedItems.push({
       variantId: p.variantId,
       productId: p.productId,
       originalPrice: Number(p.oldPrice),
-      stagedPrice,
+      stagedPrice: inputPrice,
     });
   }
 
