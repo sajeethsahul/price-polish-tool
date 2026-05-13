@@ -127,30 +127,43 @@ export function ScheduledHistoryModal({
               View and manage your upcoming and past pricing campaigns.
             </Text>
 
-            {loading ? (
-              <Box padding="400">
-                <InlineStack align="center">
-                  <Spinner size="small" />
-                </InlineStack>
-              </Box>
-            ) : (
-              <DataTable
-                columnContentTypes={["text", "text", "text", "text"]}
-                headings={["Title", "Run Time", "Product Count", "Status"]}
-                rows={jobs.map((job) => [
-                  job.title,
-                  formatDate(job.runAt),
-                  <Button
-                    key={`${job.id}-products`}
-                    variant="plain"
-                    onClick={() => setSelectedJob(job)}
-                  >
-                    {`${job.productCount} Products`}
-                  </Button>,
-                  getStatusBadge(job.status),
-                ])}
-              />
-            )}
+            <Box minHeight="220px">
+              {loading ? (
+                <Box paddingBlockStart="600" paddingBlockEnd="600">
+                  <InlineStack align="center" blockAlign="center">
+                    <Spinner size="small" accessibilityLabel="Loading schedule history" />
+                  </InlineStack>
+                </Box>
+              ) : jobs.length === 0 ? (
+                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                      No scheduled campaigns yet
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      When you schedule pricing from Pricing Actions, upcoming and completed runs appear here.
+                    </Text>
+                  </BlockStack>
+                </Box>
+              ) : (
+                <DataTable
+                  columnContentTypes={["text", "text", "text", "text"]}
+                  headings={["Title", "Run Time", "Product Count", "Status"]}
+                  rows={jobs.map((job) => [
+                    job.title,
+                    formatDate(job.runAt),
+                    <Button
+                      key={`${job.id}-products`}
+                      variant="plain"
+                      onClick={() => setSelectedJob(job)}
+                    >
+                      {`${job.productCount} Products`}
+                    </Button>,
+                    getStatusBadge(job.status),
+                  ])}
+                />
+              )}
+            </Box>
           </BlockStack>
         </Modal.Section>
       </Modal>

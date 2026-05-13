@@ -255,38 +255,38 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                     <Card>
                         <BlockStack gap="200">
 
-                            <Text   as="span" variant="headingMd">Live Example</Text>
+                            <Text as="span" variant="headingMd">Live Example</Text>
 
                             <InlineStack align="space-between">
-                                <Text   as="span" tone="subdued">Base</Text>
-                                <Text   as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
+                                <Text as="span" tone="subdued">Base</Text>
+                                <Text as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
                             </InlineStack>
 
                             <InlineStack align="space-between">
-                                <Text   as="span" tone="subdued">+{safeMarkup}%</Text>
-                                <Text   as="span">{currencyCode} {markupApplied.toFixed(2)}</Text>
+                                <Text as="span" tone="subdued">+{safeMarkup}%</Text>
+                                <Text as="span">{currencyCode} {markupApplied.toFixed(2)}</Text>
                             </InlineStack>
 
                             <InlineStack align="space-between">
-                                <Text   as="span" tone="subdued">Rounded</Text>
-                                <Text   as="span">{currencyCode} {finalPrice.toFixed(2)}</Text>
+                                <Text as="span" tone="subdued">Rounded</Text>
+                                <Text as="span">{currencyCode} {finalPrice.toFixed(2)}</Text>
                             </InlineStack>
 
-                            <Text   as="span" variant="heading2xl" tone="success">
+                            <Text as="span" variant="heading2xl" tone="success">
                                 {currencyCode} {finalPrice.toFixed(2)}
                             </Text>
 
                             {loaderData.updatedAt && (
-                                <Text   as="span" tone="subdued">
+                                <Text as="span" tone="subdued">
                                     Last updated: {new Date(loaderData.updatedAt).toLocaleString()}
                                 </Text>
                             )}
 
                             <BlockStack gap="100">
-                                <Text   as="span" variant="headingSm">Recent Changes</Text>
+                                <Text as="span" variant="headingSm">Recent Changes</Text>
 
                                 {loaderData.history.map((h: any) => (
-                                    <Text   as="span" key={h.id} tone="subdued">
+                                    <Text as="span" key={h.id} tone="subdued">
                                         {h.markupPercent > 0 ? "+" : ""}{h.markupPercent}% • {h.roundingStep?.toFixed(2)}{h.charmPricing && " • .99"} • {new Date(h.createdAt).toLocaleDateString()}
                                     </Text>
                                 ))}

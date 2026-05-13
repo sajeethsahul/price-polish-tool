@@ -809,7 +809,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       <Page title="Price Polish Dashboard" fullWidth>
         <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
-          <BlockStack gap="500">
+          <BlockStack gap="400">
 
             {/* Debug Tools */}
             {SHOW_DEBUG_TOOLS && (
@@ -861,14 +861,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             {/* First Visit Welcome */}
             {firstVisit && (
               <Card>
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">Welcome to Price Polish! 🚀</Text>
-                  <Text as="p">Follow these simple steps to optimize your store pricing:</Text>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Welcome to Price Polish</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Follow these steps to optimize store pricing:</Text>
                   <Box paddingInlineStart="400">
-                    <BlockStack gap="200">
-                      <Text as="p">1️⃣ <strong>Configure:</strong> Set your markup and rounding rules in the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
-                      <Text as="p">2️⃣ <strong>Preview:</strong> Come back here to see how your new prices will look.</Text>
-                      <Text as="p">3️⃣ <strong>Apply:</strong> Review the changes and apply them safely (you can undo anytime).</Text>
+                    <BlockStack gap="150">
+                      <Text as="p" variant="bodySm"><strong>1. Configure:</strong> Set markup and rounding on the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
+                      <Text as="p" variant="bodySm"><strong>2. Preview:</strong> Return here to review calculated prices.</Text>
+                      <Text as="p" variant="bodySm"><strong>3. Apply:</strong> Push changes when ready; you can undo recent bulk updates.</Text>
                     </BlockStack>
                   </Box>
                 </BlockStack>
@@ -895,18 +895,22 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
             {/* Safety Info Banner */}
             <Banner tone="info">
-              <BlockStack gap="200">
-                <Text as="p">✔️ Safe to use — all changes can be undone anytime</Text>
-                <Text as="p">✔️ Your original prices are preserved and stored securely</Text>
-                <Text as="p">💡 <strong>Tip:</strong> The "Apply" button becomes disabled once your price is perfectly synced with your current Pricing Rules. Change your rules to reactivate it!</Text>
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyMd">Safe to use — all changes can be undone anytime.</Text>
+                <Text as="p" variant="bodyMd">Your original prices are preserved and stored securely.</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Tip: The Apply button is disabled when a row already matches your current pricing rules. Adjust rules or prices to enable it again.
+                </Text>
               </BlockStack>
             </Banner>
 
             {/* Live Mode Warning */}
             {metrics.isLive && (
               <Banner tone="warning">
-                <BlockStack gap="200">
-                  <Text as="p">⚠️ <strong>Live Pricing is ON:</strong> Any prices you "Apply" here will permanently change your Shopify database. Because your Live Rules are active, the storefront extension will apply its rules <strong>on top</strong> of these new prices. If you want the "Applied" price to be the final price, please stop Live Pricing or adjust your rules.</Text>
+                <BlockStack gap="100">
+                  <Text as="p" variant="bodyMd">
+                    <strong>Live Pricing is on.</strong> Applied prices update your Shopify catalog. With live rules active, the storefront may layer rules on top of those prices. Stop Live Pricing or adjust rules if you need the applied amount to be final.
+                  </Text>
                 </BlockStack>
               </Banner>
             )}
@@ -923,56 +927,57 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             )}
 
             {/* SAAS Metrics Grid */}
-            {previews.length > 0 && !loading && (
-              <Box paddingBlockEnd="400">
+            {/* Keep metrics visible during preview refresh to avoid layout jump */}
+            {previews.length > 0 && (
+              <Box paddingBlockEnd="300">
                 <Grid>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                    <div style={{ background: "linear-gradient(135deg, #f0fdf4, #dcfce7)", border: "1px solid #bbf7d0", borderRadius: 12 }}>
-                      <Card>
+                    <Card>
+                      <Box padding="300" background="bg-surface-success" borderRadius="200">
                         <BlockStack gap="100" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
-                          <Text as="h2" variant="headingLg" tone="success">
+                          <Text as="p" variant="headingLg" tone="success">
                             {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
                           </Text>
                         </BlockStack>
-                      </Card>
-                    </div>
+                      </Box>
+                    </Card>
                   </Grid.Cell>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                    <div style={{ background: "linear-gradient(135deg, #eff6ff, #dbeafe)", border: "1px solid #bfdbfe", borderRadius: 12 }}>
-                      <Card>
+                    <Card>
+                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
-                          <Text as="h2" variant="headingLg">
+                          <Text as="p" variant="headingLg">
                             {`${metrics.successRate.toFixed(1)}%`}
                           </Text>
                         </BlockStack>
-                      </Card>
-                    </div>
+                      </Box>
+                    </Card>
                   </Grid.Cell>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                    <div style={{ background: "linear-gradient(135deg, #faf5ff, #ede9fe)", border: "1px solid #ddd6fe", borderRadius: 12 }}>
-                      <Card>
+                    <Card>
+                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
-                          <Text as="h2" variant="headingLg">
+                          <Text as="p" variant="headingLg">
                             {metrics.totalApplied}
                           </Text>
                         </BlockStack>
-                      </Card>
-                    </div>
+                      </Box>
+                    </Card>
                   </Grid.Cell>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                    <div style={{ background: "linear-gradient(135deg, #f9fafb, #f3f4f6)", border: "1px solid #e5e7eb", borderRadius: 12 }}>
-                      <Card>
+                    <Card>
+                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
-                          <Text as="h2" variant="headingLg">
+                          <Text as="p" variant="headingLg">
                             {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
                           </Text>
                         </BlockStack>
-                      </Card>
-                    </div>
+                      </Box>
+                    </Card>
                   </Grid.Cell>
                 </Grid>
               </Box>
@@ -980,10 +985,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
             {/* UPDATED TASK 2: No Rules Warning Banner — shows when ruleExists is definitively false */}
             {!hasRules && ruleExists !== null && (
-              <Box paddingBlockStart="200" paddingBlockEnd="500">
+              <Box paddingBlockStart="100" paddingBlockEnd="400">
                 <Banner tone="warning" title="No Pricing Rules Found">
-                  <Box paddingBlockStart="200" paddingBlockEnd="200">
-                    <BlockStack gap="300">
+                  <Box paddingBlockStart="100" paddingBlockEnd="100">
+                    <BlockStack gap="200">
                       <p>
                         You must configure at least one pricing rule before applying changes or going live.
                       </p>
@@ -1001,63 +1006,78 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
             {/* ── TASK 3: Storefront Control Panel with Live Status Indicator ── */}
             {/* UPDATED Task 6: Opacity dimming when no rules */}
-            <Box paddingBlockEnd="400">
+            <Box paddingBlockEnd="300">
               <div style={{
                 opacity: !hasRules ? 0.6 : 1,
                 transition: "opacity 0.2s ease",
                 pointerEvents: !hasRules ? "none" : "auto",  // ADDED: block clicks at wrapper level too
               }}>
-                <Card>
-                  <InlineStack align="space-between" blockAlign="center" wrap={false}>
-                    <BlockStack gap="100">
-                      <InlineStack gap="200" blockAlign="center">
-                        <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
-                        <Tooltip content="This is a virtual overlay. It changes what customers see on your website instantly without changing your Shopify database.">
-                          <span style={{ cursor: "pointer", display: "inline-flex" }}>
-                            <Icon source={InfoIcon} tone="subdued" />
-                          </span>
-                        </Tooltip>
-                      </InlineStack>
-                      <Text as="p" variant="bodySm" tone="subdued">Choose when your dynamic pricing rules are active on the storefront. No permanent admin changes.</Text>
-                    </BlockStack>
-
-                    <InlineStack gap="300" blockAlign="center">
-                      {/* UPDATED TASK 3: Animated live status dot replaces static Badge */}
-                      <InlineStack gap="200" blockAlign="center">
-                        <span
-                          className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
-                          aria-hidden="true"
-                        />
-                        <Text as="span" variant="bodySm" fontWeight="semibold" tone={metrics.isLive ? "success" : "critical"}>
-                          {metrics.isLive ? "Live Pricing Active" : "Live Pricing Off"}
+                <Card padding="0">
+                  <Box
+                    padding="400"
+                    background="bg-surface-secondary"
+                    borderWidth="025"
+                    borderColor="border"
+                    borderRadius="300"
+                  >
+                    <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
+                      <BlockStack gap="100">
+                        <InlineStack gap="200" blockAlign="center">
+                          <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
+                          <Tooltip content="Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.">
+                            <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                              <Icon source={InfoIcon} tone="subdued" />
+                            </span>
+                          </Tooltip>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Turn live pricing on or off for the storefront. Catalog prices in Admin are unchanged until you apply updates from this app.
                         </Text>
-                      </InlineStack>
+                      </BlockStack>
 
-                      {/* UPDATED TASK 2 + 4 + 5: Show only one of Go Live / Stop Live. Guard on click. */}
-                      {metrics.isLive ? (
-                        // UPDATED Task 5: Stop → critical (red)
-                        <Button
-                          onClick={handleStopLiveClick}
-                          disabled={isProcessing || !hasRules}
-                          tone="critical"
-                          variant="primary"
-                        >
-                          Stop Live Prices
-                        </Button>
-                      ) : (
-                        // UPDATED Task 5: Go Live → success (green)
-                        <Button
-                          variant="primary"
-                          tone="success"
-                          onClick={handleGoLiveClick}
-                          loading={isProcessing}
-                          disabled={isProcessing || !hasRules}
-                        >
-                          Go Live on Storefront
-                        </Button>
-                      )}
+                      <BlockStack gap="300" inlineAlign="end">
+                        <Box paddingInlineEnd="0">
+                          <BlockStack gap="100" inlineAlign="end">
+                            <Text as="span" variant="bodySm" tone="subdued">
+                              Storefront status
+                            </Text>
+                            <InlineStack gap="200" blockAlign="center" wrap={false}>
+                              <span
+                                className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
+                                aria-hidden="true"
+                              />
+                              <Text as="span" variant="bodyMd" fontWeight="medium" tone={metrics.isLive ? "success" : "critical"}>
+                                {metrics.isLive ? "Live pricing active" : "Live pricing off"}
+                              </Text>
+                            </InlineStack>
+                          </BlockStack>
+                        </Box>
+
+                        <InlineStack gap="200" wrap={false}>
+                          {metrics.isLive ? (
+                            <Button
+                              onClick={handleStopLiveClick}
+                              disabled={isProcessing || !hasRules}
+                              tone="critical"
+                              variant="primary"
+                            >
+                              Stop Live Prices
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="primary"
+                              tone="success"
+                              onClick={handleGoLiveClick}
+                              loading={isProcessing}
+                              disabled={isProcessing || !hasRules}
+                            >
+                              Go Live on Storefront
+                            </Button>
+                          )}
+                        </InlineStack>
+                      </BlockStack>
                     </InlineStack>
-                  </InlineStack>
+                  </Box>
                 </Card>
               </div>
             </Box>
@@ -1066,12 +1086,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             {!loading && previews.length === 0 && (
               <Card>
                 <Box padding="500">
-                  <BlockStack gap="300" align="center">
-                    <Text as="h2" variant="headingMd">No products to polish yet</Text>
-                    <Text as="p" tone="subdued">
-                      We couldn't find any products that match your current rules. Try adjusting your settings or refreshing the data.
+                  <BlockStack gap="200" align="center">
+                    <Text as="h2" variant="headingMd">No preview products yet</Text>
+                    <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                      Refresh previews after configuring rules, or check that this app can access products in your catalog.
                     </Text>
-                    <Button variant="primary" tone="success" onClick={handlePreview}>Refresh Now</Button>
+                    <Button variant="primary" tone="success" onClick={handlePreview}>Refresh previews</Button>
                   </BlockStack>
                 </Box>
               </Card>
@@ -1084,11 +1104,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               transition: "opacity 0.2s ease",
               pointerEvents: !hasRules ? "none" : "auto",
             }}>
-              <Box paddingBlockEnd="400">
-                <BlockStack gap="300">
+              <Box paddingBlockEnd="300">
+                <BlockStack gap="200">
                       {/* 🔹 1. ACTION BAR CARD */}
                       <Card>
-                        <BlockStack gap="300">
+                        <BlockStack gap="200">
                           <InlineStack gap="400" align="start" blockAlign="center" wrap>
                             {/* Operations: refresh + apply */}
                             <InlineStack gap="200" align="start" blockAlign="center" wrap>
@@ -1182,12 +1202,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           {/* Processing progress */}
                           {isProcessing && (
                             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                              <BlockStack gap="300" align="center">
+                              <BlockStack gap="200" align="center">
                                 <InlineStack gap="300" blockAlign="center" align="center">
                                   <Spinner size="small" />
-                                  <Text as="p" variant="bodyMd" fontWeight="bold">Processing price updates...</Text>
+                                  <Text as="p" variant="bodyMd" fontWeight="medium">Processing price updates…</Text>
                                 </InlineStack>
-                                <Text as="p" tone="subdued" variant="bodySm">Please do not close this window or navigate away.</Text>
+                                <Text as="p" tone="subdued" variant="bodySm">Keep this page open until processing finishes.</Text>
                                 <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
                               </BlockStack>
                             </Box>
@@ -1197,18 +1217,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                       {/* 🔹 2. FILTER CARD */}
                       <Card>
-                        <BlockStack gap="300">
+                        <BlockStack gap="200">
                           <Text as="h3" variant="headingMd">Filters & Smart Segments</Text>
 
-                          <InlineStack gap="200">
+                          <InlineStack gap="200" wrap>
                             <Button pressed={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All</Button>
                             <Button pressed={activeFilter === "increase"} onClick={() => setActiveFilter("increase")}>Price Increase</Button>
                             <Button pressed={activeFilter === "decrease"} onClick={() => setActiveFilter("decrease")}>Price Decrease</Button>
                             <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
                           </InlineStack>
 
-                          <InlineStack gap="300" wrap={false} align="start">
-                            <div style={{ flex: 1, minWidth: "180px" }}>
+                          <InlineStack gap="300" wrap align="start">
+                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
                               <TextField
                                 label="Search Products"
                                 value={searchQuery}
@@ -1218,7 +1238,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 maxLength={100}
                               />
                             </div>
-                            <div style={{ flex: 1, minWidth: "180px" }}>
+                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
                               <Select
                                 label="Sort by"
                                 options={[
@@ -1233,7 +1253,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 onChange={setSortOrder}
                               />
                             </div>
-                            <div style={{ flex: 1, minWidth: "180px" }}>
+                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
                               <TextField
                                 label="Min Price"
                                 type="text"
@@ -1245,7 +1265,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 maxLength={15}
                               />
                             </div>
-                            <div style={{ flex: 1, minWidth: "180px" }}>
+                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
                               <TextField
                                 label="Max Price"
                                 type="text"
@@ -1263,9 +1283,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                       {/* 🔹 3. PRODUCT GRID CARD */}
                       <Card>
-                        <BlockStack gap="300">
-                          <InlineStack align="space-between">
-                            <InlineStack gap="300" blockAlign="center">
+                        <BlockStack gap="200">
+                          <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
+                            <InlineStack gap="300" blockAlign="center" wrap>
                               <Text as="h3" variant="headingMd">Products</Text>
                               <Button size="slim" onClick={selectAllVisible}>Select All on Page</Button>
                               <Button size="slim" onClick={() => setSelectedItems(new Set())}>Clear Selection</Button>
@@ -1280,7 +1300,21 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           </InlineStack>
 
                           {/* Product rows */}
-                          <BlockStack gap="200">
+                          <BlockStack gap="0">
+                            {previews.length > 0 && filteredPreviews.length === 0 && (
+                              <Box paddingBlockEnd="400">
+                                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                                  <BlockStack gap="100">
+                                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                                      No products match your filters
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Adjust search, price range, or smart segment filters. Clear filters to see all preview products again.
+                                    </Text>
+                                  </BlockStack>
+                                </Box>
+                              </Box>
+                            )}
                             {paginatedPreviews.map((p) => {
                               const currentPrice = parseFloat(p.oldPrice);
                               const originalPrice = parseFloat(p.originalBasePrice);
@@ -1292,15 +1326,27 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               const isSelected = selectedItems.has(p.variantId);
 
                               return (
-                                <Box key={p.variantId} padding="300" borderBlockEndWidth="025">
-                                  <Box background={isManual ? "bg-surface-caution" : undefined}>
+                                <Box
+                                  key={p.variantId}
+                                  paddingBlockStart="400"
+                                  paddingBlockEnd="400"
+                                  paddingInline="300"
+                                  borderBlockEndWidth="025"
+                                  borderColor="border-secondary"
+                                >
+                                  <Box
+                                    background={isManual ? "bg-surface-caution" : undefined}
+                                    padding="200"
+                                    borderRadius="200"
+                                  >
 
                                     <div style={{
                                       display: "flex",
                                       justifyContent: "space-between",
-                                      alignItems: "center",
+                                      alignItems: "flex-start",
                                       gap: "16px",
-                                      width: "100%", flexWrap: "nowrap"
+                                      width: "100%",
+                                      flexWrap: "wrap",
                                     }}
                                     >
                                       {/* LEFT SIDE */}
@@ -1323,15 +1369,16 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                         <Thumbnail source={p.image || ""} alt={p.title} size="small" />
 
                                         <BlockStack gap="100">
-                                          <Text as="span" variant="bodyMd" fontWeight="bold">
+                                          <Text as="span" variant="bodyMd" fontWeight="medium">
                                             {p.title}
                                           </Text>
 
                                           <div
                                             style={{
                                               display: "flex",
-                                              gap: "8px",
+                                              gap: "6px",
                                               flexWrap: "wrap",
+                                              opacity: 0.92,
                                             }}
                                           >
                                             {isChanged ? (
@@ -1345,15 +1392,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                             )}
 
                                             {isPolished && (
-                                              <Badge tone="success">Currently Polished</Badge>
+                                              <Badge tone="success">Polished</Badge>
                                             )}
 
                                             {isManual && (
-                                              <Badge tone="attention">Manual Override</Badge>
+                                              <Badge tone="attention">Manual override</Badge>
                                             )}
 
                                             {Math.abs(diffFromOriginal) >= 10 && (
-                                              <Badge tone="warning">High Impact</Badge>
+                                              <Badge tone="warning">High impact</Badge>
                                             )}
                                           </div>
                                         </BlockStack>
@@ -1366,10 +1413,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                           alignItems: "center",
                                           gap: "12px",
                                           flexShrink: 0,
-                                          whiteSpace: "nowrap",
+                                          flexWrap: "wrap",
+                                          justifyContent: "flex-end",
+                                          fontVariantNumeric: "tabular-nums",
                                         }}
                                       >
-                                        <BlockStack gap="0">
+                                        <BlockStack gap="100" inlineAlign="end">
                                           <Text as="span" variant="bodySm" tone="subdued">
                                             Original:{" "}
                                             {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
@@ -1377,6 +1426,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                                           <Text
                                             as="span"
+                                            variant="bodySm"
                                             tone="subdued"
                                             textDecorationLine={
                                               isPolished || isChanged ? "line-through" : undefined
@@ -1386,7 +1436,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                           </Text>
                                         </BlockStack>
 
-                                        <Box width="90px">
+                                        <Box width="92px" minWidth="88px">
                                           <TextField
                                             label=""
                                             labelHidden
@@ -1406,8 +1456,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                         {(isPolished || isChanged) && (
                                           <Text
                                             as="span"
+                                            variant="bodySm"
                                             tone={targetPrice > originalPrice ? "success" : "caution"}
-                                            fontWeight="bold"
+                                            fontWeight="medium"
                                           >
                                             {`${targetPrice > originalPrice ? "+" : ""}${diffFromOriginal.toFixed(
                                               1
@@ -1484,8 +1535,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           </InlineStack>
 
                           {!hasActivePlan && (
-                            <Text as="p" tone="critical">
-                              🔒 Start your free trial to apply pricing changes
+                            <Text as="p" variant="bodySm" tone="critical">
+                              Start your free trial to apply pricing changes from this dashboard.
                             </Text>
                           )}
                         </BlockStack>
