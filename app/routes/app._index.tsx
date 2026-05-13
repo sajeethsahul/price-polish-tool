@@ -25,7 +25,14 @@ import {
   Icon,
   SkeletonPage,
 } from "@shopify/polaris";
-import { InfoIcon } from "@shopify/polaris-icons";
+import {
+  InfoIcon,
+  RefreshIcon,
+  SettingsIcon,
+  CalendarTimeIcon,
+  ArrowDownIcon,
+  UndoIcon,
+} from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
 import {
@@ -1082,20 +1089,21 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       {/* 🔹 1. ACTION BAR CARD */}
                       <Card>
                         <BlockStack gap="300">
-                          <InlineStack gap="300" align="start">
-                            {/* Refresh is always available regardless of rules */}
-                            <div style={{ pointerEvents: "auto" }}>
-                              <Button
-                                onClick={handlePreview}
-                                loading={loading}
-                                disabled={loading || isProcessing}
-                              >
-                                Refresh Previews
-                              </Button>
-                            </div>
+                          <InlineStack gap="400" align="start" blockAlign="center" wrap>
+                            {/* Operations: refresh + apply */}
+                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
+                              <div style={{ pointerEvents: "auto" }}>
+                                <Button
+                                  variant="plain"
+                                  icon={RefreshIcon}
+                                  onClick={handlePreview}
+                                  loading={loading}
+                                  disabled={loading || isProcessing}
+                                >
+                                  Refresh Previews
+                                </Button>
+                              </div>
 
-                            {/* UPDATED TASK 1: All action buttons disabled + guarded when no rules */}
-                            <>
                               <Button
                                 variant="primary"
                                 tone="success"
@@ -1109,46 +1117,66 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               </Button>
 
                               <Button
-                                variant="primary"
-                                tone="success"
+                                variant="secondary"
                                 onClick={handleApplySelected}
                                 disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
                               >
                                 {`Apply Selected (${selectedItems.size})`}
                               </Button>
+                            </InlineStack>
 
-                              <Button onClick={() => setPricingActionsModalOpen(true)}>
+                            {/* Workflow: modals */}
+                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
+                              <Button
+                                variant="secondary"
+                                icon={SettingsIcon}
+                                onClick={() => setPricingActionsModalOpen(true)}
+                              >
                                 Pricing Actions
                               </Button>
 
-                              <Button onClick={() => setScheduleHistoryModalOpen(true)}>
+                              <Button
+                                variant="secondary"
+                                icon={CalendarTimeIcon}
+                                onClick={() => setScheduleHistoryModalOpen(true)}
+                              >
                                 Schedule History
                               </Button>
+                            </InlineStack>
 
+                            {/* Utility: report + undo */}
+                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
                               {previews.length === 0 ? (
                                 <Tooltip content="Please refresh previews to generate the latest report.">
-                                  <span style={{ display: 'inline-block' }}>
-                                    <Button variant="secondary" disabled>Download Impact Report</Button>
+                                  <span style={{ display: "inline-block" }}>
+                                    <Button variant="plain" icon={ArrowDownIcon} disabled>
+                                      Download Impact Report
+                                    </Button>
                                   </span>
                                 </Tooltip>
                               ) : (
-                                <Button variant="secondary" onClick={handleDownloadReport}>
+                                <Button
+                                  variant="plain"
+                                  icon={ArrowDownIcon}
+                                  onClick={handleDownloadReport}
+                                >
                                   Download Impact Report
                                 </Button>
                               )}
 
                               {lastUpdate && (
                                 <Button
-                                  variant="primary"
+                                  variant="secondary"
+                                  tone="critical"
+                                  icon={UndoIcon}
                                   onClick={handleUndo}
                                   loading={isProcessing}
                                   disabled={isProcessing || !lastUpdate.batchId}
-                                  tone="critical"
                                 >
                                   Undo Last Update
                                 </Button>
                               )}
-                            </>
+                            </InlineStack>
                           </InlineStack>
 
                           {/* Processing progress */}
