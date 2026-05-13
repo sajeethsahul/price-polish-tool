@@ -295,7 +295,20 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Data received from parallel fetch");
 
       const fetchedPreviews = data.previews ?? [];
-      setPreviews(fetchedPreviews);
+      setPreviews((prev) => {
+        const overridesByVariantId = new Map<string, string>();
+        prev.forEach((item) => {
+          if (item.overriddenPrice !== undefined) {
+            overridesByVariantId.set(item.variantId, item.overriddenPrice);
+          }
+        });
+
+        return (fetchedPreviews as PreviewItem[]).map((item: PreviewItem) => {
+          const overriddenPrice = overridesByVariantId.get(item.variantId);
+          if (overriddenPrice === undefined) return item;
+          return { ...item, overriddenPrice };
+        });
+      });
       setLastUpdate(data.lastUpdate ?? null);
       // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
       console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
@@ -354,10 +367,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const handleApplyBatch = useCallback(async (
     itemsToUpdate: PreviewItem[],
-  ) => {
+  ): Promise<boolean> => {
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules first", { isError: true });
-      return;
+      return false;
     }
 
     setIsProcessing(true);
@@ -370,7 +383,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       if (scopedItems.length === 0) {
         shopify.toast.show("No products to apply", { isError: true });
-        return;
+        return false;
       }
 
       const itemsWithFinalPrices = scopedItems.map(item => ({
@@ -429,8 +442,26 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       }
       // ─────────────────────────────────────────────────────────────────────
 
+      setPreviews((prev) =>
+        prev.map((item) => {
+          const applied = itemsWithFinalPrices.find(
+            (p) => p.variantId === item.variantId
+          );
+          if (!applied) return item;
+          return {
+            ...item,
+            oldPrice: String(applied.newPrice),
+            overriddenPrice: undefined,
+          };
+        })
+      );
+
+      setIsModalOpen(false);
+
+      return true;
     } catch (error: any) {
       shopify.toast.show(error.message || "Apply failed", { isError: true });
+      return false;
     } finally {
       setIsProcessing(false);
     }
@@ -1551,7 +1582,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           title="Confirm Bulk Update"
           primaryAction={{
             content: 'Apply Changes',
-            onAction: () => handleApplyBatch(previews),
+            onAction: () => { void handleApplyBatch(previews); },
             loading: isProcessing,
             disabled: isProcessing
           }}

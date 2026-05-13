@@ -40,9 +40,7 @@ export interface PricingActionsModalProps {
   hasActivePlan: boolean;
   hasRules: boolean;
   collectionId: string;
-  onApplyBatch: (
-    items: PricingActionsPreviewItem[]
-  ) => void | Promise<void>;
+  onApplyBatch: (items: PricingActionsPreviewItem[]) => boolean | Promise<boolean>;
   shopify: {
     toast: {
       show: (message: string, options?: { isError?: boolean }) => void;
@@ -120,8 +118,8 @@ export function PricingActionsModal({
                 }
                 setIsSubmitting(true);
                 try {
-                  await onApplyBatch(scopedItems);
-                  onClose();
+                  const ok = await onApplyBatch(scopedItems);
+                  if (ok) onClose();
                 } finally {
                   setIsSubmitting(false);
                 }
