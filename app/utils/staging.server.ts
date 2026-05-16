@@ -14,6 +14,7 @@ type StagedItem = {
   productId: string;
   originalPrice: number;
   stagedPrice: number;
+  isManual: boolean;
 };
 
 type FailedItem = {
@@ -44,7 +45,8 @@ type StagingResult = {
  */
 export async function stagePrices(
   shop: string,
-  products: ProductInput[]
+  products: ProductInput[],
+  campaignId?: string
 ): Promise<StagingResult> {
   const emptyResult: StagingResult = {
     success: false,
@@ -96,6 +98,7 @@ export async function stagePrices(
       productId: p.productId,
       originalPrice: Number(p.oldPrice),
       stagedPrice: inputPrice,
+      isManual: p.isManual === true,
     });
   }
 
@@ -107,10 +110,15 @@ export async function stagePrices(
       productId: item.productId,
       originalPrice: item.originalPrice,
       stagedPrice: item.stagedPrice,
+      campaignId,
+      isManual: item.isManual,
     }));
 
-    // Replace all existing staged prices for this shop with the new set
-    await prisma.stagedPrice.deleteMany({ where: { shop } });
+    // Replace staged prices within the campaign when provided; otherwise keep
+    // the legacy shop-wide staging behavior unchanged.
+    await prisma.stagedPrice.deleteMany({
+      where: campaignId ? { shop, campaignId } : { shop },
+    });
     await prisma.stagedPrice.createMany({ data: rows });
   }
 

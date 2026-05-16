@@ -8,8 +8,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const body = await request.json();
 
   const products = body?.products || [];
+  const campaignId =
+    typeof body?.campaignId === "string" && body.campaignId.length > 0
+      ? body.campaignId
+      : undefined;
 
-  const result = await stagePrices(session.shop, products);
+  const result = await stagePrices(session.shop, products, campaignId);
 
   if (!result.success) {
     return new Response(
@@ -29,6 +33,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         stagedOnly: true,
         stagedCount: result.successCount,
         failedCount: result.failedCount,
+        ...(campaignId ? { campaignId } : {}),
         message: result.message,
       })
     );
@@ -38,5 +43,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     success: true,
     stagedCount: result.successCount,
     failedCount: result.failedCount,
+    ...(campaignId ? { campaignId } : {}),
   }));
 };

@@ -6,6 +6,7 @@ import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    console.log("[PREVIEW] Route started");
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
@@ -28,6 +29,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const markupPercent = rule?.markupPercent ?? 10;
         const charmPricing = rule?.charmPricing ?? true;
         const roundingStep = rule?.roundingStep ?? 1;
+
+        console.log("[PREVIEW] Fetching Shopify products");
+                    console.log("[PREVIEW] Rule loaded:", {
+                    hasRule: rule !== null,
+                    markupPercent,
+                    roundingStep,
+                    charmPricing,
+                    });
 
         const response = await admin.graphql(`
         {
@@ -56,6 +65,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const data: any = await response.json();
 
+            console.log("[PREVIEW] Shopify response received");
+            console.log("[PREVIEW] GraphQL top-level keys:", Object.keys(data || {}));
+
+            if (!data?.data?.products) {
+            console.error("[PREVIEW] Missing products payload:", JSON.stringify(data, null, 2));
+            }
+
+
         console.log(`DEBUG BACKEND: GraphQL response status: ${response.status} for shop: ${shop}`);
         if (data.errors) {
             console.error("DEBUG BACKEND ERRORS: Shopify returned GraphQL errors:", JSON.stringify(data.errors, null, 2));
@@ -77,10 +94,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             .map((p: any) => p.variants.nodes[0]?.id)
             .filter(Boolean);
 
+            console.log("[PREVIEW] Loading price history");
+console.log("[PREVIEW] Variant IDs count:", variantIds.length);
+
         const histories = await prisma.priceHistory.findMany({
             where: { variantId: { in: variantIds }, shop },
             orderBy: { createdAt: "desc" },
         });
+
+        console.log("[PREVIEW] Price history loaded");
+console.log("[PREVIEW] History rows:", histories.length);
 
         // Create a map for the LATEST history per variant
         const latestHistoryMap: Record<string, any> = {};
@@ -94,6 +117,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             where: { shop },
             orderBy: { createdAt: "desc" },
         });
+
+        console.log("[PREVIEW] Last update loaded:", !!lastUpdate);
 
         const previews = nodes.map((product: any) => {
             const variant = product.variants.nodes[0];
@@ -140,6 +165,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         console.log("RETURNING PRODUCTS:", previews.length, "| ruleExists:", ruleExists);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
+        console.log("[PREVIEW] Returning success response");
+console.log("[PREVIEW] Preview count:", previews.length);
+console.log("[PREVIEW] ruleExists:", ruleExists);
+
         return cors(new Response(JSON.stringify({
             previews,
             markupPercent,
@@ -150,9 +179,33 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }), {
             headers: { "Content-Type": "application/json" },
         }));
-    } catch (error: any) {
-        await logActivity(shop, "ERROR", { action: "PREVIEW_LOAD", message: error.message });
-        return cors(new Response(JSON.stringify({ error: "Failed to load preview data" }), {
+    }   catch (error: any) {
+
+        console.error("[PREVIEW] ROOT ERROR:", error);
+    
+        console.error(
+            "[PREVIEW] ROOT ERROR MESSAGE:",
+            error instanceof Error ? error.message : error
+        );
+    
+        console.error(
+            "[PREVIEW] ROOT ERROR STACK:",
+            error instanceof Error ? error.stack : "no-stack"
+        );
+    
+        try {
+            await logActivity(shop, "ERROR", {
+                action: "PREVIEW_LOAD",
+                message: error?.message || "unknown-error",
+            });
+        } catch (logError) {
+            console.error("[PREVIEW] logActivity failed:", logError);
+        }
+    
+        return cors(new Response(JSON.stringify({
+            error: "Failed to load preview data",
+            debug: error?.message || "unknown-error"
+        }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
         }));

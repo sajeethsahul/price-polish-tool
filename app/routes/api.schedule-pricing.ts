@@ -23,9 +23,11 @@ export async function action({ request }: ActionFunctionArgs) {
     // If products are provided, stage them. If not, verify existing staged prices.
     let stagedCount = 0;
     let failedCount = 0;
+    let campaignId: string | undefined;
 
     if (Array.isArray(products) && products.length > 0) {
-        const stageResult = await stagePrices(shop, products);
+        campaignId = crypto.randomUUID();
+        const stageResult = await stagePrices(shop, products, campaignId);
 
         console.log(
             `[Schedule] Auto-staged ${stageResult.successCount} price(s) for shop ${shop}` +
@@ -66,6 +68,7 @@ export async function action({ request }: ActionFunctionArgs) {
     await prisma.scheduledJob.create({
         data: {
             shop,
+            campaignId,
             runAt: new Date(runAt),
             title: title || "Scheduled Campaign",
             productCount: products ? products.length : 0,
@@ -73,5 +76,18 @@ export async function action({ request }: ActionFunctionArgs) {
         },
     });
 
-    return json({ success: true, stagedCount, failedCount });
+    if (campaignId) {
+        await prisma.campaign.create({
+            data: {
+                id: campaignId,
+                shop,
+                title: title || "Scheduled Campaign",
+                status: "scheduled",
+                runAt: new Date(runAt),
+                source: "schedule",
+            },
+        });
+    }
+
+    return json({ success: true, stagedCount, failedCount, ...(campaignId ? { campaignId } : {}) });
 }
