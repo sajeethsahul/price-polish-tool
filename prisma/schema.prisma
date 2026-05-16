@@ -14,21 +14,21 @@ datasource db {
 }
 
 model Session {
-  id            String    @id
-  shop          String
-  state         String
-  isOnline      Boolean   @default(false)
-  scope         String?
-  expires       DateTime?
-  accessToken   String
-  userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
@@ -47,16 +47,38 @@ model PricingRule {
   updatedAt         DateTime @updatedAt
 }
 
-model PriceHistory {
-  id        String   @id @default(cuid())
+model Campaign {
+  id        String    @id @default(uuid())
   shop      String
-  productId String?
-  variantId String
-  oldPrice  Float
-  newPrice  Float
-  isManual  Boolean  @default(false) // NEW
-  batchId   String
-  createdAt DateTime @default(now())
+  title     String    @default("Pricing Campaign")
+  status    String    @default("draft")
+  runAt     DateTime?
+  source    String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([shop, status])
+  @@index([shop, runAt])
+}
+
+model PriceHistory {
+  id           String    @id @default(cuid())
+  shop         String
+  campaignId   String?
+  productId    String?
+  variantId    String
+  oldPrice     Float
+  newPrice     Float
+  isManual     Boolean   @default(false) // NEW
+  batchId      String
+  revertStatus String?
+  revertedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([shop, campaignId])
+  @@index([shop, batchId])
+  @@index([campaignId])
 }
 
 model ActivityLog {
@@ -71,7 +93,7 @@ model Subscription {
   id        String   @id @default(cuid())
   shop      String   @unique
   plan      String
-  status    String   // active | cancelled
+  status    String // active | cancelled
   chargeId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -85,36 +107,50 @@ model PricingRuleHistory {
   roundingStep  Float
   createdAt     DateTime @default(now())
 }
+
 model StagedPrice {
-  id          String   @id @default(uuid())
-  shop        String
-  variantId   String
-  productId String?
-  stagedPrice Float
+  id            String   @id @default(uuid())
+  shop          String
+  campaignId    String?
+  variantId     String
+  productId     String?
+  stagedPrice   Float
   originalPrice Float
-  createdAt   DateTime @default(now())
+  isManual      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([shop, campaignId])
+  @@index([campaignId])
+  @@index([shop, variantId])
 }
+
 model AppState {
-  shop   String @id
+  shop   String  @id
   isLive Boolean @default(false)
 }
+
 model PushJob {
-  id         String   @id @default(uuid())
-  shop       String
-  total      Int
-  processed  Int      @default(0)
-  success    Int      @default(0)
-  failed     Int      @default(0)
-  status     String   @default("running") // running | done
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  shop      String
+  total     Int
+  processed Int      @default(0)
+  success   Int      @default(0)
+  failed    Int      @default(0)
+  status    String   @default("running") // running | done
+  createdAt DateTime @default(now())
 }
+
 model ScheduledJob {
   id           String   @id @default(uuid())
   shop         String
+  campaignId   String?
   runAt        DateTime
   status       String   @default("pending")
   createdAt    DateTime @default(now())
   title        String   @default("Scheduled Campaign")
   productCount Int      @default(0)
   products     Json?
+
+  @@index([shop, campaignId])
+  @@index([campaignId])
 }
