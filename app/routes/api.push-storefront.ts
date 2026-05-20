@@ -36,6 +36,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const normalizeId = (id: unknown) => String(id ?? "").split("/").pop() ?? "";
     const manualVariantIds = Array.isArray(body.manualVariantIds) ? body.manualVariantIds : [];
     const manualVariantIdSet = new Set<string>(manualVariantIds.map(normalizeId));
+    const campaignId =
+      typeof body.campaignId === "string" && body.campaignId.length > 0
+        ? body.campaignId
+        : undefined;
+    const stagedWhere = campaignId ? { shop, campaignId } : { shop };
 
 
     
@@ -156,7 +161,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // 🔍 READ STAGED PRICES
     // ============================
     const staged = await prisma.stagedPrice.findMany({
-      where: { shop },
+      where: stagedWhere,
     });
 
     if (!staged.length) {
@@ -299,7 +304,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // mechanism from this point on. If every variant failed, staged data is preserved
     // so the user can retry Go Live without re-applying.
     if (successCount > 0) {
-      await prisma.stagedPrice.deleteMany({ where: { shop } });
+      await prisma.stagedPrice.deleteMany({ where: stagedWhere });
       console.log(`✅ StagedPrice cleared for shop ${shop} after successful Go Live (${successCount} applied)`);
     }
 

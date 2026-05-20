@@ -15,6 +15,7 @@ const STUCK_JOB_TIMEOUT_MINUTES = 15;
 type ClaimedJob = {
     id: string;
     shop: string;
+    campaignId?: string | null;
     runAt: Date;
     status: string;
     createdAt: Date;
@@ -69,7 +70,7 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
             LIMIT  1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, shop, "runAt", status, "createdAt", products
+        RETURNING id, shop, "campaignId", "runAt", status, "createdAt", products
     `;
     return result[0] ?? null;
 }
@@ -151,6 +152,7 @@ export function startWorker() {
                     }> = [];
                     
                     if (job.products && Array.isArray(job.products) && job.products.length > 0) {
+                        console.log(`[Worker] 📚 Job ${jobId} using snapshot products (${job.products.length})`);
                         // Use frozen snapshot from schedule creation
                         itemsToProcess = job.products.map((p: any) => ({
                             variantId: p.variantId,
@@ -159,7 +161,20 @@ export function startWorker() {
                             originalPrice: Number(p.oldPrice),
                             isManual: p.isManual === true
                         }));
+                    } else if (job.campaignId) {
+                        console.log(`[Worker] 🧭 Job ${jobId} using campaign-scoped staged fallback (campaignId=${job.campaignId})`);
+                        const staged = await prisma.stagedPrice.findMany({
+                            where: { shop, campaignId: job.campaignId },
+                        });
+                        itemsToProcess = staged.map(p => ({
+                            variantId: p.variantId,
+                            productId: p.productId,
+                            stagedPrice: Number(p.stagedPrice),
+                            originalPrice: Number(p.originalPrice),
+                            isManual: p.isManual === true
+                        }));
                     } else {
+                        console.log(`[Worker] 🧩 Job ${jobId} using legacy shop-wide staged fallback`);
                         // Fallback: older jobs without snapshot read from StagedPrice
                         const staged = await prisma.stagedPrice.findMany({
                             where: { shop },
