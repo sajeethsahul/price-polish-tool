@@ -235,6 +235,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
   const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
   const [message, setMessage] = useState<{ type: "success" | "critical" | "warning"; text: string; details?: string } | null>(null);
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -392,6 +393,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("Selected items:", selectedItems);
       console.log("Scoped items:", scopedItems);
       console.log("Sending payload:", itemsWithFinalPrices);
+      const campaignId = crypto.randomUUID();
 
       const response = await fetch("/api/staging-price", {
         method: "POST",
@@ -400,24 +402,37 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         },
         body: JSON.stringify({
           products: itemsWithFinalPrices,
+          campaignId,
         })
       });
 
       const result = await response.json();
+      const stagingCampaignId =
+        typeof result?.campaignId === "string" && result.campaignId.length > 0
+          ? result.campaignId
+          : null;
+      console.log("[Apply] staging campaignId received:", stagingCampaignId);
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to apply pricing");
       }
+
+      setActiveCampaignId(stagingCampaignId);
 
       // ── Auto-push when Live Pricing is Active ────────────────────────────
       if (metrics.isLive) {
         const manualVariantIds = itemsWithFinalPrices
           .filter((p) => p.isManual)
           .map((p) => p.variantId);
+        console.log("[Apply] push-storefront called with campaignId:", stagingCampaignId);
         const pushRes = await fetch("/api/push-storefront", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clear: false, manualVariantIds }),
+          body: JSON.stringify({
+            clear: false,
+            manualVariantIds,
+            ...(stagingCampaignId ? { campaignId: stagingCampaignId } : {}),
+          }),
         });
 
         const pushData = await pushRes.json();
@@ -649,10 +664,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     setShowStopModal(false);
 
     try {
+      const pushBody = {
+        clear,
+        ...(!clear && activeCampaignId ? { campaignId: activeCampaignId } : {}),
+      };
+      if (!clear) {
+        console.log("[Apply] push-storefront called with campaignId:", activeCampaignId);
+      }
       const res = await fetch("/api/push-storefront", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clear })
+        body: JSON.stringify(pushBody)
       });
 
       console.log(`DEBUG: /api/push-storefront status: ${res.status}`);
@@ -674,7 +696,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Finalizing handlePushStorefront processing state.");
       setIsProcessing(false);
     }
-  }, [shopify]);
+  }, [shopify, activeCampaignId]);
 
   const toggleSelection = (id: string) => {
     setSelectedItems(prev => {

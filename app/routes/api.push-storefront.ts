@@ -181,6 +181,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let successCount = 0;
     let failCount = 0;
     const failedItems: string[] = [];
+    let historyLineageLogged = false;
 
     // 🔥 CREATE JOB
     const job = await prisma.pushJob.create({
@@ -256,6 +257,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await prisma.priceHistory.create({
           data: {
             shop,
+            campaignId,
             productId: item.productId,
             variantId: item.variantId,
             oldPrice: item.originalPrice,
@@ -264,6 +266,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             batchId,
           },
         });
+
+        if (!historyLineageLogged) {
+          console.log(
+            campaignId
+              ? `[Push] PriceHistory written with campaignId=${campaignId}`
+              : "[Push] PriceHistory written via legacy batch-only lineage"
+          );
+          historyLineageLogged = true;
+        }
 
         successCount++;
 
