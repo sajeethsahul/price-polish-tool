@@ -74,6 +74,7 @@ model PriceHistory {
   batchId      String
   revertStatus String?
   revertedAt   DateTime?
+  revertFailureReason String?
   createdAt    DateTime  @default(now())
 
   @@index([shop, campaignId])

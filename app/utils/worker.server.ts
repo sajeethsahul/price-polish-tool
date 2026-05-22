@@ -271,6 +271,7 @@ export function startWorker() {
                             await prisma.priceHistory.create({
                                 data: {
                                     shop,
+                                    campaignId: job.campaignId ?? undefined,
                                     productId: item.productId,
                                     variantId: item.variantId,
                                     oldPrice: item.originalPrice,
@@ -300,6 +301,18 @@ export function startWorker() {
                             update: { isLive: true },
                             create: { shop, isLive: true },
                         });
+
+                        if (job.campaignId) {
+                            const nextCampaignStatus = failCount > 0 ? "partial" : "active";
+                            await prisma.campaign.updateMany({
+                                where: { id: job.campaignId, shop },
+                                data: { status: nextCampaignStatus },
+                            });
+                            console.log("[Worker] 🏷️ Campaign status transitioned", {
+                                campaignId: job.campaignId,
+                                status: nextCampaignStatus,
+                            });
+                        }
                     }
 
                     // ── STEP 5: Mark job done (processing → done) ─────────────

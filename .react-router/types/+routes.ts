@@ -14,10 +14,16 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/api/campaign-revert-preview": {
+    params: {};
+  };
   "/webhooks/app/scopes_update": {
     params: {};
   };
   "/webhooks/app/uninstalled": {
+    params: {};
+  };
+  "/api/campaign-history": {
     params: {};
   };
   "/api/schedule-history": {
@@ -99,7 +105,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/api/campaign-revert-preview" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/additional" | "/app/settings" | "/app/rules" | "/app/bulk" | "/app/help";
+  };
+  "routes/api.campaign-revert-preview.ts": {
+    id: "routes/api.campaign-revert-preview";
+    page: "/api/campaign-revert-preview";
   };
   "routes/webhooks.app.scopes_update.tsx": {
     id: "routes/webhooks.app.scopes_update";
@@ -108,6 +118,10 @@ type RouteFiles = {
   "routes/webhooks.app.uninstalled.tsx": {
     id: "routes/webhooks.app.uninstalled";
     page: "/webhooks/app/uninstalled";
+  };
+  "routes/api.campaign-history.ts": {
+    id: "routes/api.campaign-history";
+    page: "/api/campaign-history";
   };
   "routes/api.schedule-history.ts": {
     id: "routes/api.schedule-history";
@@ -217,8 +231,10 @@ type RouteFiles = {
 
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
+  "routes/api.campaign-revert-preview": typeof import("./app/routes/api.campaign-revert-preview.ts");
   "routes/webhooks.app.scopes_update": typeof import("./app/routes/webhooks.app.scopes_update.tsx");
   "routes/webhooks.app.uninstalled": typeof import("./app/routes/webhooks.app.uninstalled.tsx");
+  "routes/api.campaign-history": typeof import("./app/routes/api.campaign-history.ts");
   "routes/api.schedule-history": typeof import("./app/routes/api.schedule-history.ts");
   "routes/api.schedule-pricing": typeof import("./app/routes/api.schedule-pricing.ts");
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");

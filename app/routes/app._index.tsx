@@ -56,6 +56,49 @@ interface LastUpdateInfo {
   failedCount: number;
 }
 
+interface CampaignHistoryItem {
+  campaignId: string;
+  title: string;
+  status: string;
+  createdAt: string;
+  productCount: number;
+  source: string | null;
+  latestBatchId: string | null;
+  revertable: boolean;
+  unrecoverableReason: string | null;
+  revertedCount: number;
+  failedCount: number;
+  unrecoverableCount: number;
+  totalTrackedCount: number;
+}
+
+interface CampaignRevertPreviewRow {
+  variantId: string;
+  productTitle: string;
+  currentPrice: number | null;
+  revertTargetPrice: number;
+  status?: string;
+  revertFailureReason?: string | null;
+}
+
+interface CampaignRevertPreviewData {
+  campaignId: string | null;
+  title: string;
+  productCount: number;
+  latestBatchId: string | null;
+  rows: CampaignRevertPreviewRow[];
+  revertedCount?: number;
+  failedCount?: number;
+  unrecoverableCount?: number;
+  totalTrackedCount?: number;
+  terminal?: boolean;
+  message?: string | null;
+}
+
+function getDefaultApplyCampaignTitle() {
+  return `Manual Apply - ${new Date().toLocaleString()}`;
+}
+
 // ─── Animated Loader ───────────────────────────────────────────────────────
 const LOADER_MESSAGES = [
   "Counting your coins... 🪙",
@@ -235,7 +278,20 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
   const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
   const [message, setMessage] = useState<{ type: "success" | "critical" | "warning"; text: string; details?: string } | null>(null);
+  const [applyCampaignTitle, setApplyCampaignTitle] = useState(getDefaultApplyCampaignTitle());
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([]);
+  const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
+  const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
+  const [revertPreviewOpen, setRevertPreviewOpen] = useState(false);
+  const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
+  const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] = useState(false);
+  const [selectedCampaignForRevert, setSelectedCampaignForRevert] = useState<CampaignHistoryItem | null>(null);
+  const [revertPreview, setRevertPreview] = useState<CampaignRevertPreviewData | null>(null);
+  const [campaignDetailOpen, setCampaignDetailOpen] = useState(false);
+  const [campaignDetailLoading, setCampaignDetailLoading] = useState(false);
+  const [selectedCampaignForDetail, setSelectedCampaignForDetail] = useState<CampaignHistoryItem | null>(null);
+  const [campaignDetail, setCampaignDetail] = useState<CampaignRevertPreviewData | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -290,16 +346,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
     try {
       const fetcher = await appFetch;
+      console.log("[Campaign History UI] fetch started");
 
-      const [data, metricsData] = await Promise.all([
+      const [data, metricsData, campaignHistoryData] = await Promise.all([
         fetcher("/api/preview-price"),
-        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true }))
+        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true })),
+        fetcher("/api/campaign-history").catch(() => ({ campaigns: [] })),
       ]);
 
       console.log("DEBUG: Data received from parallel fetch");
 
       const fetchedPreviews = data.previews ?? [];
       setPreviews(fetchedPreviews);
+      console.log("[Operational Refresh] preview/grid refreshed", { count: fetchedPreviews.length });
       setLastUpdate(data.lastUpdate ?? null);
       // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
       console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
@@ -312,6 +371,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         ...metricsData,
         hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true
       }));
+      const campaigns = Array.isArray(campaignHistoryData?.campaigns) ? campaignHistoryData.campaigns : [];
+      setCampaignHistory(campaigns);
+      console.log("[Campaign History UI] loaded count:", campaigns.length);
+      console.log("[Campaign History UI] operational metrics rendered", { count: campaigns.length });
+      console.log("[Operational Refresh] campaign history refreshed", { count: campaigns.length });
 
       if (fetchedPreviews.length === 0) {
         setFirstVisit(true);
@@ -360,6 +424,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const handleApplyBatch = useCallback(async (
     itemsToUpdate: PreviewItem[],
+    campaignTitle?: string,
   ): Promise<boolean> => {
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules first", { isError: true });
@@ -394,6 +459,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("Scoped items:", scopedItems);
       console.log("Sending payload:", itemsWithFinalPrices);
       const campaignId = crypto.randomUUID();
+      const resolvedCampaignTitle =
+        typeof campaignTitle === "string" && campaignTitle.trim().length > 0
+          ? campaignTitle.trim()
+          : getDefaultApplyCampaignTitle();
+      console.log("[Apply] campaign title submitted:", resolvedCampaignTitle);
 
       const response = await fetch("/api/staging-price", {
         method: "POST",
@@ -403,6 +473,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         body: JSON.stringify({
           products: itemsWithFinalPrices,
           campaignId,
+          campaignTitle: resolvedCampaignTitle,
         })
       });
 
@@ -452,27 +523,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       }
       // ─────────────────────────────────────────────────────────────────────
 
-      setPreviews((prev) =>
-        prev.map((item) => {
-          const applied = itemsWithFinalPrices.find(
-            (p) => p.variantId === item.variantId
-          );
-          if (!applied) return item;
-          const appliedPriceNum = Number(applied.newPrice);
-          const nextRulePrice = calculatePrice(
-            appliedPriceNum,
-            activeMarkup,
-            roundingStep,
-            charmPricing
-          );
-          return {
-            ...item,
-            oldPrice: String(applied.newPrice),
-            newPrice: applied.isManual ? nextRulePrice.toFixed(2) : String(applied.newPrice),
-            overriddenPrice: undefined,
-          };
-        })
-      );
+      await handlePreview();
 
       setIsModalOpen(false);
 
@@ -483,7 +534,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     } finally {
       setIsProcessing(false);
     }
-  }, [hasRules, shopify, metrics.isLive]);
+  }, [hasRules, shopify, metrics.isLive, handlePreview]);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
     // Row-level apply — directly passes the single item to handleApplyBatch.
@@ -569,10 +620,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: /api/undo-price data received:", !!data);
 
       if (res.ok) {
-        setLastUpdate(null);
         if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
-        handlePreview();
+        await handlePreview();
         setSelectedItems(new Set());
       } else {
         throw new Error(data.error || "Failed to undo changes.");
@@ -586,6 +636,163 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setIsProcessing(false);
     }
   }, [applyMode, lastUpdate, shopify, handlePreview]);
+
+  const openCampaignDetailView = useCallback(async (campaign: CampaignHistoryItem) => {
+    console.log("[Campaign History UI] campaign detail view opened", {
+      campaignId: campaign.campaignId,
+      title: campaign.title,
+    });
+    setSelectedCampaignForDetail(campaign);
+    setCampaignDetailOpen(true);
+    setCampaignDetailLoading(true);
+    setCampaignDetail(null);
+    try {
+      const res = await fetch("/api/campaign-revert-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: campaign.campaignId,
+          ...(campaign.latestBatchId ? { batchId: campaign.latestBatchId } : {}),
+          includeAllStatuses: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load campaign details.");
+      }
+      setCampaignDetail(data);
+      console.log("[Campaign History UI] informational campaign detail loaded", {
+        campaignId: campaign.campaignId,
+        count: Array.isArray(data?.rows) ? data.rows.length : 0,
+      });
+    } catch (err) {
+      console.error("DEBUG: Campaign detail view error:", err);
+      if (shopify) shopify.toast.show("Failed to load campaign details", { isError: true });
+      else console.error("BYPASS: Failed to load campaign details");
+      setCampaignDetailOpen(false);
+      setSelectedCampaignForDetail(null);
+    } finally {
+      setCampaignDetailLoading(false);
+    }
+  }, [shopify]);
+
+  const openCampaignRevertPreview = useCallback(async (campaign: CampaignHistoryItem, retryFailedOnly = false) => {
+    if (!campaign.revertable) return;
+    console.log("[Campaign Revert] preview opened", { campaignId: campaign.campaignId, title: campaign.title });
+    setSelectedCampaignForRevert(campaign);
+    setRevertPreviewRetryFailedOnly(retryFailedOnly);
+    setRevertPreviewOpen(true);
+    setRevertPreviewLoading(true);
+    setRevertPreview(null);
+    try {
+      const res = await fetch("/api/campaign-revert-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: campaign.campaignId,
+          ...(campaign.latestBatchId ? { batchId: campaign.latestBatchId } : {}),
+          ...(retryFailedOnly ? { retryFailedOnly: true } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to load revert preview.");
+      }
+      setRevertPreview(data);
+      if (data?.terminal === true) {
+        console.log("[Campaign Revert] unrecoverable informational modal shown", {
+          campaignId: campaign.campaignId,
+          message: data?.message ?? null,
+        });
+      }
+    } catch (err) {
+      console.error("DEBUG: Campaign Revert Preview Error detail:", err);
+      if (shopify) shopify.toast.show("Failed to load revert preview", { isError: true });
+      else console.error("BYPASS: Failed to load revert preview");
+      setRevertPreviewOpen(false);
+      setSelectedCampaignForRevert(null);
+    } finally {
+      setRevertPreviewLoading(false);
+    }
+  }, [shopify]);
+
+  const confirmCampaignRevert = useCallback(async () => {
+    if (!selectedCampaignForRevert) return;
+    console.log("[Campaign Revert] confirmed", {
+      campaignId: selectedCampaignForRevert.campaignId,
+      title: selectedCampaignForRevert.title,
+    });
+    setIsProcessing(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/undo-price", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: selectedCampaignForRevert.campaignId,
+          ...(selectedCampaignForRevert.latestBatchId ? { batchId: selectedCampaignForRevert.latestBatchId } : {}),
+          ...(revertPreviewRetryFailedOnly ? { retryFailedOnly: true } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to revert campaign.");
+      }
+      const terminalReason = selectedCampaignForRevert?.unrecoverableReason;
+      if (data?.terminal === true) {
+        const terminalMessage = terminalReason
+          ? `This campaign can no longer be reverted because ${terminalReason.toLowerCase()}.`
+          : (data?.message || "This campaign can no longer be reverted.");
+        if (shopify) shopify.toast.show(terminalMessage, { isError: true });
+        else console.warn(`BYPASS: ${terminalMessage}`);
+      } else if (data?.message) {
+        const operationalMessage = terminalReason
+          ? `${data.message} Reason: ${terminalReason}.`
+          : data.message;
+        if (shopify) shopify.toast.show(operationalMessage);
+        else console.log(`BYPASS: ${operationalMessage}`);
+      } else if (data?.restoredCount > 0) {
+        if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
+        else console.log(`BYPASS: Restored ${data.restoredCount} products`);
+      } else {
+        const noRetryMessage = terminalReason
+          ? `No retryable revert actions remain because ${terminalReason.toLowerCase()}.`
+          : "No retryable revert actions remain.";
+        if (shopify) shopify.toast.show(noRetryMessage, { isError: true });
+        else console.warn(`BYPASS: ${noRetryMessage}`);
+      }
+      setRevertPreviewOpen(false);
+      setSelectedCampaignForRevert(null);
+      setRevertPreview(null);
+      setRevertPreviewRetryFailedOnly(false);
+      await handlePreview();
+    } catch (err) {
+      console.error("DEBUG: Campaign Revert Error detail:", err);
+      if (shopify) shopify.toast.show("Failed to revert campaign", { isError: true });
+      else console.error("BYPASS: Failed to revert campaign");
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [selectedCampaignForRevert, shopify, handlePreview, revertPreviewRetryFailedOnly]);
+
+  const handleRefreshCampaignHistory = useCallback(async () => {
+    setCampaignHistoryLoading(true);
+    console.log("[Campaign History UI] manual refresh started");
+    try {
+      const fetcher = await appFetch;
+      const campaignHistoryData = await fetcher("/api/campaign-history");
+      const campaigns = Array.isArray(campaignHistoryData?.campaigns) ? campaignHistoryData.campaigns : [];
+      setCampaignHistory(campaigns);
+      console.log("[Campaign History UI] manual refresh completed", { count: campaigns.length });
+      console.log("[Campaign History UI] operational metrics rendered", { count: campaigns.length });
+    } catch (error) {
+      console.error("DEBUG: Campaign History manual refresh failed:", error);
+      if (shopify) shopify.toast.show("Failed to refresh campaign history", { isError: true });
+      else console.error("BYPASS: Failed to refresh campaign history");
+    } finally {
+      setCampaignHistoryLoading(false);
+    }
+  }, [appFetch, shopify]);
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
     if (value.length > 15) return;
@@ -697,6 +904,44 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setIsProcessing(false);
     }
   }, [shopify, activeCampaignId]);
+
+  const campaignStatusTone = useCallback((status: string) => {
+    const normalized = status.toLowerCase();
+    if (normalized === "unrecoverable") return "critical" as const;
+    if (normalized === "active" || normalized === "done") return "success" as const;
+    if (normalized === "reverted") return "info" as const;
+    if (normalized === "scheduled" || normalized === "pending") return "warning" as const;
+    return "attention" as const;
+  }, []);
+
+  const detailStatusTone = useCallback((status?: string | null) => {
+    const normalized = (status ?? "pending").toLowerCase();
+    if (normalized === "reverted") return "success" as const;
+    if (normalized === "failed") return "warning" as const;
+    if (normalized === "unrecoverable") return "critical" as const;
+    return "attention" as const;
+  }, []);
+
+  const detailStatusLabel = useCallback((status?: string | null) => {
+    const normalized = (status ?? "pending").toLowerCase();
+    if (normalized === "reverted") return "Reverted";
+    if (normalized === "failed") return "Failed";
+    if (normalized === "unrecoverable") return "Unrecoverable";
+    return "Pending";
+  }, []);
+
+  const visibleCampaignHistory = useMemo(() => {
+    if (!hideClosedCampaigns) return campaignHistory;
+    const visible = campaignHistory.filter((campaign) => {
+      const status = campaign.status.toLowerCase();
+      return status !== "reverted" && status !== "unrecoverable";
+    });
+    console.log("[Campaign History UI] closed campaigns hidden", {
+      hiddenCount: campaignHistory.length - visible.length,
+      total: campaignHistory.length,
+    });
+    return visible;
+  }, [campaignHistory, hideClosedCampaigns]);
 
   const toggleSelection = (id: string) => {
     setSelectedItems(prev => {
@@ -1012,6 +1257,132 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               </Box>
             )}
 
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center" wrap>
+                  <Text as="h3" variant="headingMd">Campaign History</Text>
+                  <InlineStack gap="200" blockAlign="center" wrap={false}>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Operational history from campaign runs
+                    </Text>
+                    <Button
+                      size="slim"
+                      variant="tertiary"
+                      icon={RefreshIcon}
+                      loading={campaignHistoryLoading}
+                      disabled={campaignHistoryLoading}
+                      onClick={() => { void handleRefreshCampaignHistory(); }}
+                    >
+                      Refresh
+                    </Button>
+                  </InlineStack>
+                </InlineStack>
+
+                <Checkbox
+                  label="Hide Closed Campaigns"
+                  checked={hideClosedCampaigns}
+                  onChange={(checked) => {
+                    setHideClosedCampaigns(checked);
+                    console.log(
+                      checked
+                        ? "[Campaign History UI] closed campaigns hidden"
+                        : "[Campaign History UI] closed campaigns shown"
+                    );
+                  }}
+                />
+
+                {visibleCampaignHistory.length === 0 ? (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {campaignHistory.length === 0
+                      ? "No campaigns recorded yet."
+                      : "No campaigns match the current filter."}
+                  </Text>
+                ) : (
+                  <div style={{ maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
+                    <BlockStack gap="200">
+                      {visibleCampaignHistory.map((campaign) => (
+                        <Box
+                          key={campaign.campaignId}
+                          padding="300"
+                          background="bg-surface-secondary"
+                          borderRadius="200"
+                        >
+                          <InlineStack align="space-between" blockAlign="start" wrap>
+                            <BlockStack gap="100">
+                              <InlineStack gap="200" blockAlign="center" wrap>
+                                <Text as="p" variant="bodyMd" fontWeight="medium">
+                                  {campaign.title}
+                                </Text>
+                                <Badge tone={campaignStatusTone(campaign.status)}>
+                                  {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
+                                </Badge>
+                              </InlineStack>
+                              <InlineStack gap="300" wrap>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Source: {campaign.source || "unknown"}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Products: {campaign.productCount}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Created: {new Date(campaign.createdAt).toLocaleString()}
+                                </Text>
+                              </InlineStack>
+                              <Box padding="200" background="bg-surface" borderRadius="200">
+                                <InlineStack gap="200" wrap>
+                                  <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
+                                  <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
+                                  <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
+                                  <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                                </InlineStack>
+                              </Box>
+                              {campaign.unrecoverableReason && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  Reason: {campaign.unrecoverableReason}
+                                </Text>
+                              )}
+                            </BlockStack>
+
+                            <InlineStack gap="200" wrap={false}>
+                              <Button
+                                size="slim"
+                                variant="tertiary"
+                                onClick={() => { void openCampaignDetailView(campaign); }}
+                              >
+                                View
+                              </Button>
+                              {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
+                                <Button
+                                  size="slim"
+                                  variant="secondary"
+                                  disabled={isProcessing}
+                                  loading={isProcessing}
+                                  onClick={() => openCampaignRevertPreview(campaign, true)}
+                                >
+                                  Retry Failed Reverts
+                                </Button>
+                              )}
+                              {campaign.revertable && (
+                                <Button
+                                  size="slim"
+                                  tone="critical"
+                                  disabled={isProcessing}
+                                  loading={isProcessing}
+                                  onClick={() => openCampaignRevertPreview(campaign)}
+                                >
+                                  Revert
+                                </Button>
+                              )}
+                            </InlineStack>
+                          </InlineStack>
+                        </Box>
+                      ))}
+                    </BlockStack>
+                  </div>
+                )}
+              </BlockStack>
+            </Card>
+
             {/* UPDATED TASK 2: No Rules Warning Banner — shows when ruleExists is definitively false */}
             {!hasRules && ruleExists !== null && (
               <Box paddingBlockStart="100" paddingBlockEnd="400">
@@ -1158,6 +1529,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 tone="success"
                                 onClick={() => {
                                   if (guardNoRules()) return;
+                                  setApplyCampaignTitle(getDefaultApplyCampaignTitle());
                                   setIsModalOpen(true);
                                 }}
                                 disabled={!hasActivePlan || isProcessing || previews.length === 0 || !hasRules}
@@ -1606,6 +1978,199 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           currencyCode={currencyCode}
         />
 
+        <Modal
+          open={campaignDetailOpen}
+          onClose={() => {
+            setCampaignDetailOpen(false);
+            setCampaignDetail(null);
+            setSelectedCampaignForDetail(null);
+          }}
+          title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
+          secondaryActions={[{
+            content: "Close",
+            onAction: () => {
+              setCampaignDetailOpen(false);
+              setCampaignDetail(null);
+              setSelectedCampaignForDetail(null);
+            },
+          }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              {campaignDetailLoading ? (
+                <InlineStack align="center" blockAlign="center">
+                  <Spinner size="small" />
+                </InlineStack>
+              ) : campaignDetail ? (
+                <>
+                  <InlineStack gap="300" wrap>
+                    <Text as="p" variant="bodySm">
+                      <strong>Campaign:</strong> {campaignDetail.title}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      <strong>Tracked items:</strong> {campaignDetail.totalTrackedCount ?? campaignDetail.rows.length}
+                    </Text>
+                  </InlineStack>
+
+                  <InlineStack gap="200" wrap>
+                    <Badge tone="success">{`Reverted: ${campaignDetail.revertedCount ?? 0}`}</Badge>
+                    <Badge tone="warning">{`Failed: ${campaignDetail.failedCount ?? 0}`}</Badge>
+                    <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
+                  </InlineStack>
+
+                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                    <div style={{ maxHeight: 360, overflowY: "auto", overflowX: "auto" }}>
+                      <BlockStack gap="150">
+                        <InlineStack align="space-between" wrap={false}>
+                          <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
+                          <InlineStack gap="300" wrap={false}>
+                            <Text as="p" variant="bodySm" fontWeight="medium">Current Price</Text>
+                            <Text as="p" variant="bodySm" fontWeight="medium">Revert Target</Text>
+                            <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
+                          </InlineStack>
+                        </InlineStack>
+                        {campaignDetail.rows.map((row) => (
+                          <InlineStack key={`${row.variantId}-${row.revertTargetPrice}-${row.status ?? "pending"}`} align="space-between" blockAlign="start" wrap={false}>
+                            <BlockStack gap="0">
+                              <Text as="p" variant="bodySm">{row.productTitle}</Text>
+                              <Text as="p" variant="bodySm" tone="subdued">{row.variantId}</Text>
+                              {row.revertFailureReason && (
+                                <Text as="p" variant="bodySm" tone="subdued">{row.revertFailureReason}</Text>
+                              )}
+                            </BlockStack>
+                            <InlineStack gap="300" wrap={false} blockAlign="center">
+                              <Text as="p" variant="bodySm">
+                                {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
+                              </Text>
+                              <Text as="p" variant="bodySm" fontWeight="medium">
+                                {formatMoney(row.revertTargetPrice, currencyCode)}
+                              </Text>
+                              <Badge tone={detailStatusTone(row.status)}>
+                                {detailStatusLabel(row.status)}
+                              </Badge>
+                            </InlineStack>
+                          </InlineStack>
+                        ))}
+                      </BlockStack>
+                    </div>
+                  </Box>
+                </>
+              ) : (
+                <Text as="p" variant="bodySm" tone="subdued">
+                  No campaign detail data available.
+                </Text>
+              )}
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+
+        <Modal
+          open={revertPreviewOpen}
+          onClose={() => {
+            if (isProcessing) return;
+            setRevertPreviewOpen(false);
+            setSelectedCampaignForRevert(null);
+            setRevertPreview(null);
+            setRevertPreviewRetryFailedOnly(false);
+          }}
+          title={`${revertPreviewRetryFailedOnly ? "Retry Failed Reverts" : "Revert Campaign"}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
+          primaryAction={
+            revertPreview?.terminal
+              ? undefined
+              : {
+                content: revertPreviewRetryFailedOnly ? "Confirm Retry" : "Confirm Revert",
+                onAction: () => { void confirmCampaignRevert(); },
+                destructive: true,
+                loading: isProcessing,
+                disabled: isProcessing || revertPreviewLoading || !selectedCampaignForRevert,
+              }
+          }
+          secondaryActions={[{
+            content: "Cancel",
+            onAction: () => {
+              setRevertPreviewOpen(false);
+              setSelectedCampaignForRevert(null);
+              setRevertPreview(null);
+              setRevertPreviewRetryFailedOnly(false);
+            },
+          }]}
+        >
+          <Modal.Section>
+            <BlockStack gap="300">
+              {revertPreviewLoading ? (
+                <InlineStack align="center" blockAlign="center">
+                  <Spinner size="small" />
+                </InlineStack>
+              ) : revertPreview ? (
+                <>
+                  {revertPreview.message && (
+                    <Banner tone={revertPreview.terminal ? "warning" : "info"}>
+                      <p>{revertPreview.message}</p>
+                    </Banner>
+                  )}
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Review the current storefront prices against revert target prices before confirming.
+                  </Text>
+                  <InlineStack gap="300" wrap>
+                    <Text as="p" variant="bodySm">
+                      <strong>Campaign:</strong> {revertPreview.title}
+                    </Text>
+                    <Text as="p" variant="bodySm">
+                      <strong>Affected products:</strong> {revertPreview.productCount}
+                    </Text>
+                  </InlineStack>
+                  {selectedCampaignForRevert?.unrecoverableReason && (
+                    <Banner tone="warning">
+                      <p>{selectedCampaignForRevert.unrecoverableReason}</p>
+                    </Banner>
+                  )}
+                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                    <BlockStack gap="150">
+                      <InlineStack align="space-between">
+                        <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
+                        <InlineStack gap="300" wrap={false}>
+                          <Text as="p" variant="bodySm" fontWeight="medium">Current</Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">Revert Target</Text>
+                        </InlineStack>
+                      </InlineStack>
+                      {revertPreview.rows.slice(0, 12).map((row) => (
+                        <InlineStack key={`${row.variantId}-${row.revertTargetPrice}`} align="space-between" blockAlign="center">
+                          <BlockStack gap="0">
+                            <Text as="p" variant="bodySm">{row.productTitle}</Text>
+                            <Text as="p" variant="bodySm" tone="subdued">{row.variantId}</Text>
+                          </BlockStack>
+                          <InlineStack gap="300" wrap={false}>
+                            <Text as="p" variant="bodySm">
+                              {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
+                            </Text>
+                            <Text as="p" variant="bodySm" fontWeight="medium" tone="critical">
+                              {formatMoney(row.revertTargetPrice, currencyCode)}
+                            </Text>
+                          </InlineStack>
+                        </InlineStack>
+                      ))}
+                      {revertPreview.rows.length > 12 && (
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Showing first 12 of {revertPreview.rows.length} rows.
+                        </Text>
+                      )}
+                      {revertPreview.rows.some((row) => Boolean(row.revertFailureReason)) && (
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Some items include recovery notes from previous Shopify failures.
+                        </Text>
+                      )}
+                    </BlockStack>
+                  </Box>
+                </>
+              ) : (
+                <Text as="p" variant="bodySm" tone="subdued">
+                  No preview data available.
+                </Text>
+              )}
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
+
         {/* Apply All confirmation modal — unchanged handler */}
         <Modal
           open={isModalOpen}
@@ -1613,17 +2178,25 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
           title="Confirm Bulk Update"
           primaryAction={{
             content: 'Apply Changes',
-            onAction: () => { void handleApplyBatch(previews); },
+            onAction: () => { void handleApplyBatch(previews, applyCampaignTitle); },
             loading: isProcessing,
             disabled: isProcessing
           }}
           secondaryActions={[{ content: 'Cancel', onAction: () => setIsModalOpen(false) }]}
         >
           <Modal.Section>
-            <Text as="p">
-              You are about to update prices for <strong>{previews.length}</strong> products.
-              This action can be undone later using the "Undo Last Update" button.
-            </Text>
+            <BlockStack gap="300">
+              <Text as="p">
+                You are about to update prices for <strong>{previews.length}</strong> products.
+                This action can be undone later using the "Undo Last Update" button.
+              </Text>
+              <TextField
+                label="Campaign Name"
+                value={applyCampaignTitle}
+                onChange={setApplyCampaignTitle}
+                autoComplete="off"
+              />
+            </BlockStack>
           </Modal.Section>
         </Modal>
 

@@ -12,6 +12,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     typeof body?.campaignId === "string" && body.campaignId.length > 0
       ? body.campaignId
       : undefined;
+  const campaignTitle =
+    typeof body?.campaignTitle === "string" && body.campaignTitle.trim().length > 0
+      ? body.campaignTitle.trim()
+      : "Manual Apply Campaign";
 
   const result = await stagePrices(session.shop, products, campaignId);
 
@@ -25,6 +29,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const appState = await prisma.appState.findUnique({
     where: { shop: session.shop },
   });
+
+  if (campaignId) {
+    await prisma.campaign.upsert({
+      where: { id: campaignId },
+      update: { title: campaignTitle },
+      create: {
+        id: campaignId,
+        shop: session.shop,
+        title: campaignTitle,
+        status: "draft",
+        source: "apply",
+      },
+    });
+    console.log("[Apply] campaign title persisted", { campaignId, campaignTitle });
+  }
 
   if (!appState?.isLive) {
     return new Response(
