@@ -6,9 +6,11 @@ import { cors, handlePreflight } from "../utils/cors";
 type HistoryRow = {
   variantId: string;
   oldPrice: number;
+  newPrice: number;
   batchId: string;
   revertStatus: string | null;
   revertFailureReason: string | null;
+  revertedAt: Date | null;
 };
 
 function toVariantGid(variantId: string) {
@@ -110,9 +112,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       select: {
         variantId: true,
         oldPrice: true,
+        newPrice: true,
         batchId: true,
         revertStatus: true,
         revertFailureReason: true,
+        revertedAt: true,
       },
     });
 
@@ -215,6 +219,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
     }
 
+    let missingHistoricalRevertedFromCount = 0;
     const rows = history.map((h) => {
       const normalizedId = String(h.variantId).split("/").pop() ?? "";
       const current = currentByVariant.get(normalizedId);
@@ -226,10 +231,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             : h.revertStatus === "unrecoverable"
               ? "unrecoverable"
               : "pending";
+      const historicalRevertedFromPrice = Number.isFinite(h.newPrice) ? Number(h.newPrice) : null;
+      const shouldUseHistoricalMovement = includeAllStatuses && operationalStatus === "reverted";
+      const revertedFromPrice = shouldUseHistoricalMovement
+        ? historicalRevertedFromPrice
+        : current?.currentPrice ?? null;
+      if (shouldUseHistoricalMovement && revertedFromPrice == null) {
+        missingHistoricalRevertedFromCount += 1;
+      }
       return {
         variantId: h.variantId,
         productTitle: current?.productTitle ?? "Untitled Product",
-        currentPrice: current?.currentPrice,
+        currentPrice: revertedFromPrice,
         revertTargetPrice: Number(h.oldPrice),
         status: operationalStatus,
         revertFailureReason: h.revertFailureReason ?? null,
@@ -241,6 +254,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const failedCount = history.filter((row) => row.revertStatus === "failed").length;
     const unrecoverableCount = history.filter((row) => row.revertStatus === "unrecoverable").length;
     const totalTrackedCount = history.length;
+    const revertCompletedAt =
+      history
+        .filter((row) => row.revertStatus === "reverted" && row.revertedAt instanceof Date)
+        .map((row) => row.revertedAt as Date)
+        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
 
     if (includeAllStatuses) {
       console.log("[Campaign Revert Preview] informational campaign detail loaded", {
@@ -261,6 +279,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       failedCount,
       unrecoverableCount,
       totalTrackedCount,
+      revertCompletedAt,
+      missingHistoricalRevertedFromCount,
       terminal: false,
       message: null,
     }), {

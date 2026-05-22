@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 /**
  * A reusable fetch wrapper for Shopify embedded apps.
  * - Handles relative paths
@@ -5,7 +7,7 @@
  * - Throws on non-OK responses for consistent error handling
  */
 export function useAppFetch() {
-  return async (url: string, options: RequestInit = {}) => {
+  return useCallback(async (url: string, options: RequestInit = {}) => {
     const headers = new Headers(options.headers);
 
     if (
@@ -58,5 +60,5 @@ export function useAppFetch() {
 
       throw err;
     }
-  };
+  }, []);
 }

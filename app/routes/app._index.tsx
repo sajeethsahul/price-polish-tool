@@ -28,7 +28,6 @@ import {
 import {
   InfoIcon,
   RefreshIcon,
-  SettingsIcon,
   CalendarTimeIcon,
   ArrowDownIcon,
   UndoIcon,
@@ -37,19 +36,27 @@ import {
 } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
-import {
-  PricingActionsModal,
-  type ApplyMode,
-  type PricingActionsPreviewItem,
-} from "../components/PricingActionsModal";
 import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
+import {
+  ImmediateApplyConfirmationModal,
+  type ImmediateApplyImpactSummary,
+} from "../components/ImmediateApplyConfirmationModal";
+import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
 import { calculatePrice } from "../utils/pricing";
 
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
+const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
+const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px";
+const LARGE_OPERATION_THRESHOLD = 100;
+const VERY_LARGE_OPERATION_THRESHOLD = 250;
+const MOST_VISIBLE_SCOPE_RATIO = 0.8;
+const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
+const MAJOR_MOVEMENT_THRESHOLD = 40;
 
-type PreviewItem = PricingActionsPreviewItem;
+type PreviewItem = PricingPreviewItem;
+type ImmediateApplyScope = "all" | "selected" | "single";
 
 interface LastUpdateInfo {
   batchId: string;
@@ -88,14 +95,58 @@ interface CampaignRevertPreviewData {
   title: string;
   productCount: number;
   latestBatchId: string | null;
+  revertCompletedAt?: string | null;
   rows: CampaignRevertPreviewRow[];
   revertedCount?: number;
   failedCount?: number;
   unrecoverableCount?: number;
   totalTrackedCount?: number;
+  missingHistoricalRevertedFromCount?: number;
   terminal?: boolean;
   message?: string | null;
 }
+
+interface StorefrontControlMetrics {
+  influencedVariantCount: number;
+  stagedPendingCount: number;
+  retryableRevertCount: number;
+  unrecoverableCount: number;
+  latestInfluenceAt: string;
+  openCampaignCount: number;
+  closedCampaignCount: number;
+  canGoLive: boolean;
+  goLiveMessage: string;
+}
+
+interface DashboardMetrics {
+  totalApplied: number;
+  lastUpdate: string;
+  successRate: number;
+  isLive: boolean;
+  hasActivePlan: boolean;
+  storefrontControl: StorefrontControlMetrics;
+}
+
+const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
+  influencedVariantCount: 0,
+  stagedPendingCount: 0,
+  retryableRevertCount: 0,
+  unrecoverableCount: 0,
+  latestInfluenceAt: "",
+  openCampaignCount: 0,
+  closedCampaignCount: 0,
+  canGoLive: false,
+  goLiveMessage: "No staged prices are ready. Apply pricing before going live.",
+};
+
+const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
+  totalApplied: 0,
+  lastUpdate: "",
+  successRate: 100,
+  isLive: false,
+  hasActivePlan: true,
+  storefrontControl: DEFAULT_STOREFRONT_CONTROL_METRICS,
+};
 
 type TimelineTone = "success" | "warning" | "critical" | "info" | "attention";
 
@@ -103,12 +154,19 @@ interface CampaignTimelineMilestone {
   key: string;
   label: string;
   tone: TimelineTone;
+  badgeLabel?: string;
   timestamp?: string | null;
   description: string;
 }
 
 type CampaignHistoryStatusFilter = "all" | "active" | "partial" | "scheduled" | "closed";
 type CampaignHistorySourceFilter = "all" | "manual" | "scheduled";
+type RevertPreviewMovementFilter = "all" | "increase" | "decrease" | "large_movement";
+
+const OPERATIONAL_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
+const SELECT_OPTION_PREFIX = "\u2002";
+const REVERT_PREVIEW_DEFAULT_PAGE_SIZE = 15;
+const REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD = 15;
 
 function normalizeCampaignStatus(status: string) {
   return status.toLowerCase();
@@ -121,10 +179,6 @@ function isClosedCampaignStatus(status: string) {
 
 function normalizeCampaignSource(source: string | null) {
   return (source ?? "").trim().toLowerCase();
-}
-
-function getDefaultApplyCampaignTitle() {
-  return `Manual Apply - ${new Date().toLocaleString()}`;
 }
 
 // ─── Animated Loader ───────────────────────────────────────────────────────
@@ -302,11 +356,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
   const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
   const [message, setMessage] = useState<{ type: "success" | "critical" | "warning"; text: string; details?: string } | null>(null);
-  const [applyCampaignTitle, setApplyCampaignTitle] = useState(getDefaultApplyCampaignTitle());
+  const [applyCampaignTitle, setApplyCampaignTitle] = useState("");
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([]);
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
@@ -320,10 +373,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] = useState(false);
   const [selectedCampaignForRevert, setSelectedCampaignForRevert] = useState<CampaignHistoryItem | null>(null);
   const [revertPreview, setRevertPreview] = useState<CampaignRevertPreviewData | null>(null);
+  const [revertPreviewSearchQuery, setRevertPreviewSearchQuery] = useState("");
+  const [revertPreviewMovementFilter, setRevertPreviewMovementFilter] =
+    useState<RevertPreviewMovementFilter>("all");
+  const [revertPreviewPageSize, setRevertPreviewPageSize] = useState(REVERT_PREVIEW_DEFAULT_PAGE_SIZE);
+  const [revertPreviewPage, setRevertPreviewPage] = useState(1);
   const [campaignDetailOpen, setCampaignDetailOpen] = useState(false);
   const [campaignDetailLoading, setCampaignDetailLoading] = useState(false);
   const [selectedCampaignForDetail, setSelectedCampaignForDetail] = useState<CampaignHistoryItem | null>(null);
   const [campaignDetail, setCampaignDetail] = useState<CampaignRevertPreviewData | null>(null);
+  const [campaignDetailPageSize, setCampaignDetailPageSize] = useState(15);
+  const [campaignDetailPage, setCampaignDetailPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -335,12 +395,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [roundingStep, setRoundingStep] = useState(1);
   const [charmPricing, setCharmPricing] = useState(true);
-  const [metrics, setMetrics] = useState({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true });
-  const [applyMode, setApplyMode] = useState<ApplyMode>("");
-  const [collectionId, setCollectionId] = useState("");
-  const [scheduleTime, setScheduleTime] = useState("");
-  const [scheduleTitle, setScheduleTitle] = useState("");
-  const [pricingActionsModalOpen, setPricingActionsModalOpen] = useState(false);
+  const [metrics, setMetrics] = useState<DashboardMetrics>(DEFAULT_DASHBOARD_METRICS);
+  const collectionId = "";
+  const [immediateApplyModalOpen, setImmediateApplyModalOpen] = useState(false);
+  const [immediateApplyScope, setImmediateApplyScope] = useState<ImmediateApplyScope>("selected");
+  const [immediateApplySingleItem, setImmediateApplySingleItem] = useState<PreviewItem | null>(null);
   const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] = useState(false);
 
   // Billing placeholders — do not modify
@@ -350,6 +409,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, [shopify]);
 
   const hasActivePlan = metrics.hasActivePlan;
+  const storefrontControl = metrics.storefrontControl ?? DEFAULT_STOREFRONT_CONTROL_METRICS;
 
   // UPDATED: hasRules driven by backend DB check (ruleExists), NOT previews.length
   const hasRules = ruleExists === true;
@@ -382,7 +442,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       const [data, metricsData, campaignHistoryData] = await Promise.all([
         fetcher("/api/preview-price"),
-        fetcher("/api/metrics").catch(() => ({ totalApplied: 0, lastUpdate: "", successRate: 100, isLive: false, hasActivePlan: true })),
+        fetcher("/api/metrics").catch(() => DEFAULT_DASHBOARD_METRICS),
         fetcher("/api/campaign-history").catch(() => ({ campaigns: [] })),
       ]);
 
@@ -401,7 +461,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setMetrics(prev => ({
         ...prev,
         ...metricsData,
-        hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true
+        hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true,
+        storefrontControl: {
+          ...DEFAULT_STOREFRONT_CONTROL_METRICS,
+          ...(metricsData?.storefrontControl ?? {}),
+        },
       }));
       const campaigns = Array.isArray(campaignHistoryData?.campaigns) ? campaignHistoryData.campaigns : [];
       setCampaignHistory(campaigns);
@@ -456,7 +520,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const handleApplyBatch = useCallback(async (
     itemsToUpdate: PreviewItem[],
-    campaignTitle?: string,
+    campaignTitle: string,
   ): Promise<boolean> => {
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules first", { isError: true });
@@ -467,12 +531,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
     try {
       // handleApplyBatch ONLY stages the items passed to it.
-      // It does NOT filter based on applyMode.
-      // Callers (row Apply, Apply Selected, Apply All) determine the item list.
+      // Callers determine the item list/scope.
       const scopedItems = itemsToUpdate;
 
       if (scopedItems.length === 0) {
         shopify.toast.show("No products to apply", { isError: true });
+        return false;
+      }
+
+      const normalizedCampaignTitle = campaignTitle.trim();
+      if (!normalizedCampaignTitle) {
+        shopify.toast.show("Campaign title is required before applying pricing.", {
+          isError: true,
+        });
         return false;
       }
 
@@ -491,11 +562,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("Scoped items:", scopedItems);
       console.log("Sending payload:", itemsWithFinalPrices);
       const campaignId = crypto.randomUUID();
-      const resolvedCampaignTitle =
-        typeof campaignTitle === "string" && campaignTitle.trim().length > 0
-          ? campaignTitle.trim()
-          : getDefaultApplyCampaignTitle();
-      console.log("[Apply] campaign title submitted:", resolvedCampaignTitle);
+      console.log("[Apply] campaign title submitted:", normalizedCampaignTitle);
 
       const response = await fetch("/api/staging-price", {
         method: "POST",
@@ -505,7 +572,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         body: JSON.stringify({
           products: itemsWithFinalPrices,
           campaignId,
-          campaignTitle: resolvedCampaignTitle,
+          campaignTitle: normalizedCampaignTitle,
         })
       });
 
@@ -557,8 +624,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       await handlePreview();
 
-      setIsModalOpen(false);
-
       return true;
     } catch (error: any) {
       shopify.toast.show(error.message || "Apply failed", { isError: true });
@@ -568,10 +633,316 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [hasRules, shopify, metrics.isLive, handlePreview]);
 
+  const selectedPreviewItems = useMemo(
+    () => previews.filter((item) => selectedItems.has(String(item.variantId))),
+    [previews, selectedItems]
+  );
+
+  const immediateApplyItems = useMemo(
+    () =>
+      immediateApplyScope === "all"
+        ? previews
+        : immediateApplyScope === "single"
+          ? immediateApplySingleItem
+            ? [immediateApplySingleItem]
+            : []
+          : selectedPreviewItems,
+    [immediateApplyScope, previews, selectedPreviewItems, immediateApplySingleItem]
+  );
+
+  const immediateApplyScopeLabel =
+    immediateApplyScope === "all"
+      ? "products"
+      : immediateApplyScope === "single"
+        ? "product"
+        : "selected products";
+
+  const immediateApplyImpactSummary = useMemo<ImmediateApplyImpactSummary>(() => {
+    const summary: ImmediateApplyImpactSummary = {
+      increaseCount: 0,
+      decreaseCount: 0,
+      averageChangePercent: 0,
+      largestMovementPercent: null,
+      largestMovementDirection: null,
+      singleItemDirection: null,
+    };
+
+    if (immediateApplyItems.length === 0) {
+      return summary;
+    }
+
+    let totalPercentChange = 0;
+    let validPercentCount = 0;
+
+    for (const item of immediateApplyItems) {
+      const oldPrice = Number.parseFloat(item.oldPrice);
+      const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
+      const proposedPrice = Number.parseFloat(proposedRaw);
+
+      if (!Number.isFinite(oldPrice) || !Number.isFinite(proposedPrice) || oldPrice <= 0) {
+        continue;
+      }
+
+      const deltaPercent = ((proposedPrice - oldPrice) / oldPrice) * 100;
+      totalPercentChange += deltaPercent;
+      validPercentCount += 1;
+
+      if (deltaPercent > 0) {
+        summary.increaseCount += 1;
+      } else if (deltaPercent < 0) {
+        summary.decreaseCount += 1;
+      }
+
+      if (
+        summary.largestMovementPercent === null ||
+        Math.abs(deltaPercent) > Math.abs(summary.largestMovementPercent)
+      ) {
+        summary.largestMovementPercent = deltaPercent;
+        summary.largestMovementDirection =
+          deltaPercent > 0 ? "increase" : deltaPercent < 0 ? "decrease" : null;
+      }
+    }
+
+    if (validPercentCount > 0) {
+      summary.averageChangePercent = totalPercentChange / validPercentCount;
+    }
+
+    if (immediateApplyItems.length === 1) {
+      summary.singleItemDirection =
+        summary.largestMovementDirection === "increase"
+          ? "increase"
+          : summary.largestMovementDirection === "decrease"
+            ? "decrease"
+            : "no_change";
+    }
+
+    return summary;
+  }, [immediateApplyItems]);
+
+  const immediateApplySafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
+    if (immediateApplyItems.length <= 1) {
+      return [];
+    }
+
+    const notices: OperationalSafeguardNotice[] = [];
+    const totalVisibleProducts = previews.length;
+    const affectsMostVisible =
+      totalVisibleProducts > 0 &&
+      immediateApplyItems.length >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
+    const largestMovement = Math.abs(immediateApplyImpactSummary.largestMovementPercent ?? 0);
+    const isStorefrontWide =
+      totalVisibleProducts > 0 && immediateApplyItems.length >= Math.ceil(totalVisibleProducts * 0.95);
+    const isAllProductsScope = immediateApplyScope === "all";
+
+    if (isAllProductsScope || immediateApplyItems.length >= LARGE_OPERATION_THRESHOLD) {
+      notices.push({
+        id: "immediate-large-operation",
+        severity: "informational",
+        message: "A large number of products will update.",
+      });
+    }
+
+    if (affectsMostVisible) {
+      notices.push({
+        id: "immediate-most-visible",
+        severity: "informational",
+        message: "This update affects most visible products.",
+      });
+    }
+
+    if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
+      notices.push({
+        id: "immediate-significant-movement",
+        severity: "informational",
+        message: "Some products have larger price changes.",
+      });
+    }
+
+    if (immediateApplyItems.length >= VERY_LARGE_OPERATION_THRESHOLD) {
+      notices.push({
+        id: "immediate-very-large-operation",
+        severity: "warning",
+        message: "A very large number of products will update.",
+      });
+    }
+
+    if (isStorefrontWide) {
+      notices.push({
+        id: "immediate-storefront-wide",
+        severity: "warning",
+        message: "Most visible storefront products will update.",
+      });
+    }
+
+    if (isAllProductsScope && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
+      notices.push({
+        id: "immediate-all-products-major-movement",
+        severity: "warning",
+        message: "This all-products update includes larger price changes.",
+      });
+    }
+
+    return notices;
+  }, [immediateApplyItems.length, immediateApplyImpactSummary.largestMovementPercent, immediateApplyScope, previews.length]);
+
+  const openImmediateApplyModal = useCallback((scope: ImmediateApplyScope, item?: PreviewItem) => {
+    setImmediateApplyScope(scope);
+    if (scope === "single" && item) {
+      setImmediateApplySingleItem(item);
+    } else {
+      setImmediateApplySingleItem(null);
+    }
+    setImmediateApplyModalOpen(true);
+  }, []);
+
+  const closeImmediateApplyModal = useCallback(() => {
+    setImmediateApplyModalOpen(false);
+    setImmediateApplySingleItem(null);
+  }, []);
+
   const handleApplySingle = useCallback((item: PreviewItem) => {
-    // Row-level apply — directly passes the single item to handleApplyBatch.
-    handleApplyBatch([item]);
-  }, [handleApplyBatch]);
+    openImmediateApplyModal("single", item);
+  }, [openImmediateApplyModal]);
+
+  const resetRevertPreviewViewState = useCallback(() => {
+    setRevertPreviewSearchQuery("");
+    setRevertPreviewMovementFilter("all");
+    setRevertPreviewPageSize(REVERT_PREVIEW_DEFAULT_PAGE_SIZE);
+    setRevertPreviewPage(1);
+  }, []);
+
+  const campaignDetailRows = campaignDetail?.rows ?? [];
+  const campaignDetailTotalPages = Math.max(1, Math.ceil(campaignDetailRows.length / campaignDetailPageSize));
+  const campaignDetailPaginatedRows = useMemo(() => {
+    const start = (campaignDetailPage - 1) * campaignDetailPageSize;
+    return campaignDetailRows.slice(start, start + campaignDetailPageSize);
+  }, [campaignDetailPage, campaignDetailPageSize, campaignDetailRows]);
+
+  useEffect(() => {
+    setCampaignDetailPage(1);
+  }, [campaignDetail, campaignDetailPageSize]);
+
+  useEffect(() => {
+    if (campaignDetailPage > campaignDetailTotalPages) {
+      setCampaignDetailPage(campaignDetailTotalPages);
+    }
+  }, [campaignDetailPage, campaignDetailTotalPages]);
+
+  const revertSafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
+    if (!revertPreview || revertPreview.terminal) return [];
+
+    const notices: OperationalSafeguardNotice[] = [];
+    const productCount = Number.isFinite(revertPreview.productCount) ? revertPreview.productCount : 0;
+    const totalVisibleProducts = previews.length;
+    const affectsMostVisible =
+      totalVisibleProducts > 0 &&
+      productCount >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
+    const storefrontWide = totalVisibleProducts > 0 && productCount >= Math.ceil(totalVisibleProducts * 0.95);
+    let largestMovement = 0;
+
+    for (const row of revertPreview.rows) {
+      if (row.currentPrice == null || row.currentPrice <= 0) continue;
+      const deltaPercent = ((row.revertTargetPrice - row.currentPrice) / row.currentPrice) * 100;
+      if (Number.isFinite(deltaPercent)) {
+        largestMovement = Math.max(largestMovement, Math.abs(deltaPercent));
+      }
+    }
+
+    if (productCount >= LARGE_OPERATION_THRESHOLD) {
+      notices.push({
+        id: "revert-large-scope",
+        severity: "informational",
+        message: "Large revert operation detected.",
+      });
+    }
+
+    if (affectsMostVisible) {
+      notices.push({
+        id: "revert-most-visible",
+        severity: "informational",
+        message: "This revert restores pricing across most visible products.",
+      });
+    }
+
+    if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
+      notices.push({
+        id: "revert-significant-movement",
+        severity: "informational",
+        message: "Some products contain significant pricing movement.",
+      });
+    }
+
+    if (productCount >= VERY_LARGE_OPERATION_THRESHOLD) {
+      notices.push({
+        id: "revert-very-large-scope",
+        severity: "warning",
+        message: "This revert restores pricing across a large campaign set.",
+      });
+    }
+
+    if (storefrontWide && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
+      notices.push({
+        id: "revert-storefront-major-movement",
+        severity: "warning",
+        message: "Storefront-wide revert scope includes major pricing movement.",
+      });
+    }
+
+    return notices;
+  }, [previews.length, revertPreview]);
+
+  const revertPreviewFilteredRows = useMemo(() => {
+    if (!revertPreview) return [] as CampaignRevertPreviewRow[];
+
+    const normalizedQuery = revertPreviewSearchQuery.trim().toLowerCase();
+
+    return revertPreview.rows.filter((row) => {
+      if (normalizedQuery && !row.productTitle.toLowerCase().includes(normalizedQuery)) {
+        return false;
+      }
+
+      if (revertPreviewMovementFilter === "all") {
+        return true;
+      }
+
+      if (row.currentPrice == null || row.currentPrice <= 0) {
+        return revertPreviewMovementFilter === "large_movement" ? false : true;
+      }
+
+      const delta = row.revertTargetPrice - row.currentPrice;
+      const deltaPercent = (delta / row.currentPrice) * 100;
+
+      if (revertPreviewMovementFilter === "increase") {
+        return delta > 0;
+      }
+      if (revertPreviewMovementFilter === "decrease") {
+        return delta < 0;
+      }
+      if (revertPreviewMovementFilter === "large_movement") {
+        return Math.abs(deltaPercent) >= REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD;
+      }
+      return true;
+    });
+  }, [revertPreview, revertPreviewMovementFilter, revertPreviewSearchQuery]);
+
+  const revertPreviewTotalPages = Math.max(
+    1,
+    Math.ceil(revertPreviewFilteredRows.length / revertPreviewPageSize)
+  );
+  const revertPreviewPaginatedRows = useMemo(() => {
+    const start = (revertPreviewPage - 1) * revertPreviewPageSize;
+    return revertPreviewFilteredRows.slice(start, start + revertPreviewPageSize);
+  }, [revertPreviewFilteredRows, revertPreviewPage, revertPreviewPageSize]);
+
+  useEffect(() => {
+    setRevertPreviewPage(1);
+  }, [revertPreviewSearchQuery, revertPreviewMovementFilter, revertPreviewPageSize]);
+
+  useEffect(() => {
+    if (revertPreviewPage > revertPreviewTotalPages) {
+      setRevertPreviewPage(revertPreviewTotalPages);
+    }
+  }, [revertPreviewPage, revertPreviewTotalPages]);
 
   const filteredPreviews = useMemo(() => {
     console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
@@ -617,23 +988,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     return result;
   }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
-  const handleApplySelected = useCallback(() => {
-    // Apply Selected ONLY uses the current checkbox selection state.
-    // It does NOT depend on applyMode (which is for scheduling scope only).
-    if (guardNoRules()) return;
-
-    const selectedPreviews = previews.filter(p =>
-      selectedItems.has(p.variantId)
-    );
-
-    if (selectedPreviews.length === 0) {
-      shopify.toast.show("No products selected", { isError: true });
-      return;
-    }
-
-    handleApplyBatch(selectedPreviews);
-  }, [previews, selectedItems, handleApplyBatch, guardNoRules, shopify]);
-
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
     console.log(`DEBUG: Initializing handleUndo for batch: ${lastUpdate.batchId}...`);
@@ -667,13 +1021,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
     }
-  }, [applyMode, lastUpdate, shopify, handlePreview]);
+  }, [lastUpdate, shopify, handlePreview]);
 
   const openCampaignDetailView = useCallback(async (campaign: CampaignHistoryItem) => {
     console.log("[Campaign History UI] campaign detail view opened", {
       campaignId: campaign.campaignId,
       title: campaign.title,
     });
+    setCampaignDetailPageSize(15);
+    setCampaignDetailPage(1);
     setSelectedCampaignForDetail(campaign);
     setCampaignDetailOpen(true);
     setCampaignDetailLoading(true);
@@ -703,6 +1059,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       else console.error("BYPASS: Failed to load campaign details");
       setCampaignDetailOpen(false);
       setSelectedCampaignForDetail(null);
+      setCampaignDetailPageSize(15);
+      setCampaignDetailPage(1);
     } finally {
       setCampaignDetailLoading(false);
     }
@@ -711,6 +1069,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const openCampaignRevertPreview = useCallback(async (campaign: CampaignHistoryItem, retryFailedOnly = false) => {
     if (!campaign.revertable) return;
     console.log("[Campaign Revert] preview opened", { campaignId: campaign.campaignId, title: campaign.title });
+    resetRevertPreviewViewState();
     setSelectedCampaignForRevert(campaign);
     setRevertPreviewRetryFailedOnly(retryFailedOnly);
     setRevertPreviewOpen(true);
@@ -743,10 +1102,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       else console.error("BYPASS: Failed to load revert preview");
       setRevertPreviewOpen(false);
       setSelectedCampaignForRevert(null);
+      resetRevertPreviewViewState();
     } finally {
       setRevertPreviewLoading(false);
     }
-  }, [shopify]);
+  }, [resetRevertPreviewViewState, shopify]);
 
   const confirmCampaignRevert = useCallback(async () => {
     if (!selectedCampaignForRevert) return;
@@ -797,6 +1157,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setSelectedCampaignForRevert(null);
       setRevertPreview(null);
       setRevertPreviewRetryFailedOnly(false);
+      resetRevertPreviewViewState();
       await handlePreview();
     } catch (err) {
       console.error("DEBUG: Campaign Revert Error detail:", err);
@@ -805,7 +1166,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     } finally {
       setIsProcessing(false);
     }
-  }, [selectedCampaignForRevert, shopify, handlePreview, revertPreviewRetryFailedOnly]);
+  }, [handlePreview, resetRevertPreviewViewState, revertPreviewRetryFailedOnly, selectedCampaignForRevert, shopify]);
 
   const handleRefreshCampaignHistory = useCallback(async () => {
     setCampaignHistoryLoading(true);
@@ -924,18 +1285,20 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         if (shopify) shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
         else console.log(`BYPASS: ${clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront"}`);
         setMetrics(prev => ({ ...prev, isLive: !clear }));
+        await handlePreview();
       } else {
         throw new Error(data.error || "Failed to push rules.");
       }
     } catch (err) {
       console.error("DEBUG: PushStorefront Error detail:", err);
-      if (shopify) shopify.toast.show("No active storefront pricing changes found to restore.", { isError: true });
-      else console.error("BYPASS:No active storefront pricing changes found to restore.");
+      const errorMessage = err instanceof Error ? err.message : "Failed to update storefront pricing state.";
+      if (shopify) shopify.toast.show(errorMessage, { isError: true });
+      else console.error("BYPASS:", errorMessage);
     } finally {
       console.log("DEBUG: Finalizing handlePushStorefront processing state.");
       setIsProcessing(false);
     }
-  }, [shopify, activeCampaignId]);
+  }, [shopify, activeCampaignId, handlePreview]);
 
   const campaignStatusTone = useCallback((status: string) => {
     const normalized = status.toLowerCase();
@@ -974,12 +1337,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
     const normalizedStatus = normalizeCampaignStatus(selectedCampaignForDetail.status);
     const failedCount = campaignDetail?.failedCount ?? selectedCampaignForDetail.failedCount ?? 0;
+    const revertCompletedTimestamp =
+      normalizedStatus === "reverted"
+        ? formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? null)
+        : null;
 
     const milestones: CampaignTimelineMilestone[] = [
       {
         key: "created",
         label: "Created",
         tone: "info",
+        badgeLabel: "Recorded",
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.createdAt),
         description: "Campaign record created and ready for lifecycle actions.",
       },
@@ -990,6 +1358,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         key: "scheduled",
         label: "Scheduled",
         tone: "warning",
+        badgeLabel: "Queued",
         description: "Campaign is queued for execution.",
       });
     }
@@ -999,6 +1368,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         key: "applied",
         label: "Applied",
         tone: "success",
+        badgeLabel: "Completed",
         description: "Pricing updates were applied to tracked items.",
       });
     }
@@ -1008,6 +1378,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         key: "partial-failure",
         label: "Partial Failure",
         tone: "warning",
+        badgeLabel: "Attention",
         description: "Some items failed to complete rollback operations.",
       });
     }
@@ -1017,7 +1388,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         key: "reverted",
         label: "Reverted",
         tone: "success",
-        description: "Rollback completed and tracked prices were restored.",
+        badgeLabel: "Completed",
+        timestamp: revertCompletedTimestamp,
+        description: "Pricing successfully restored to original storefront values.",
       });
     }
 
@@ -1026,6 +1399,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         key: "unrecoverable",
         label: "Unrecoverable",
         tone: "critical",
+        badgeLabel: "Terminal",
         description:
           selectedCampaignForDetail.unrecoverableReason ??
           "Rollback is terminal for one or more items and cannot be retried.",
@@ -1609,73 +1983,86 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               background="bg-surface-secondary"
                               borderRadius="200"
                             >
-                              <InlineStack align="space-between" blockAlign="start" wrap>
-                                <BlockStack gap="100">
-                                  <InlineStack gap="200" blockAlign="center" wrap>
-                                    <Text as="p" variant="bodyMd" fontWeight="medium">
-                                      {campaign.title}
-                                    </Text>
-                                    <Badge tone={campaignStatusTone(campaign.status)}>
-                                      {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
-                                    </Badge>
-                                  </InlineStack>
-                                  <InlineStack gap="300" wrap>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Source: {campaign.source || "unknown"}
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Products: {campaign.productCount}
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Created: {new Date(campaign.createdAt).toLocaleString()}
-                                    </Text>
-                                  </InlineStack>
-                                  <Box padding="200" background="bg-surface" borderRadius="200">
-                                    <InlineStack gap="200" wrap>
-                                      <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
-                                      <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
-                                      <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
-                                      <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                              <InlineStack align="space-between" blockAlign="start" gap="300" wrap>
+                                <div style={{ flex: "2 1 420px", minWidth: 260 }}>
+                                  <BlockStack gap="200">
+                                    <InlineStack gap="200" blockAlign="center" wrap>
+                                      <Text as="p" variant="bodyMd" fontWeight="medium">
+                                        {campaign.title}
+                                      </Text>
+                                      <Badge tone={campaignStatusTone(campaign.status)}>
+                                        {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
+                                      </Badge>
                                     </InlineStack>
+                                    <InlineStack gap="400" wrap>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Source: {campaign.source || "unknown"}
+                                      </Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Products: {campaign.productCount}
+                                      </Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Created: {new Date(campaign.createdAt).toLocaleString()}
+                                      </Text>
+                                    </InlineStack>
+                                  </BlockStack>
+                                </div>
+
+                                <div style={{ flex: "1 1 360px", minWidth: 260 }}>
+                                  <Box padding="200" background="bg-surface" borderRadius="200">
+                                    <BlockStack gap="150">
+                                      <InlineStack gap="150" wrap>
+                                        <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
+                                        <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
+                                      </InlineStack>
+                                      <InlineStack gap="150" wrap>
+                                        <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
+                                        <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                                      </InlineStack>
+                                    </BlockStack>
                                   </Box>
                                   {campaign.unrecoverableReason && (
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Reason: {campaign.unrecoverableReason}
-                                    </Text>
+                                    <Box paddingBlockStart="100">
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Reason: {campaign.unrecoverableReason}
+                                      </Text>
+                                    </Box>
                                   )}
-                                </BlockStack>
+                                </div>
 
-                                <InlineStack gap="200" wrap={false}>
-                                  <Button
-                                    size="slim"
-                                    variant="tertiary"
-                                    onClick={() => { void openCampaignDetailView(campaign); }}
-                                  >
-                                    View
-                                  </Button>
-                                  {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
+                                <div style={{ flex: "0 1 auto", marginInlineStart: "auto" }}>
+                                  <BlockStack gap="150" align="end">
                                     <Button
                                       size="slim"
-                                      variant="secondary"
-                                      disabled={isProcessing}
-                                      loading={isProcessing}
-                                      onClick={() => openCampaignRevertPreview(campaign, true)}
+                                      variant="tertiary"
+                                      onClick={() => { void openCampaignDetailView(campaign); }}
                                     >
-                                      Retry Failed Reverts
+                                      View
                                     </Button>
-                                  )}
-                                  {campaign.revertable && (
-                                    <Button
-                                      size="slim"
-                                      tone="critical"
-                                      disabled={isProcessing}
-                                      loading={isProcessing}
-                                      onClick={() => openCampaignRevertPreview(campaign)}
-                                    >
-                                      Revert
-                                    </Button>
-                                  )}
-                                </InlineStack>
+                                    {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
+                                      <Button
+                                        size="slim"
+                                        variant="secondary"
+                                        disabled={isProcessing}
+                                        loading={isProcessing}
+                                        onClick={() => openCampaignRevertPreview(campaign, true)}
+                                      >
+                                        Retry Failed Reverts
+                                      </Button>
+                                    )}
+                                    {campaign.revertable && (
+                                      <Button
+                                        size="slim"
+                                        tone="critical"
+                                        disabled={isProcessing}
+                                        loading={isProcessing}
+                                        onClick={() => openCampaignRevertPreview(campaign)}
+                                      >
+                                        Revert
+                                      </Button>
+                                    )}
+                                  </BlockStack>
+                                </div>
                               </InlineStack>
                             </Box>
                           ))}
@@ -1740,63 +2127,103 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     borderColor="border"
                     borderRadius="300"
                   >
-                    <InlineStack align="space-between" blockAlign="start" gap="400" wrap>
-                      <BlockStack gap="100">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
-                          <Tooltip content="Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.">
-                            <span style={{ cursor: "pointer", display: "inline-flex" }}>
-                              <Icon source={InfoIcon} tone="subdued" />
-                            </span>
-                          </Tooltip>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between" blockAlign="start" gap="300" wrap>
+                        <div style={{ flex: "1 1 460px" }}>
+                          <BlockStack gap="100">
+                            <InlineStack gap="200" blockAlign="center">
+                              <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
+                              <Tooltip content="Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.">
+                                <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                                  <Icon source={InfoIcon} tone="subdued" />
+                                </span>
+                              </Tooltip>
+                            </InlineStack>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Manage storefront pricing visibility for shoppers. Admin catalog prices remain unchanged until updates are applied in this app.
+                            </Text>
+                          </BlockStack>
+                        </div>
+
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <InlineStack gap="150" blockAlign="center" wrap={false}>
+                            <span
+                              className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
+                              aria-hidden="true"
+                            />
+                            <Text as="span" variant="headingSm" fontWeight="semibold">
+                              {metrics.isLive ? "Live pricing is active" : "Live pricing is paused"}
+                            </Text>
+                          </InlineStack>
+                          <Badge tone={metrics.isLive ? "success" : "attention"}>
+                            {metrics.isLive ? "Storefront active" : "Storefront paused"}
+                          </Badge>
                         </InlineStack>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Turn live pricing on or off for the storefront. Catalog prices in Admin are unchanged until you apply updates from this app.
+                      </InlineStack>
+
+                      <InlineStack gap="200" blockAlign="center" wrap>
+                        {metrics.isLive ? (
+                          <Button
+                            onClick={handleStopLiveClick}
+                            disabled={isProcessing || !hasRules}
+                            tone="critical"
+                            variant="secondary"
+                          >
+                            Pause Live Pricing
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            onClick={handleGoLiveClick}
+                            loading={isProcessing}
+                            disabled={isProcessing || !hasRules || !storefrontControl.canGoLive}
+                          >
+                            Publish Pricing
+                          </Button>
+                        )}
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {storefrontControl.goLiveMessage}
                         </Text>
+                      </InlineStack>
+
+                      <BlockStack gap="150">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Operational attention
+                        </Text>
+                        <InlineStack gap="200" wrap>
+                          <Badge tone={storefrontControl.stagedPendingCount > 0 ? "warning" : "info"}>
+                            {`Ready to publish: ${storefrontControl.stagedPendingCount}`}
+                          </Badge>
+                          <Badge tone={storefrontControl.retryableRevertCount > 0 ? "attention" : "success"}>
+                            {`Recoverable issues: ${storefrontControl.retryableRevertCount}`}
+                          </Badge>
+                          <Badge tone={storefrontControl.unrecoverableCount > 0 ? "critical" : "success"}>
+                            {`Attention needed: ${storefrontControl.unrecoverableCount}`}
+                          </Badge>
+                        </InlineStack>
                       </BlockStack>
 
-                      <BlockStack gap="300" inlineAlign="end">
-                        <Box paddingInlineEnd="0">
-                          <BlockStack gap="100" inlineAlign="end">
-                            <Text as="span" variant="bodySm" tone="subdued">
-                              Storefront status
-                            </Text>
-                            <InlineStack gap="200" blockAlign="center" wrap={false}>
-                              <span
-                                className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
-                                aria-hidden="true"
-                              />
-                              <Text as="span" variant="bodyMd" fontWeight="medium" tone={metrics.isLive ? "success" : "critical"}>
-                                {metrics.isLive ? "Live pricing active" : "Live pricing off"}
-                              </Text>
-                            </InlineStack>
-                          </BlockStack>
-                        </Box>
-
-                        <InlineStack gap="200" wrap={false}>
-                          {metrics.isLive ? (
-                            <Button
-                              onClick={handleStopLiveClick}
-                              disabled={isProcessing || !hasRules}
-                              tone="critical"
-                              variant="primary"
-                            >
-                              Stop Live Prices
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="primary"
-                              tone="success"
-                              onClick={handleGoLiveClick}
-                              loading={isProcessing}
-                              disabled={isProcessing || !hasRules}
-                            >
-                              Go Live on Storefront
-                            </Button>
+                      <BlockStack gap="150">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Operational details
+                        </Text>
+                        <InlineStack gap="200" wrap>
+                          <Badge tone={storefrontControl.influencedVariantCount > 0 ? "info" : "success"}>
+                            {`Active pricing rules: ${storefrontControl.influencedVariantCount}`}
+                          </Badge>
+                          {(storefrontControl.openCampaignCount > 0 || storefrontControl.closedCampaignCount > 0) && (
+                            <Badge tone="info">
+                              {`Open campaigns: ${storefrontControl.openCampaignCount} • Closed campaigns: ${storefrontControl.closedCampaignCount}`}
+                            </Badge>
+                          )}
+                          {storefrontControl.latestInfluenceAt && (
+                            <Badge tone="info">
+                              {`Last storefront update: ${timeAgo(storefrontControl.latestInfluenceAt)}`}
+                            </Badge>
                           )}
                         </InlineStack>
                       </BlockStack>
-                    </InlineStack>
+                    </BlockStack>
                   </Box>
                 </Card>
               </div>
@@ -1843,15 +2270,26 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                   Refresh Previews
                                 </Button>
                               </div>
+                            </InlineStack>
 
+                            {/* Workflow: immediate and scheduled operations */}
+                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
                               <Button
                                 variant="primary"
                                 tone="success"
-                                onClick={() => {
-                                  if (guardNoRules()) return;
-                                  setApplyCampaignTitle(getDefaultApplyCampaignTitle());
-                                  setIsModalOpen(true);
-                                }}
+                                onClick={() => openImmediateApplyModal("selected")}
+                                disabled={
+                                  !hasActivePlan ||
+                                  isProcessing ||
+                                  !hasRules ||
+                                  selectedPreviewItems.length === 0
+                                }
+                              >
+                                {`Apply Selected (${selectedPreviewItems.length})`}
+                              </Button>
+                              <Button
+                                variant="primary"
+                                onClick={() => openImmediateApplyModal("all")}
                                 disabled={!hasActivePlan || isProcessing || previews.length === 0 || !hasRules}
                               >
                                 {`Apply All (${previews.length})`}
@@ -1859,29 +2297,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
                               <Button
                                 variant="secondary"
-                                onClick={handleApplySelected}
-                                disabled={!hasActivePlan || isProcessing || selectedItems.size === 0 || !hasRules}
-                              >
-                                {`Apply Selected (${selectedItems.size})`}
-                              </Button>
-                            </InlineStack>
-
-                            {/* Workflow: modals */}
-                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
-                              <Button
-                                variant="secondary"
-                                icon={SettingsIcon}
-                                onClick={() => setPricingActionsModalOpen(true)}
-                              >
-                                Pricing Actions
-                              </Button>
-
-                              <Button
-                                variant="secondary"
                                 icon={CalendarTimeIcon}
                                 onClick={() => setScheduleHistoryModalOpen(true)}
                               >
-                                Schedule History
+                                Schedule Center
                               </Button>
                             </InlineStack>
 
@@ -2272,31 +2691,39 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         {/* ── TASK 4: Confirmation Modals ── */}
 
         {shopify && (
-          <PricingActionsModal
-            open={pricingActionsModalOpen}
-            onClose={() => setPricingActionsModalOpen(false)}
-            applyMode={applyMode}
-            onApplyModeChange={setApplyMode}
-            scheduleTitle={scheduleTitle}
-            onScheduleTitleChange={setScheduleTitle}
-            scheduleTime={scheduleTime}
-            onScheduleTimeChange={setScheduleTime}
-            previews={previews}
-            selectedItems={selectedItems}
+          <ImmediateApplyConfirmationModal
+            open={immediateApplyModalOpen}
+            onClose={closeImmediateApplyModal}
+            scopeLabel={immediateApplyScopeLabel}
+            itemCount={immediateApplyItems.length}
+            impactSummary={immediateApplyImpactSummary}
+            safeguardNotices={immediateApplySafeguardNotices}
             isProcessing={isProcessing}
-            hasActivePlan={hasActivePlan}
-            hasRules={hasRules}
-            collectionId={collectionId}
-            onApplyBatch={handleApplyBatch}
-            shopify={shopify}
+            initialCampaignTitle={applyCampaignTitle}
+            onConfirm={async (campaignTitle) => {
+              const ok = await handleApplyBatch(immediateApplyItems, campaignTitle);
+              if (ok) {
+                setApplyCampaignTitle(campaignTitle);
+              }
+              return ok;
+            }}
           />
         )}
 
-        <ScheduledHistoryModal
-          open={scheduleHistoryModalOpen}
-          onClose={() => setScheduleHistoryModalOpen(false)}
-          currencyCode={currencyCode}
-        />
+        {shopify && (
+          <ScheduledHistoryModal
+            open={scheduleHistoryModalOpen}
+            onClose={() => setScheduleHistoryModalOpen(false)}
+            currencyCode={currencyCode}
+            previews={previews}
+            filteredPreviews={filteredPreviews}
+            selectedItems={selectedItems}
+            collectionId={collectionId}
+            hasActivePlan={hasActivePlan}
+            hasRules={hasRules}
+            shopify={shopify}
+          />
+        )}
 
         <Modal
           open={campaignDetailOpen}
@@ -2304,6 +2731,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             setCampaignDetailOpen(false);
             setCampaignDetail(null);
             setSelectedCampaignForDetail(null);
+            setCampaignDetailPageSize(15);
+            setCampaignDetailPage(1);
           }}
           title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
           secondaryActions={[{
@@ -2312,6 +2741,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               setCampaignDetailOpen(false);
               setCampaignDetail(null);
               setSelectedCampaignForDetail(null);
+              setCampaignDetailPageSize(15);
+              setCampaignDetailPage(1);
             },
           }]}
         >
@@ -2384,7 +2815,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                     <Text as="p" variant="bodySm" fontWeight="medium">
                                       {milestone.label}
                                     </Text>
-                                    <Badge tone={milestone.tone}>{milestone.label}</Badge>
+                                    <Badge tone={milestone.tone}>
+                                      {milestone.badgeLabel ?? "Milestone"}
+                                    </Badge>
                                   </InlineStack>
                                   {milestone.timestamp ? (
                                     <Text as="p" variant="bodySm" tone="subdued">
@@ -2404,12 +2837,35 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   )}
 
                   <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                    <div style={{ maxHeight: 360, overflowY: "auto" }}>
+                    <BlockStack gap="300">
+                      <InlineStack align="space-between" blockAlign="end">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {`Showing ${
+                            campaignDetailPaginatedRows.length === 0
+                              ? 0
+                              : (campaignDetailPage - 1) * campaignDetailPageSize + 1
+                          }-${
+                            (campaignDetailPage - 1) * campaignDetailPageSize +
+                            campaignDetailPaginatedRows.length
+                          } of ${campaignDetailRows.length} tracked items`}
+                        </Text>
+                        <div style={{ minWidth: 140 }}>
+                          <Select
+                            label="Rows per page"
+                            options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
+                              label: `${SELECT_OPTION_PREFIX}${size}`,
+                              value: String(size),
+                            }))}
+                            value={String(campaignDetailPageSize)}
+                            onChange={(value) => setCampaignDetailPageSize(Number(value))}
+                          />
+                        </div>
+                      </InlineStack>
                       <BlockStack gap="150">
                         <div
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "minmax(0, 1fr) 108px 108px minmax(96px, auto)",
+                            gridTemplateColumns: CAMPAIGN_DETAIL_COMPARISON_GRID,
                             gap: "12px",
                             alignItems: "center",
                             paddingInline: "2px",
@@ -2423,7 +2879,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               fontWeight="medium"
                               alignment="end"
                             >
-                              Current Price
+                              Reverted From
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -2433,22 +2889,22 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               fontWeight="medium"
                               alignment="end"
                             >
-                              Revert Target
+                              Restored To
                             </Text>
                           </div>
                           <InlineStack align="start">
                             <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
                           </InlineStack>
                         </div>
-                        {campaignDetail.rows.map((row) => (
+                        {campaignDetailPaginatedRows.map((row) => (
                           <div
                             key={`${row.variantId}-${row.revertTargetPrice}-${row.status ?? "pending"}`}
                             style={{
                               display: "grid",
-                              gridTemplateColumns: "minmax(0, 1fr) 108px 108px minmax(96px, auto)",
+                              gridTemplateColumns: CAMPAIGN_DETAIL_COMPARISON_GRID,
                               gap: "12px",
                               alignItems: "start",
-                              padding: "8px 2px",
+                              padding: "12px 2px",
                               borderTop: "1px solid var(--p-color-border-secondary)",
                             }}
                           >
@@ -2478,6 +2934,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 as="p"
                                 variant="bodySm"
                                 alignment="end"
+                                tone="subdued"
                               >
                                 {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
                               </Text>
@@ -2488,6 +2945,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 variant="bodySm"
                                 fontWeight="medium"
                                 alignment="end"
+                                tone="success"
                               >
                                 {formatMoney(row.revertTargetPrice, currencyCode)}
                               </Text>
@@ -2499,8 +2957,26 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             </InlineStack>
                           </div>
                         ))}
+                        {(campaignDetail.missingHistoricalRevertedFromCount ?? 0) > 0 && (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Some historical pre-revert values are unavailable. Restored values remain accurate.
+                          </Text>
+                        )}
+                        <InlineStack align="end">
+                          <Pagination
+                            hasPrevious={campaignDetailPage > 1}
+                            onPrevious={() => setCampaignDetailPage((prev) => Math.max(1, prev - 1))}
+                            hasNext={campaignDetailPage < campaignDetailTotalPages}
+                            onNext={() =>
+                              setCampaignDetailPage((prev) =>
+                                Math.min(campaignDetailTotalPages, prev + 1)
+                              )
+                            }
+                            label={`Page ${campaignDetailPage} of ${campaignDetailTotalPages}`}
+                          />
+                        </InlineStack>
                       </BlockStack>
-                    </div>
+                    </BlockStack>
                   </Box>
                 </>
               ) : (
@@ -2520,6 +2996,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             setSelectedCampaignForRevert(null);
             setRevertPreview(null);
             setRevertPreviewRetryFailedOnly(false);
+            resetRevertPreviewViewState();
           }}
           title={`${revertPreviewRetryFailedOnly ? "Retry Failed Reverts" : "Revert Campaign"}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
           primaryAction={
@@ -2540,6 +3017,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               setSelectedCampaignForRevert(null);
               setRevertPreview(null);
               setRevertPreviewRetryFailedOnly(false);
+              resetRevertPreviewViewState();
             },
           }]}
         >
@@ -2567,46 +3045,208 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       <strong>Affected products:</strong> {revertPreview.productCount}
                     </Text>
                   </InlineStack>
+                  <InlineStack gap="200" wrap>
+                    <Badge
+                      tone={
+                        revertPreview.productCount >= VERY_LARGE_OPERATION_THRESHOLD
+                          ? "warning"
+                          : "info"
+                      }
+                    >
+                      {`Affected products: ${revertPreview.productCount}`}
+                    </Badge>
+                    <Badge tone="success">
+                      {`Revert rows in preview: ${revertPreview.rows.length}`}
+                    </Badge>
+                  </InlineStack>
+                  {revertSafeguardNotices.length > 0 && (
+                    <Box
+                      padding="300"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                      borderColor="border"
+                      borderWidth="025"
+                    >
+                      <BlockStack gap="200">
+                        <InlineStack align="space-between" blockAlign="center" wrap>
+                          <Text as="p" variant="bodySm" fontWeight="medium">
+                            Operational safeguards
+                          </Text>
+                          <InlineStack gap="100" wrap>
+                            <Badge tone="warning">
+                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} Warning${
+                                revertSafeguardNotices.filter((notice) => notice.severity === "warning").length === 1
+                                  ? ""
+                                  : "s"
+                              }`}
+                            </Badge>
+                            <Badge tone="info">
+                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "informational").length} Info`}
+                            </Badge>
+                          </InlineStack>
+                        </InlineStack>
+                        <BlockStack gap="150">
+                          {revertSafeguardNotices.map((notice) => (
+                            <InlineStack key={notice.id} gap="200" blockAlign="center">
+                              <Badge tone={notice.severity === "warning" ? "warning" : "info"}>
+                                {notice.severity === "warning" ? "Warning" : "Info"}
+                              </Badge>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {notice.message}
+                              </Text>
+                            </InlineStack>
+                          ))}
+                        </BlockStack>
+                      </BlockStack>
+                    </Box>
+                  )}
                   {selectedCampaignForRevert?.unrecoverableReason && (
                     <Banner tone="warning">
                       <p>{selectedCampaignForRevert.unrecoverableReason}</p>
                     </Banner>
                   )}
+                  <Box
+                    padding="200"
+                    background="bg-surface-secondary"
+                    borderRadius="200"
+                    borderColor="border"
+                    borderWidth="025"
+                  >
+                    <InlineStack gap="200" wrap align="space-between" blockAlign="end">
+                      <div style={{ minWidth: 220, flex: "1 1 320px" }}>
+                        <TextField
+                          label="Search product"
+                          value={revertPreviewSearchQuery}
+                          onChange={setRevertPreviewSearchQuery}
+                          placeholder="Search by product title"
+                          autoComplete="off"
+                          disabled={isProcessing}
+                        />
+                      </div>
+                      <div style={{ minWidth: 210 }}>
+                        <Select
+                          label="Movement filter"
+                          options={[
+                            { label: `${SELECT_OPTION_PREFIX}All products`, value: "all" },
+                            { label: `${SELECT_OPTION_PREFIX}Price increases`, value: "increase" },
+                            { label: `${SELECT_OPTION_PREFIX}Price decreases`, value: "decrease" },
+                            { label: `${SELECT_OPTION_PREFIX}Large movements`, value: "large_movement" },
+                          ]}
+                          value={revertPreviewMovementFilter}
+                          onChange={(value) =>
+                            setRevertPreviewMovementFilter(value as RevertPreviewMovementFilter)
+                          }
+                          disabled={isProcessing}
+                        />
+                      </div>
+                      <div style={{ minWidth: 130 }}>
+                        <Select
+                          label="Rows per page"
+                          options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
+                            label: `${SELECT_OPTION_PREFIX}${size}`,
+                            value: String(size),
+                          }))}
+                          value={String(revertPreviewPageSize)}
+                          onChange={(value) => setRevertPreviewPageSize(Number(value))}
+                          disabled={isProcessing}
+                        />
+                      </div>
+                    </InlineStack>
+                  </Box>
                   <Box padding="200" background="bg-surface-secondary" borderRadius="200">
                     <BlockStack gap="150">
-                      <InlineStack align="space-between">
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: REVERT_PREVIEW_COMPARISON_GRID,
+                          gap: "12px",
+                          alignItems: "center",
+                          paddingInline: "2px",
+                        }}
+                      >
                         <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
-                        <InlineStack gap="300" wrap={false}>
-                          <Text as="p" variant="bodySm" fontWeight="medium">Current</Text>
-                          <Text as="p" variant="bodySm" fontWeight="medium">Revert Target</Text>
-                        </InlineStack>
-                      </InlineStack>
-                      {revertPreview.rows.slice(0, 12).map((row) => (
-                        <InlineStack key={`${row.variantId}-${row.revertTargetPrice}`} align="space-between" blockAlign="center">
-                          <BlockStack gap="0">
-                            <Text as="p" variant="bodySm">{row.productTitle}</Text>
-                            <Text as="p" variant="bodySm" tone="subdued">{row.variantId}</Text>
-                          </BlockStack>
-                          <InlineStack gap="300" wrap={false}>
-                            <Text as="p" variant="bodySm">
+                        <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                          <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
+                            Current
+                          </Text>
+                        </div>
+                        <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                          <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
+                            Revert Target
+                          </Text>
+                        </div>
+                      </div>
+                      {revertPreviewPaginatedRows.map((row) => (
+                        <div
+                          key={`${row.variantId}-${row.revertTargetPrice}`}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: REVERT_PREVIEW_COMPARISON_GRID,
+                            gap: "12px",
+                            alignItems: "start",
+                            padding: "12px 2px",
+                            borderTop: "1px solid var(--p-color-border-secondary)",
+                          }}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <BlockStack gap="0">
+                              <div style={{ overflowWrap: "anywhere" }}>
+                                <Text as="p" variant="bodySm">{row.productTitle}</Text>
+                              </div>
+                              <div style={{ overflowWrap: "anywhere" }}>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  {compactVariantIdentifier(row.variantId)}
+                                </Text>
+                              </div>
+                            </BlockStack>
+                          </div>
+                          <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                            <Text as="p" variant="bodySm" alignment="end" tone="subdued">
                               {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
                             </Text>
-                            <Text as="p" variant="bodySm" fontWeight="medium" tone="critical">
+                          </div>
+                          <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                            <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
                               {formatMoney(row.revertTargetPrice, currencyCode)}
                             </Text>
-                          </InlineStack>
-                        </InlineStack>
+                          </div>
+                        </div>
                       ))}
-                      {revertPreview.rows.length > 12 && (
+                      {revertPreviewFilteredRows.length === 0 ? (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Showing first 12 of {revertPreview.rows.length} rows.
+                          No products match the current revert preview filters.
                         </Text>
-                      )}
+                      ) : null}
                       {revertPreview.rows.some((row) => Boolean(row.revertFailureReason)) && (
                         <Text as="p" variant="bodySm" tone="subdued">
                           Some items include recovery notes from previous Shopify failures.
                         </Text>
                       )}
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {`Showing ${
+                            revertPreviewFilteredRows.length === 0
+                              ? 0
+                              : (revertPreviewPage - 1) * revertPreviewPageSize + 1
+                          }-${
+                            Math.min(
+                              revertPreviewPage * revertPreviewPageSize,
+                              revertPreviewFilteredRows.length
+                            )
+                          } of ${revertPreviewFilteredRows.length} matching products`}
+                        </Text>
+                        <Pagination
+                          hasPrevious={revertPreviewPage > 1}
+                          onPrevious={() => setRevertPreviewPage((prev) => Math.max(1, prev - 1))}
+                          hasNext={revertPreviewPage < revertPreviewTotalPages}
+                          onNext={() =>
+                            setRevertPreviewPage((prev) =>
+                              Math.min(revertPreviewTotalPages, prev + 1)
+                            )
+                          }
+                          label={`Page ${revertPreviewPage} of ${revertPreviewTotalPages}`}
+                        />
+                      </InlineStack>
                     </BlockStack>
                   </Box>
                 </>
@@ -2615,35 +3255,6 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   No preview data available.
                 </Text>
               )}
-            </BlockStack>
-          </Modal.Section>
-        </Modal>
-
-        {/* Apply All confirmation modal — unchanged handler */}
-        <Modal
-          open={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Confirm Bulk Update"
-          primaryAction={{
-            content: 'Apply Changes',
-            onAction: () => { void handleApplyBatch(previews, applyCampaignTitle); },
-            loading: isProcessing,
-            disabled: isProcessing
-          }}
-          secondaryActions={[{ content: 'Cancel', onAction: () => setIsModalOpen(false) }]}
-        >
-          <Modal.Section>
-            <BlockStack gap="300">
-              <Text as="p">
-                You are about to update prices for <strong>{previews.length}</strong> products.
-                This action can be undone later using the "Undo Last Update" button.
-              </Text>
-              <TextField
-                label="Campaign Name"
-                value={applyCampaignTitle}
-                onChange={setApplyCampaignTitle}
-                autoComplete="off"
-              />
             </BlockStack>
           </Modal.Section>
         </Modal>
