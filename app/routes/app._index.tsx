@@ -282,6 +282,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
   const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([]);
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
+  const [campaignHistoryExpanded, setCampaignHistoryExpanded] = useState(true);
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
   const [revertPreviewOpen, setRevertPreviewOpen] = useState(false);
   const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
@@ -943,6 +944,31 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     return visible;
   }, [campaignHistory, hideClosedCampaigns]);
 
+  const campaignHistorySummary = useMemo(() => {
+    return campaignHistory.reduce(
+      (acc, campaign) => {
+        const status = campaign.status.toLowerCase();
+        if (status === "active") {
+          acc.active += 1;
+        } else if (status === "partial") {
+          acc.partial += 1;
+        } else if (status === "reverted" || status === "unrecoverable") {
+          acc.closed += 1;
+        }
+        return acc;
+      },
+      { active: 0, partial: 0, closed: 0 }
+    );
+  }, [campaignHistory]);
+
+  const toggleCampaignHistoryExpanded = useCallback(() => {
+    setCampaignHistoryExpanded((prev) => {
+      const next = !prev;
+      console.log(next ? "campaign history expanded" : "campaign history collapsed");
+      return next;
+    });
+  }, []);
+
   const toggleSelection = (id: string) => {
     setSelectedItems(prev => {
       const next = new Set(prev);
@@ -1275,110 +1301,144 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     >
                       Refresh
                     </Button>
+                    <Button
+                      size="slim"
+                      variant="tertiary"
+                      onClick={toggleCampaignHistoryExpanded}
+                      accessibilityLabel={campaignHistoryExpanded ? "Collapse campaign history panel" : "Expand campaign history panel"}
+                    >
+                      {campaignHistoryExpanded ? "Collapse" : "Expand"}
+                    </Button>
                   </InlineStack>
                 </InlineStack>
-
-                <Checkbox
-                  label="Hide Closed Campaigns"
-                  checked={hideClosedCampaigns}
-                  onChange={(checked) => {
-                    setHideClosedCampaigns(checked);
-                    console.log(
-                      checked
-                        ? "[Campaign History UI] closed campaigns hidden"
-                        : "[Campaign History UI] closed campaigns shown"
-                    );
+                <div
+                  style={{
+                    overflow: "hidden",
+                    maxHeight: campaignHistoryExpanded ? 1200 : 0,
+                    opacity: campaignHistoryExpanded ? 1 : 0,
+                    transition: "max-height 220ms ease, opacity 160ms ease",
                   }}
-                />
+                >
+                  <BlockStack gap="300">
+                    <Checkbox
+                      label="Hide Closed Campaigns"
+                      checked={hideClosedCampaigns}
+                      onChange={(checked) => {
+                        setHideClosedCampaigns(checked);
+                        console.log(
+                          checked
+                            ? "[Campaign History UI] closed campaigns hidden"
+                            : "[Campaign History UI] closed campaigns shown"
+                        );
+                      }}
+                    />
 
-                {visibleCampaignHistory.length === 0 ? (
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {campaignHistory.length === 0
-                      ? "No campaigns recorded yet."
-                      : "No campaigns match the current filter."}
-                  </Text>
-                ) : (
-                  <div style={{ maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
-                    <BlockStack gap="200">
-                      {visibleCampaignHistory.map((campaign) => (
-                        <Box
-                          key={campaign.campaignId}
-                          padding="300"
-                          background="bg-surface-secondary"
-                          borderRadius="200"
-                        >
-                          <InlineStack align="space-between" blockAlign="start" wrap>
-                            <BlockStack gap="100">
-                              <InlineStack gap="200" blockAlign="center" wrap>
-                                <Text as="p" variant="bodyMd" fontWeight="medium">
-                                  {campaign.title}
-                                </Text>
-                                <Badge tone={campaignStatusTone(campaign.status)}>
-                                  {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
-                                </Badge>
-                              </InlineStack>
-                              <InlineStack gap="300" wrap>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Source: {campaign.source || "unknown"}
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Products: {campaign.productCount}
-                                </Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Created: {new Date(campaign.createdAt).toLocaleString()}
-                                </Text>
-                              </InlineStack>
-                              <Box padding="200" background="bg-surface" borderRadius="200">
-                                <InlineStack gap="200" wrap>
-                                  <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
-                                  <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
-                                  <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
-                                  <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                    {visibleCampaignHistory.length === 0 ? (
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {campaignHistory.length === 0
+                          ? "No campaigns recorded yet."
+                          : "No campaigns match the current filter."}
+                      </Text>
+                    ) : (
+                      <div style={{ maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
+                        <BlockStack gap="200">
+                          {visibleCampaignHistory.map((campaign) => (
+                            <Box
+                              key={campaign.campaignId}
+                              padding="300"
+                              background="bg-surface-secondary"
+                              borderRadius="200"
+                            >
+                              <InlineStack align="space-between" blockAlign="start" wrap>
+                                <BlockStack gap="100">
+                                  <InlineStack gap="200" blockAlign="center" wrap>
+                                    <Text as="p" variant="bodyMd" fontWeight="medium">
+                                      {campaign.title}
+                                    </Text>
+                                    <Badge tone={campaignStatusTone(campaign.status)}>
+                                      {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
+                                    </Badge>
+                                  </InlineStack>
+                                  <InlineStack gap="300" wrap>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Source: {campaign.source || "unknown"}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Products: {campaign.productCount}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Created: {new Date(campaign.createdAt).toLocaleString()}
+                                    </Text>
+                                  </InlineStack>
+                                  <Box padding="200" background="bg-surface" borderRadius="200">
+                                    <InlineStack gap="200" wrap>
+                                      <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
+                                      <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
+                                      <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
+                                      <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                                    </InlineStack>
+                                  </Box>
+                                  {campaign.unrecoverableReason && (
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Reason: {campaign.unrecoverableReason}
+                                    </Text>
+                                  )}
+                                </BlockStack>
+
+                                <InlineStack gap="200" wrap={false}>
+                                  <Button
+                                    size="slim"
+                                    variant="tertiary"
+                                    onClick={() => { void openCampaignDetailView(campaign); }}
+                                  >
+                                    View
+                                  </Button>
+                                  {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
+                                    <Button
+                                      size="slim"
+                                      variant="secondary"
+                                      disabled={isProcessing}
+                                      loading={isProcessing}
+                                      onClick={() => openCampaignRevertPreview(campaign, true)}
+                                    >
+                                      Retry Failed Reverts
+                                    </Button>
+                                  )}
+                                  {campaign.revertable && (
+                                    <Button
+                                      size="slim"
+                                      tone="critical"
+                                      disabled={isProcessing}
+                                      loading={isProcessing}
+                                      onClick={() => openCampaignRevertPreview(campaign)}
+                                    >
+                                      Revert
+                                    </Button>
+                                  )}
                                 </InlineStack>
-                              </Box>
-                              {campaign.unrecoverableReason && (
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  Reason: {campaign.unrecoverableReason}
-                                </Text>
-                              )}
-                            </BlockStack>
+                              </InlineStack>
+                            </Box>
+                          ))}
+                        </BlockStack>
+                      </div>
+                    )}
+                  </BlockStack>
+                </div>
 
-                            <InlineStack gap="200" wrap={false}>
-                              <Button
-                                size="slim"
-                                variant="tertiary"
-                                onClick={() => { void openCampaignDetailView(campaign); }}
-                              >
-                                View
-                              </Button>
-                              {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
-                                <Button
-                                  size="slim"
-                                  variant="secondary"
-                                  disabled={isProcessing}
-                                  loading={isProcessing}
-                                  onClick={() => openCampaignRevertPreview(campaign, true)}
-                                >
-                                  Retry Failed Reverts
-                                </Button>
-                              )}
-                              {campaign.revertable && (
-                                <Button
-                                  size="slim"
-                                  tone="critical"
-                                  disabled={isProcessing}
-                                  loading={isProcessing}
-                                  onClick={() => openCampaignRevertPreview(campaign)}
-                                >
-                                  Revert
-                                </Button>
-                              )}
-                            </InlineStack>
-                          </InlineStack>
-                        </Box>
-                      ))}
-                    </BlockStack>
-                  </div>
+                {!campaignHistoryExpanded && (
+                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                    <InlineStack gap="300" wrap>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Active: {campaignHistorySummary.active}
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Partial: {campaignHistorySummary.partial}
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Closed: {campaignHistorySummary.closed}
+                      </Text>
+                    </InlineStack>
+                  </Box>
                 )}
               </BlockStack>
             </Card>
