@@ -32,6 +32,8 @@ import {
   CalendarTimeIcon,
   ArrowDownIcon,
   UndoIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "@shopify/polaris-icons";
 import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
@@ -93,6 +95,32 @@ interface CampaignRevertPreviewData {
   totalTrackedCount?: number;
   terminal?: boolean;
   message?: string | null;
+}
+
+type TimelineTone = "success" | "warning" | "critical" | "info" | "attention";
+
+interface CampaignTimelineMilestone {
+  key: string;
+  label: string;
+  tone: TimelineTone;
+  timestamp?: string | null;
+  description: string;
+}
+
+type CampaignHistoryStatusFilter = "all" | "active" | "partial" | "scheduled" | "closed";
+type CampaignHistorySourceFilter = "all" | "manual" | "scheduled";
+
+function normalizeCampaignStatus(status: string) {
+  return status.toLowerCase();
+}
+
+function isClosedCampaignStatus(status: string) {
+  const normalized = normalizeCampaignStatus(status);
+  return normalized === "reverted" || normalized === "unrecoverable";
+}
+
+function normalizeCampaignSource(source: string | null) {
+  return (source ?? "").trim().toLowerCase();
 }
 
 function getDefaultApplyCampaignTitle() {
@@ -284,6 +312,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
   const [campaignHistoryExpanded, setCampaignHistoryExpanded] = useState(true);
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
+  const [campaignHistoryStatusFilter, setCampaignHistoryStatusFilter] = useState<CampaignHistoryStatusFilter>("all");
+  const [campaignHistorySourceFilter, setCampaignHistorySourceFilter] = useState<CampaignHistorySourceFilter>("all");
+  const [campaignHistorySearchQuery, setCampaignHistorySearchQuery] = useState("");
   const [revertPreviewOpen, setRevertPreviewOpen] = useState(false);
   const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
   const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] = useState(false);
@@ -931,35 +962,233 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     return "Pending";
   }, []);
 
-  const visibleCampaignHistory = useMemo(() => {
-    if (!hideClosedCampaigns) return campaignHistory;
-    const visible = campaignHistory.filter((campaign) => {
-      const status = campaign.status.toLowerCase();
-      return status !== "reverted" && status !== "unrecoverable";
-    });
-    console.log("[Campaign History UI] closed campaigns hidden", {
-      hiddenCount: campaignHistory.length - visible.length,
-      total: campaignHistory.length,
-    });
-    return visible;
-  }, [campaignHistory, hideClosedCampaigns]);
+  const formatTimelineTimestamp = useCallback((value?: string | null) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleString();
+  }, []);
 
-  const campaignHistorySummary = useMemo(() => {
+  const campaignOperationalTimeline = useMemo<CampaignTimelineMilestone[]>(() => {
+    if (!selectedCampaignForDetail) return [];
+
+    const normalizedStatus = normalizeCampaignStatus(selectedCampaignForDetail.status);
+    const failedCount = campaignDetail?.failedCount ?? selectedCampaignForDetail.failedCount ?? 0;
+
+    const milestones: CampaignTimelineMilestone[] = [
+      {
+        key: "created",
+        label: "Created",
+        tone: "info",
+        timestamp: formatTimelineTimestamp(selectedCampaignForDetail.createdAt),
+        description: "Campaign record created and ready for lifecycle actions.",
+      },
+    ];
+
+    if (normalizedStatus === "scheduled" || normalizedStatus === "pending") {
+      milestones.push({
+        key: "scheduled",
+        label: "Scheduled",
+        tone: "warning",
+        description: "Campaign is queued for execution.",
+      });
+    }
+
+    if (["active", "partial", "reverted", "unrecoverable"].includes(normalizedStatus)) {
+      milestones.push({
+        key: "applied",
+        label: "Applied",
+        tone: "success",
+        description: "Pricing updates were applied to tracked items.",
+      });
+    }
+
+    if (normalizedStatus === "partial" || failedCount > 0) {
+      milestones.push({
+        key: "partial-failure",
+        label: "Partial Failure",
+        tone: "warning",
+        description: "Some items failed to complete rollback operations.",
+      });
+    }
+
+    if (normalizedStatus === "reverted") {
+      milestones.push({
+        key: "reverted",
+        label: "Reverted",
+        tone: "success",
+        description: "Rollback completed and tracked prices were restored.",
+      });
+    }
+
+    if (normalizedStatus === "unrecoverable") {
+      milestones.push({
+        key: "unrecoverable",
+        label: "Unrecoverable",
+        tone: "critical",
+        description:
+          selectedCampaignForDetail.unrecoverableReason ??
+          "Rollback is terminal for one or more items and cannot be retried.",
+      });
+    }
+
+    return milestones;
+  }, [campaignDetail, formatTimelineTimestamp, selectedCampaignForDetail]);
+
+  const compactVariantIdentifier = useCallback((variantId: string) => {
+    const normalized = variantId.trim();
+    if (normalized.length === 0) return "Variant: -";
+    if (normalized.startsWith("gid://")) {
+      return `gid://...${normalized.slice(-6)}`;
+    }
+    if (normalized.length > 16) {
+      return `Variant: ...${normalized.slice(-8)}`;
+    }
+    return `Variant: ${normalized}`;
+  }, []);
+
+  const campaignHistoryCounts = useMemo(() => {
     return campaignHistory.reduce(
       (acc, campaign) => {
-        const status = campaign.status.toLowerCase();
+        const status = normalizeCampaignStatus(campaign.status);
         if (status === "active") {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
-        } else if (status === "reverted" || status === "unrecoverable") {
+        } else if (status === "scheduled" || status === "pending") {
+          acc.scheduled += 1;
+        } else if (isClosedCampaignStatus(status)) {
+          acc.closed += 1;
+        }
+        return acc;
+      },
+      { active: 0, partial: 0, scheduled: 0, closed: 0 }
+    );
+  }, [campaignHistory]);
+
+  const handleCampaignHistoryStatusFilterChange = useCallback((value: string) => {
+    const nextValue = value as CampaignHistoryStatusFilter;
+    setCampaignHistoryStatusFilter(nextValue);
+    console.log("[Campaign History UI] campaign history filter changed", {
+      statusFilter: nextValue,
+    });
+  }, []);
+
+  const handleCampaignHistorySourceFilterChange = useCallback((value: string) => {
+    const nextValue = value as CampaignHistorySourceFilter;
+    setCampaignHistorySourceFilter(nextValue);
+    console.log("[Campaign History UI] campaign history filter changed", {
+      sourceFilter: nextValue,
+    });
+  }, []);
+
+  const handleCampaignHistorySearchChange = useCallback((value: string) => {
+    if (value.length > 120) return;
+    setCampaignHistorySearchQuery(value);
+    console.log("[Campaign History UI] campaign history search applied", {
+      query: value.trim(),
+    });
+  }, []);
+
+  const filteredCampaignHistory = useMemo(() => {
+    const normalizedQuery = campaignHistorySearchQuery.trim().toLowerCase();
+
+    return campaignHistory.filter((campaign) => {
+      const status = normalizeCampaignStatus(campaign.status);
+      const source = normalizeCampaignSource(campaign.source);
+      const title = campaign.title.toLowerCase();
+      const campaignId = campaign.campaignId.toLowerCase();
+
+      const matchesStatus = (() => {
+        if (campaignHistoryStatusFilter === "all") return true;
+        if (campaignHistoryStatusFilter === "active") return status === "active";
+        if (campaignHistoryStatusFilter === "partial") return status === "partial";
+        if (campaignHistoryStatusFilter === "scheduled") return status === "scheduled" || status === "pending";
+        return isClosedCampaignStatus(status);
+      })();
+
+      const matchesSource =
+        campaignHistorySourceFilter === "all" || source === campaignHistorySourceFilter;
+
+      const matchesSearch =
+        normalizedQuery.length === 0 ||
+        title.includes(normalizedQuery) ||
+        campaignId.includes(normalizedQuery);
+
+      return matchesStatus && matchesSource && matchesSearch;
+    });
+  }, [campaignHistory, campaignHistoryStatusFilter, campaignHistorySourceFilter, campaignHistorySearchQuery]);
+
+  const visibleCampaignHistory = useMemo(() => {
+    if (!hideClosedCampaigns) return filteredCampaignHistory;
+    const visible = filteredCampaignHistory.filter((campaign) => !isClosedCampaignStatus(campaign.status));
+    console.log("[Campaign History UI] closed campaigns hidden", {
+      hiddenCount: filteredCampaignHistory.length - visible.length,
+      total: filteredCampaignHistory.length,
+    });
+    return visible;
+  }, [filteredCampaignHistory, hideClosedCampaigns]);
+
+  const campaignHistorySummary = useMemo(() => {
+    return visibleCampaignHistory.reduce(
+      (acc, campaign) => {
+        const status = normalizeCampaignStatus(campaign.status);
+        if (status === "active") {
+          acc.active += 1;
+        } else if (status === "partial") {
+          acc.partial += 1;
+        } else if (isClosedCampaignStatus(status)) {
           acc.closed += 1;
         }
         return acc;
       },
       { active: 0, partial: 0, closed: 0 }
     );
-  }, [campaignHistory]);
+  }, [visibleCampaignHistory]);
+
+  const campaignHistoryStatusOptions = useMemo(
+    () => [
+      { label: "All", value: "all" },
+      { label: `Active (${campaignHistoryCounts.active})`, value: "active" },
+      { label: `Partial (${campaignHistoryCounts.partial})`, value: "partial" },
+      { label: "Scheduled", value: "scheduled" },
+      { label: "Closed", value: "closed" },
+    ],
+    [campaignHistoryCounts.active, campaignHistoryCounts.partial]
+  );
+
+  const campaignHistorySourceOptions = useMemo(
+    () => [
+      { label: "All Sources", value: "all" },
+      { label: "Manual", value: "manual" },
+      { label: "Scheduled", value: "scheduled" },
+    ],
+    []
+  );
+
+  const campaignHistoryEmptyStateMessage = useMemo(() => {
+    if (campaignHistory.length === 0) return "No campaigns recorded yet.";
+
+    if (filteredCampaignHistory.length === 0) {
+      if (campaignHistoryStatusFilter === "active") return "No active campaigns found.";
+      if (campaignHistoryStatusFilter === "partial") return "No partial campaigns found.";
+      if (campaignHistoryStatusFilter === "scheduled") return "No scheduled campaigns found.";
+      if (campaignHistoryStatusFilter === "closed") return "No closed campaigns found.";
+      return "No campaigns match the current filters.";
+    }
+
+    if (hideClosedCampaigns && visibleCampaignHistory.length === 0) {
+      return "All matching campaigns are closed. Turn off Hide Closed Campaigns to view them.";
+    }
+
+    return "No campaigns match the current filters.";
+  }, [
+    campaignHistory.length,
+    filteredCampaignHistory.length,
+    campaignHistoryStatusFilter,
+    hideClosedCampaigns,
+    visibleCampaignHistory.length,
+  ]);
 
   const toggleCampaignHistoryExpanded = useCallback(() => {
     setCampaignHistoryExpanded((prev) => {
@@ -1304,6 +1533,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     <Button
                       size="slim"
                       variant="tertiary"
+                      icon={campaignHistoryExpanded ? ChevronUpIcon : ChevronDownIcon}
                       onClick={toggleCampaignHistoryExpanded}
                       accessibilityLabel={campaignHistoryExpanded ? "Collapse campaign history panel" : "Expand campaign history panel"}
                     >
@@ -1320,6 +1550,34 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                   }}
                 >
                   <BlockStack gap="300">
+                    <InlineStack gap="300" wrap align="start">
+                      <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
+                        <Select
+                          label="Status"
+                          options={campaignHistoryStatusOptions}
+                          value={campaignHistoryStatusFilter}
+                          onChange={handleCampaignHistoryStatusFilterChange}
+                        />
+                      </div>
+                      <div style={{ flex: "1 1 180px", minWidth: "160px" }}>
+                        <Select
+                          label="Source"
+                          options={campaignHistorySourceOptions}
+                          value={campaignHistorySourceFilter}
+                          onChange={handleCampaignHistorySourceFilterChange}
+                        />
+                      </div>
+                      <div style={{ flex: "2 1 260px", minWidth: "220px" }}>
+                        <TextField
+                          label="Search Campaigns"
+                          value={campaignHistorySearchQuery}
+                          onChange={handleCampaignHistorySearchChange}
+                          autoComplete="off"
+                          placeholder="Campaign title or campaign ID"
+                          maxLength={120}
+                        />
+                      </div>
+                    </InlineStack>
                     <Checkbox
                       label="Hide Closed Campaigns"
                       checked={hideClosedCampaigns}
@@ -1333,11 +1591,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       }}
                     />
 
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Showing {visibleCampaignHistory.length} of {filteredCampaignHistory.length} matching campaigns
+                    </Text>
+
                     {visibleCampaignHistory.length === 0 ? (
                       <Text as="p" variant="bodySm" tone="subdued">
-                        {campaignHistory.length === 0
-                          ? "No campaigns recorded yet."
-                          : "No campaigns match the current filter."}
+                        {campaignHistoryEmptyStateMessage}
                       </Text>
                     ) : (
                       <div style={{ maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
@@ -2078,38 +2338,166 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
                   </InlineStack>
 
+                  {campaignOperationalTimeline.length > 0 && (
+                    <Box padding="300" background="bg-surface" borderRadius="200">
+                      <BlockStack gap="200">
+                        <Text as="h3" variant="headingSm">
+                          Operational timeline
+                        </Text>
+                        <div
+                          style={{
+                            borderLeft: "2px solid var(--p-color-border-secondary)",
+                            paddingLeft: 12,
+                          }}
+                        >
+                          <BlockStack gap="200">
+                            {campaignOperationalTimeline.map((milestone, index) => (
+                              <div
+                                key={milestone.key}
+                                style={{
+                                  position: "relative",
+                                  paddingLeft: 10,
+                                  paddingBottom: index === campaignOperationalTimeline.length - 1 ? 0 : 2,
+                                }}
+                              >
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    position: "absolute",
+                                    left: -18,
+                                    top: 5,
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "50%",
+                                    background:
+                                      milestone.tone === "critical"
+                                        ? "var(--p-color-bg-fill-critical)"
+                                        : milestone.tone === "warning"
+                                          ? "var(--p-color-bg-fill-warning)"
+                                          : milestone.tone === "success"
+                                            ? "var(--p-color-bg-fill-success)"
+                                            : "var(--p-color-bg-fill-info)",
+                                  }}
+                                />
+                                <InlineStack align="space-between" blockAlign="start" wrap={false}>
+                                  <InlineStack gap="200" blockAlign="center">
+                                    <Text as="p" variant="bodySm" fontWeight="medium">
+                                      {milestone.label}
+                                    </Text>
+                                    <Badge tone={milestone.tone}>{milestone.label}</Badge>
+                                  </InlineStack>
+                                  {milestone.timestamp ? (
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      {milestone.timestamp}
+                                    </Text>
+                                  ) : null}
+                                </InlineStack>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  {milestone.description}
+                                </Text>
+                              </div>
+                            ))}
+                          </BlockStack>
+                        </div>
+                      </BlockStack>
+                    </Box>
+                  )}
+
                   <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                    <div style={{ maxHeight: 360, overflowY: "auto", overflowX: "auto" }}>
+                    <div style={{ maxHeight: 360, overflowY: "auto" }}>
                       <BlockStack gap="150">
-                        <InlineStack align="space-between" wrap={false}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 1fr) 108px 108px minmax(96px, auto)",
+                            gap: "12px",
+                            alignItems: "center",
+                            paddingInline: "2px",
+                          }}
+                        >
                           <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
-                          <InlineStack gap="300" wrap={false}>
-                            <Text as="p" variant="bodySm" fontWeight="medium">Current Price</Text>
-                            <Text as="p" variant="bodySm" fontWeight="medium">Revert Target</Text>
+                          <div style={{ fontVariantNumeric: "tabular-nums" }}>
+                            <Text
+                              as="p"
+                              variant="bodySm"
+                              fontWeight="medium"
+                              alignment="end"
+                            >
+                              Current Price
+                            </Text>
+                          </div>
+                          <div style={{ fontVariantNumeric: "tabular-nums" }}>
+                            <Text
+                              as="p"
+                              variant="bodySm"
+                              fontWeight="medium"
+                              alignment="end"
+                            >
+                              Revert Target
+                            </Text>
+                          </div>
+                          <InlineStack align="start">
                             <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
                           </InlineStack>
-                        </InlineStack>
+                        </div>
                         {campaignDetail.rows.map((row) => (
-                          <InlineStack key={`${row.variantId}-${row.revertTargetPrice}-${row.status ?? "pending"}`} align="space-between" blockAlign="start" wrap={false}>
-                            <BlockStack gap="0">
-                              <Text as="p" variant="bodySm">{row.productTitle}</Text>
-                              <Text as="p" variant="bodySm" tone="subdued">{row.variantId}</Text>
-                              {row.revertFailureReason && (
-                                <Text as="p" variant="bodySm" tone="subdued">{row.revertFailureReason}</Text>
-                              )}
-                            </BlockStack>
-                            <InlineStack gap="300" wrap={false} blockAlign="center">
-                              <Text as="p" variant="bodySm">
+                          <div
+                            key={`${row.variantId}-${row.revertTargetPrice}-${row.status ?? "pending"}`}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "minmax(0, 1fr) 108px 108px minmax(96px, auto)",
+                              gap: "12px",
+                              alignItems: "start",
+                              padding: "8px 2px",
+                              borderTop: "1px solid var(--p-color-border-secondary)",
+                            }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <BlockStack gap="0">
+                                <div style={{ overflowWrap: "anywhere" }}>
+                                  <Text as="p" variant="bodySm">
+                                    {row.productTitle}
+                                  </Text>
+                                </div>
+                                <div style={{ overflowWrap: "anywhere" }}>
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    {compactVariantIdentifier(row.variantId)}
+                                  </Text>
+                                </div>
+                                {row.revertFailureReason && (
+                                  <div style={{ overflowWrap: "anywhere" }}>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      {row.revertFailureReason}
+                                    </Text>
+                                  </div>
+                                )}
+                              </BlockStack>
+                            </div>
+                            <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                              <Text
+                                as="p"
+                                variant="bodySm"
+                                alignment="end"
+                              >
                                 {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
                               </Text>
-                              <Text as="p" variant="bodySm" fontWeight="medium">
+                            </div>
+                            <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                              <Text
+                                as="p"
+                                variant="bodySm"
+                                fontWeight="medium"
+                                alignment="end"
+                              >
                                 {formatMoney(row.revertTargetPrice, currencyCode)}
                               </Text>
+                            </div>
+                            <InlineStack align="start" blockAlign="center">
                               <Badge tone={detailStatusTone(row.status)}>
                                 {detailStatusLabel(row.status)}
                               </Badge>
                             </InlineStack>
-                          </InlineStack>
+                          </div>
                         ))}
                       </BlockStack>
                     </div>
