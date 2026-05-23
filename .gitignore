@@ -38,3 +38,5 @@ extensions/**/assets/*.gif
 .vscode/
 .idea/
 .cursor/
+# TREA local workspace
+.trae/

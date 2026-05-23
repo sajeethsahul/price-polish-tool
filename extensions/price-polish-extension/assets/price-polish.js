@@ -51,24 +51,86 @@
       return true;
     } catch (error) {
       console.error("Price Polish: Error fetching config:", error);
-      CONFIG = { markup: 10, charm: true, rounding: 1, manualIds: [] };
+      CONFIG = {
+        markup: 10,
+        charm: true,
+        rounding: 1,
+        adjustmentType: "percentage",
+        adjustmentDirection: "increase",
+        adjustmentValue: 10,
+        endingOption: "0.99",
+        roundingPrecision: "standard",
+        minPrice: null,
+        maxPrice: null,
+        manualIds: [],
+        appliedPrices: [],
+      };
       return false;
     }
   }
 
   function calculatePrice(price) {
     if (!CONFIG) return price;
-    // If markup is 0 and no rounding/charm, don't change anything
-    if (CONFIG.markup === 0 && CONFIG.rounding === 0 && !CONFIG.charm) return price.toFixed(2);
-    
-    let newPrice = price * (1 + CONFIG.markup / 100);
-    
-    if (CONFIG.charm) {
-      newPrice = Math.floor(newPrice) + 0.99;
-    } else if (CONFIG.rounding > 0) {
-      newPrice = Math.floor(newPrice) + CONFIG.rounding;
+
+    const adjustmentType = (CONFIG.adjustmentType || "percentage").toLowerCase();
+    const adjustmentDirection = (CONFIG.adjustmentDirection || (Number(CONFIG.markup) < 0 ? "decrease" : "increase")).toLowerCase();
+    const adjustmentValue = Number(
+      CONFIG.adjustmentValue !== undefined
+        ? CONFIG.adjustmentValue
+        : Math.abs(Number(CONFIG.markup) || 0)
+    );
+
+    const signed = adjustmentDirection === "decrease" ? -1 : 1;
+
+    let adjusted = price;
+    if (adjustmentType === "fixed") {
+      adjusted = price + signed * adjustmentValue;
+    } else {
+      adjusted = price * (1 + signed * (adjustmentValue / 100));
     }
-    return newPrice.toFixed(2);
+
+    const roundingPrecision = (CONFIG.roundingPrecision || "standard").toLowerCase();
+    if (roundingPrecision === "whole") {
+      adjusted = Math.round(adjusted);
+    } else if (roundingPrecision === "nearest-0.05") {
+      adjusted = Math.round(adjusted / 0.05) * 0.05;
+    } else {
+      adjusted = Number(adjusted.toFixed(2));
+    }
+
+    const endingOption = String(
+      CONFIG.endingOption !== undefined
+        ? CONFIG.endingOption
+        : (CONFIG.charm ? "0.99" : (Number(CONFIG.rounding) > 0 ? Number(CONFIG.rounding).toFixed(2) : "none"))
+    ).toLowerCase();
+
+    if (endingOption !== "none") {
+      const endingNumber = Number(endingOption);
+      if (!isNaN(endingNumber) && endingNumber >= 0 && endingNumber < 1) {
+        let candidate = Math.floor(adjusted) + endingNumber;
+        if (adjustmentDirection === "decrease") {
+          if (candidate > adjusted) candidate -= 1;
+        } else {
+          if (candidate < adjusted) candidate += 1;
+        }
+        adjusted = Number(candidate.toFixed(2));
+      }
+    } else {
+      adjusted = Number(adjusted.toFixed(2));
+    }
+
+    const minPrice = CONFIG.minPrice === null || CONFIG.minPrice === undefined ? null : Number(CONFIG.minPrice);
+    const maxPrice = CONFIG.maxPrice === null || CONFIG.maxPrice === undefined ? null : Number(CONFIG.maxPrice);
+
+    if (minPrice !== null && !isNaN(minPrice)) {
+      adjusted = Math.max(adjusted, minPrice);
+    }
+    if (maxPrice !== null && !isNaN(maxPrice)) {
+      adjusted = Math.min(adjusted, maxPrice);
+    }
+
+    if (!isFinite(adjusted)) return price.toFixed(2);
+    return Number(adjusted).toFixed(2);
   }
 
   function updatePrices() {

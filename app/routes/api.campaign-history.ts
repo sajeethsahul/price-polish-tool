@@ -87,7 +87,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       return json({ campaigns: [] });
     }
 
-    const campaignIds = campaigns.map((c) => c.id);
+    const campaignIds = campaigns.map((c: any) => c.id)
 
     const [historyRows, scheduledRows] = await Promise.all([
       prisma.priceHistory.findMany({
@@ -213,7 +213,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     const now = new Date();
-    const result: CampaignHistoryItem[] = campaigns.map((campaign) => {
+    const result: CampaignHistoryItem[] = campaigns.map((campaign: any) => {
       const latestBatchId = latestBatchByCampaign.get(campaign.id) ?? null;
       const productCount =
         scheduledCountByCampaign.get(campaign.id) ??

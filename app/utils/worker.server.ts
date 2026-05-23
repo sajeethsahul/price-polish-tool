@@ -312,7 +312,7 @@ export function startWorker() {
 
                 try {
                     const restoreClaimedAt = new Date();
-                    if (!isWindowExpired({ ...expiredWindow, source: "schedule-window" }, restoreClaimedAt)) {
+                    if (!expiredWindow.windowEndAt || expiredWindow.windowEndAt > restoreClaimedAt) {
                         console.warn("[Worker] ⚠️ Restore claim skipped because window end has not passed", {
                             jobId,
                             campaignId,
@@ -456,10 +456,18 @@ export function startWorker() {
                         });
                     }
 
-                    if (
-                        job.mode === "time-window" &&
-                        isWindowExpired({ ...job, source: "schedule-window" }, new Date())
-                    ) {
+                  if (
+                            job.mode === "time-window" &&
+                            job.windowEndAt &&
+                            isWindowExpired(
+                                {
+                                    ...job,
+                                    source: "schedule-window",
+                                    windowEndAt: job.windowEndAt,
+                                },
+                                new Date()
+                            )
+                        ) {
                         console.warn("[Worker] ⚠️ Skipping expired pricing window before publish", {
                             jobId,
                             campaignId: job.campaignId,

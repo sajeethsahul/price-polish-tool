@@ -29,6 +29,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const markupPercent = rule?.markupPercent ?? 10;
         const charmPricing = rule?.charmPricing ?? true;
         const roundingStep = rule?.roundingStep ?? 1;
+        const endingOption = rule?.endingOption ?? (charmPricing ? "0.99" : (roundingStep > 0 ? Number(roundingStep).toFixed(2) : "none"));
+        const roundingPrecision = rule?.roundingPrecision ?? "standard";
+        const minPrice = rule?.minPrice ?? null;
+        const maxPrice = rule?.maxPrice ?? null;
+        const adjustmentType = rule?.adjustmentType ?? "percentage";
+        const adjustmentDirection = adjustmentType === "percentage"
+          ? (markupPercent < 0 ? "decrease" : "increase")
+          : (rule?.adjustmentDirection ?? "increase");
+        const adjustmentValue = adjustmentType === "percentage"
+          ? Math.abs(markupPercent)
+          : (rule?.adjustmentValue ?? 0);
 
         console.log("[PREVIEW] Fetching Shopify products");
                     console.log("[PREVIEW] Rule loaded:", {
@@ -140,12 +151,15 @@ console.log("[PREVIEW] History rows:", histories.length);
                     ? currentPrice
                     : (isFinite(historyOld) ? historyOld : currentPrice);
 
-            const newPrice = calculatePrice(
-                basePrice,
-                markupPercent,
-                roundingStep,
-                charmPricing,
-            );
+            const newPrice = calculatePrice(basePrice, {
+                adjustmentType,
+                adjustmentDirection,
+                adjustmentValue,
+                endingOption,
+                roundingPrecision,
+                minPrice,
+                maxPrice,
+            });
 
             return {
                 productId: product.id,
@@ -174,6 +188,13 @@ console.log("[PREVIEW] ruleExists:", ruleExists);
             markupPercent,
             roundingStep,
             charmPricing,
+            adjustmentType,
+            adjustmentDirection,
+            adjustmentValue,
+            endingOption,
+            roundingPrecision,
+            minPrice,
+            maxPrice,
             ruleExists,
             lastUpdate,
         }), {

@@ -167,10 +167,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 
     // ================= RESPONSE =================
+    const liveMarkupPercent = rule?.liveMarkupPercent ?? 0;
+    const liveCharmPricing = rule?.liveCharmPricing ?? false;
+    const liveRoundingStep = rule?.liveRoundingStep ?? 0;
+    const liveEndingOption = rule?.liveEndingOption ?? (liveCharmPricing ? "0.99" : (liveRoundingStep > 0 ? Number(liveRoundingStep).toFixed(2) : "none"));
+    const liveRoundingPrecision = rule?.liveRoundingPrecision ?? "standard";
+    const liveAdjustmentType = rule?.liveAdjustmentType ?? "percentage";
+    const liveAdjustmentDirection = liveAdjustmentType === "percentage"
+      ? (liveMarkupPercent < 0 ? "decrease" : "increase")
+      : (rule?.liveAdjustmentDirection ?? "increase");
+    const liveAdjustmentValue = liveAdjustmentType === "percentage"
+      ? Math.abs(liveMarkupPercent)
+      : (rule?.liveAdjustmentValue ?? 0);
+    const liveMinPrice = rule?.liveMinPrice ?? null;
+    const liveMaxPrice = rule?.liveMaxPrice ?? null;
+
     const settings = {
-      markup: rule?.liveMarkupPercent ?? 0,
-      charm: rule?.liveCharmPricing ?? false,
-      rounding: rule?.liveRoundingStep ?? 0,
+      markup: liveMarkupPercent,
+      charm: liveCharmPricing,
+      rounding: liveRoundingStep,
+      adjustmentType: liveAdjustmentType,
+      adjustmentDirection: liveAdjustmentDirection,
+      adjustmentValue: liveAdjustmentValue,
+      endingOption: liveEndingOption,
+      roundingPrecision: liveRoundingPrecision,
+      minPrice: liveMinPrice,
+      maxPrice: liveMaxPrice,
       manualIds: polishedProducts.map((p) => p.variantId),
       appliedPrices: polishedProducts.map((p) => p.newPrice),
     };

@@ -24,7 +24,7 @@ export default function HelpPage() {
       backAction={{ onAction: () => navigate("/app") }}
       fullWidth
     >
-      <Box maxWidth="980px" marginInline="auto">
+      <div style={{ maxWidth: "980px", margin: "0 auto" }}>
         <BlockStack gap="500">
 
           <Banner tone="info" title="Quick Overview">
@@ -304,7 +304,7 @@ export default function HelpPage() {
           </Banner>
 
         </BlockStack>
-      </Box>
+      </div>
     </Page>
   );
 }

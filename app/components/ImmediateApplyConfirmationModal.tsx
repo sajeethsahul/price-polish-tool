@@ -83,8 +83,7 @@ export function ImmediateApplyConfirmationModal({
       }}
       title="Confirm Immediate Apply"
       primaryAction={{
-        content: "Apply",
-        tone: "success",
+        content: "Apply",        
         loading: isProcessing,
         disabled: isProcessing || itemCount === 0,
         onAction: () => {
@@ -165,7 +164,7 @@ export function ImmediateApplyConfirmationModal({
               </BlockStack>
             </Box>
           )}
-          <Box paddingBlockStart={safeguardNotices.length > 0 ? "250" : "0"}>
+          <Box paddingBlockStart={safeguardNotices.length > 0 ? "300" : "0"}>
             <TextField
               label="Campaign Title"
               value={campaignTitle}

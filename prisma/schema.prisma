@@ -39,10 +39,24 @@ model PricingRule {
   markupPercent     Float    @default(10)
   charmPricing      Boolean  @default(true)
   roundingStep      Float    @default(1)
+  adjustmentType    String   @default("percentage") // percentage | fixed
+  adjustmentDirection String @default("increase") // increase | decrease
+  adjustmentValue   Float    @default(0)
+  endingOption      String   @default("none") // none | 0.00 | 0.25 | 0.49 | 0.50 | 0.75 | 0.95 | 0.99
+  roundingPrecision String   @default("standard") // standard | whole | keep-cents | nearest-0.05
+  minPrice          Float?
+  maxPrice          Float?
   // Storefront live settings
   liveMarkupPercent Float?
   liveCharmPricing  Boolean?
   liveRoundingStep  Float?
+  liveAdjustmentType String?
+  liveAdjustmentDirection String?
+  liveAdjustmentValue Float?
+  liveEndingOption  String?
+  liveRoundingPrecision String?
+  liveMinPrice      Float?
+  liveMaxPrice      Float?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -107,6 +121,13 @@ model PricingRuleHistory {
   markupPercent Float
   charmPricing  Boolean
   roundingStep  Float
+  adjustmentType String?
+  adjustmentDirection String?
+  adjustmentValue Float?
+  endingOption   String?
+  roundingPrecision String?
+  minPrice       Float?
+  maxPrice       Float?
   createdAt     DateTime @default(now())
 }
 
