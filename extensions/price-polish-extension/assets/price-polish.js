@@ -6,6 +6,8 @@
   let lastMutationTime = Date.now();
   let observerActive = true;
   const STABILITY_THRESHOLD = 5000; // 5 seconds of no changes to stop observer
+  const CONFIG_CACHE_KEY = "price-polish-runtime-config";
+  const CONFIG_CACHE_TTL_MS = 500;
 
   const SELECTORS = [
     ".price-item",
@@ -19,12 +21,32 @@
 
   async function fetchConfig() {
     try {
+      try {
+        const cached = sessionStorage.getItem(CONFIG_CACHE_KEY);
+        if (cached && !CONFIG) {
+          const parsed = JSON.parse(cached);
+          if (parsed.expiresAt > Date.now() && parsed.settings) {
+            CONFIG = parsed.settings;
+            updatePrices();
+          }
+        }
+      } catch {
+        sessionStorage.removeItem(CONFIG_CACHE_KEY);
+      }
+
       // Add timestamp to bypass proxy caching issues
       const timestamp = new Date().getTime();
       const response = await fetch(`/apps/price-polish/settings?t=${timestamp}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch config");
       const settings = await response.json();
       CONFIG = settings;
+      document.querySelectorAll("[data-polished='true']").forEach(el => {
+        delete el.dataset.polished;
+      });
+      sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({
+        settings,
+        expiresAt: Date.now() + CONFIG_CACHE_TTL_MS,
+      }));
       console.log("Price Polish: Config loaded", CONFIG);
       return true;
     } catch (error) {

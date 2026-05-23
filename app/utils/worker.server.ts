@@ -1,5 +1,7 @@
 import prisma from "../db.server";
 import { unauthenticated } from "../shopify.server";
+import { revertCampaignPrices } from "./revert.server";
+import { isWindowExpired } from "./window-lifecycle";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -9,6 +11,7 @@ import { unauthenticated } from "../shopify.server";
  * Using runAt as the clock reference (no updatedAt column needed).
  */
 const STUCK_JOB_TIMEOUT_MINUTES = 15;
+const PUBLISH_TIMEOUT_MS = 90 * 1000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,10 +20,55 @@ type ClaimedJob = {
     shop: string;
     campaignId?: string | null;
     runAt: Date;
+    mode?: string | null;
+    windowEndAt?: Date | null;
     status: string;
     createdAt: Date;
     products?: any;
 };
+
+async function failOneTimePublish(
+    shop: string,
+    campaignId: string | null | undefined,
+    jobId: string,
+    reason: string
+) {
+    await prisma.$transaction([
+        (prisma.scheduledJob as any).updateMany({
+            where: {
+                id: jobId,
+                shop,
+                mode: "one-time",
+                status: { in: ["pending", "processing"] },
+            },
+            data: { status: "failed" },
+        }),
+        ...(campaignId
+            ? [
+                (prisma.campaign as any).updateMany({
+                    where: {
+                        id: campaignId,
+                        shop,
+                        source: "schedule",
+                        status: { in: ["scheduled-publish", "publishing"] },
+                    },
+                    data: { status: "failed" },
+                }),
+                prisma.activityLog.create({
+                    data: {
+                        shop,
+                        action: "PUBLISH_FAILED",
+                        meta: {
+                            campaignId,
+                            jobId,
+                            reason,
+                        },
+                    },
+                }),
+            ]
+            : []),
+    ]);
+}
 
 // ─── Atomic job claim ─────────────────────────────────────────────────────────
 
@@ -58,6 +106,7 @@ type ClaimedJob = {
  *       "processing" is just a new valid string value alongside "pending"/"done"/"failed".
  */
 async function claimNextJob(): Promise<ClaimedJob | null> {
+    const now = new Date();
     const result = await prisma.$queryRaw<ClaimedJob[]>`
         UPDATE "ScheduledJob"
         SET status = 'processing'
@@ -65,12 +114,40 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
             SELECT id
             FROM   "ScheduledJob"
             WHERE  status = 'pending'
-              AND  "runAt" <= NOW()
+              AND  "runAt" <= ${now}
             ORDER  BY "runAt" ASC
             LIMIT  1
             FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, shop, "campaignId", "runAt", status, "createdAt", products
+        RETURNING id, shop, "campaignId", "runAt", mode, "windowEndAt", status, "createdAt", products
+    `;
+    return result[0] ?? null;
+}
+
+async function claimExpiredWindow(): Promise<ClaimedJob | null> {
+    const now = new Date();
+    const result = await prisma.$queryRaw<ClaimedJob[]>`
+        UPDATE "ScheduledJob" sj
+        SET status = 'restoring'
+        FROM (
+            SELECT sj_inner.id
+            FROM   "ScheduledJob" sj_inner
+            JOIN   "Campaign" c
+              ON   c.id = sj_inner."campaignId"
+             AND   c.shop = sj_inner.shop
+            WHERE  sj_inner.mode = 'time-window'
+              AND  sj_inner.status = 'active-window'
+              AND  sj_inner."windowEndAt" <= ${now}
+              AND  sj_inner."restoredAt" IS NULL
+              AND  c.source = 'schedule-window'
+              AND  c.status = 'active-window'
+              AND  c.status NOT IN ('window-stopped', 'auto-restored', 'cancelled-window', 'unrecoverable')
+            ORDER  BY sj_inner."windowEndAt" ASC
+            LIMIT  1
+            FOR UPDATE SKIP LOCKED
+        ) candidate
+        WHERE sj.id = candidate.id
+        RETURNING sj.id, sj.shop, sj."campaignId", sj."runAt", sj.mode, sj."windowEndAt", sj.status, sj."createdAt", sj.products
     `;
     return result[0] ?? null;
 }
@@ -93,35 +170,237 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
  */
 async function recoverStuckJobs(): Promise<void> {
     const cutoff = new Date(Date.now() - STUCK_JOB_TIMEOUT_MINUTES * 60 * 1000);
-    const recovered = await prisma.scheduledJob.updateMany({
+    const recoveredPublishes = await prisma.scheduledJob.updateMany({
         where: {
             status: "processing",
             runAt: { lte: cutoff },
         },
         data: { status: "pending" },
     });
-    if (recovered.count > 0) {
+    const recoveredRestores = await (prisma.scheduledJob as any).updateMany({
+        where: {
+            status: "restoring",
+            windowEndAt: { lte: cutoff },
+        },
+        data: { status: "active-window" },
+    });
+    const recoveredCount = recoveredPublishes.count + recoveredRestores.count;
+    if (recoveredCount > 0) {
         console.warn(
-            `[Worker] ♻️ Recovered ${recovered.count} stuck "processing" job(s) ` +
-            `(runAt > ${STUCK_JOB_TIMEOUT_MINUTES}min ago) — reset to "pending" for retry`
+            `[Worker] ♻️ Recovered ${recoveredCount} stuck scheduled job(s) ` +
+            `(timeout > ${STUCK_JOB_TIMEOUT_MINUTES}min) for retry`
         );
+    }
+}
+
+async function failTimedOutPublishes(): Promise<void> {
+    const cutoff = new Date(Date.now() - PUBLISH_TIMEOUT_MS);
+    const stuckPublishes = await (prisma.campaign as any).findMany({
+        where: {
+            source: "schedule",
+            status: "publishing",
+            updatedAt: { lte: cutoff },
+        },
+        select: {
+            id: true,
+            shop: true,
+            title: true,
+            updatedAt: true,
+        },
+        take: 25,
+    });
+
+    for (const campaign of stuckPublishes) {
+        const job = await (prisma.scheduledJob as any).findFirst({
+            where: {
+                shop: campaign.shop,
+                campaignId: campaign.id,
+                mode: "one-time",
+                status: "processing",
+            },
+            orderBy: { runAt: "desc" },
+            select: { id: true },
+        });
+
+        await prisma.$transaction([
+            (prisma.campaign as any).updateMany({
+                where: {
+                    id: campaign.id,
+                    shop: campaign.shop,
+                    status: "publishing",
+                },
+                data: { status: "failed" },
+            }),
+            (prisma.scheduledJob as any).updateMany({
+                where: {
+                    shop: campaign.shop,
+                    campaignId: campaign.id,
+                    mode: "one-time",
+                    status: "processing",
+                },
+                data: { status: "failed" },
+            }),
+            prisma.activityLog.create({
+                data: {
+                    shop: campaign.shop,
+                    action: "PUBLISH_TIMEOUT",
+                    meta: {
+                        campaignId: campaign.id,
+                        jobId: job?.id ?? null,
+                        reason: "Publish execution timed out",
+                        publishingSince: campaign.updatedAt,
+                    },
+                },
+            }),
+        ]);
+
+        console.warn("[Worker] ⏱️ Publish execution timed out", {
+            shop: campaign.shop,
+            campaignId: campaign.id,
+            jobId: job?.id ?? null,
+            publishingSince: campaign.updatedAt,
+        });
     }
 }
 
 // ─── Worker ───────────────────────────────────────────────────────────────────
 
-let isWorkerStarted = false;
+let workerInterval: ReturnType<typeof setInterval> | null = null;
+
+// Clear stale interval on Vite HMR hot-reload so the old closure (with old
+// status strings) does not keep running alongside the freshly-loaded module.
+if (import.meta.hot) {
+    import.meta.hot.dispose(() => {
+        if (workerInterval !== null) {
+            clearInterval(workerInterval);
+            workerInterval = null;
+            console.log("[Worker] 🔄 HMR: stale worker interval cleared");
+        }
+    });
+}
 
 export function startWorker() {
-    if (isWorkerStarted) return;
-    isWorkerStarted = true;
+    if (workerInterval !== null) return;
 
     console.log("🚀 [Worker] Background pricing worker started (60s interval, atomic job claim via FOR UPDATE SKIP LOCKED)");
 
-    setInterval(async () => {
+    workerInterval = setInterval(async () => {
         try {
             // ── Phase 0: Recover jobs orphaned by crashed workers ─────────────
             await recoverStuckJobs();
+            await failTimedOutPublishes();
+
+            let restoredWindowCount = 0;
+            let expiredWindow: ClaimedJob | null;
+            while ((expiredWindow = await claimExpiredWindow()) !== null) {
+                restoredWindowCount++;
+                const { id: jobId, shop, campaignId } = expiredWindow;
+
+                console.log(
+                    `[Worker] 🔁 Claimed expired pricing window ${jobId} for shop ${shop} ` +
+                    `(restore: ${expiredWindow.windowEndAt?.toISOString() ?? "unknown"})`
+                );
+
+                if (!campaignId) {
+                    console.warn(`[Worker] ⚠️ Window ${jobId} has no campaignId. Marking restore failed.`);
+                    await prisma.scheduledJob.update({
+                        where: { id: jobId },
+                        data: { status: "restore-failed" },
+                    });
+                    continue;
+                }
+
+                try {
+                    const restoreClaimedAt = new Date();
+                    if (!isWindowExpired({ ...expiredWindow, source: "schedule-window" }, restoreClaimedAt)) {
+                        console.warn("[Worker] ⚠️ Restore claim skipped because window end has not passed", {
+                            jobId,
+                            campaignId,
+                            runAt: expiredWindow.runAt.toISOString(),
+                            windowEndAt: expiredWindow.windowEndAt?.toISOString() ?? null,
+                            now: restoreClaimedAt.toISOString(),
+                        });
+                        await prisma.scheduledJob.update({
+                            where: { id: jobId },
+                            data: { status: "restore-deferred" },
+                        });
+                        continue;
+                    }
+
+                    const { admin } = await unauthenticated.admin(shop);
+                    const restoreResult = await revertCampaignPrices({
+                        admin,
+                        shop,
+                        campaignId,
+                        successCampaignStatus: "auto-restored",
+                    });
+
+                    const restoredCleanly =
+                        restoreResult.terminal ||
+                        (restoreResult.success &&
+                            restoreResult.failedCount === 0 &&
+                            restoreResult.unrecoverableCount === 0);
+
+                    await (prisma.scheduledJob as any).update({
+                        where: { id: jobId },
+                        data: {
+                            status: restoredCleanly ? "auto-restored" : "restore-failed",
+                            restoredAt: new Date(),
+                        },
+                    });
+                    if (restoredCleanly) {
+                        await prisma.$transaction([
+                            (prisma.campaign as any).updateMany({
+                                where: {
+                                    id: campaignId,
+                                    shop,
+                                    status: "active-window",
+                                },
+                                data: { status: "auto-restored" },
+                            }),
+                            prisma.stagedPrice.deleteMany({
+                                where: {
+                                    shop,
+                                    campaignId,
+                                },
+                            }),
+                        ]);
+                    }
+                    await prisma.activityLog.create({
+                        data: {
+                            shop,
+                            action: "WINDOW_AUTO_RESTORED",
+                            meta: {
+                                campaignId,
+                                jobId,
+                                restoredCount: restoreResult.restoredCount,
+                                failedCount: restoreResult.failedCount,
+                                unrecoverableCount: restoreResult.unrecoverableCount,
+                                terminal: restoreResult.terminal,
+                            },
+                        },
+                    });
+
+                    console.log("[Worker] 🏁 Pricing window restore complete", {
+                        jobId,
+                        campaignId,
+                        restoredCount: restoreResult.restoredCount,
+                        failedCount: restoreResult.failedCount,
+                        unrecoverableCount: restoreResult.unrecoverableCount,
+                        terminal: restoreResult.terminal,
+                    });
+                } catch (restoreError) {
+                    console.error(`[Worker] ❌ Window restore failed for ${jobId}:`, restoreError);
+                    await prisma.scheduledJob.update({
+                        where: { id: jobId },
+                        data: { status: "restore-failed" },
+                    });
+                }
+            }
+
+            if (restoredWindowCount > 0) {
+                console.log(`[Worker] ✅ Restored ${restoredWindowCount} expired pricing window(s)`);
+            }
 
             // ── Phase 1: Claim + process all due jobs (one atomic claim per job)
             //
@@ -140,8 +419,73 @@ export function startWorker() {
                     `[Worker] 🔄 Claimed job ${jobId} for shop ${shop} ` +
                     `(scheduled: ${job.runAt.toISOString()})`
                 );
+                if (job.campaignId && job.mode !== "time-window") {
+                    console.log("[Worker] 📌 Publish claimed", {
+                        shop,
+                        campaignId: job.campaignId,
+                        jobId,
+                        runAt: job.runAt.toISOString(),
+                    });
+                }
 
                 try {
+                    if (job.campaignId && job.mode !== "time-window") {
+                        await (prisma.campaign as any).updateMany({
+                            where: {
+                                id: job.campaignId,
+                                shop,
+                                status: "scheduled-publish",
+                            },
+                            data: { status: "publishing" },
+                        });
+                        await prisma.activityLog.create({
+                            data: {
+                                shop,
+                                action: "PUBLISH_STARTED",
+                                meta: {
+                                    campaignId: job.campaignId,
+                                    jobId,
+                                    runAt: job.runAt.toISOString(),
+                                },
+                            },
+                        });
+                        console.log("[Worker] 🚀 Publish started", {
+                            shop,
+                            campaignId: job.campaignId,
+                            jobId,
+                        });
+                    }
+
+                    if (
+                        job.mode === "time-window" &&
+                        isWindowExpired({ ...job, source: "schedule-window" }, new Date())
+                    ) {
+                        console.warn("[Worker] ⚠️ Skipping expired pricing window before publish", {
+                            jobId,
+                            campaignId: job.campaignId,
+                            runAt: job.runAt.toISOString(),
+                            windowEndAt: job.windowEndAt?.toISOString() ?? null,
+                        });
+                        await prisma.$transaction([
+                            (prisma.scheduledJob as any).update({
+                                where: { id: jobId },
+                                data: { status: "cancelled" },
+                            }),
+                            ...(job.campaignId
+                                ? [
+                                    (prisma.campaign as any).updateMany({
+                                        where: { id: job.campaignId, shop },
+                                        data: { status: "cancelled-window" },
+                                    }),
+                                    prisma.stagedPrice.deleteMany({
+                                        where: { shop, campaignId: job.campaignId },
+                                    }),
+                                ]
+                                : []),
+                        ]);
+                        continue;
+                    }
+
                     // ── STEP 1: Fetch products from snapshot (or fallback) ──
                     let itemsToProcess: Array<{
                         variantId: string;
@@ -193,14 +537,26 @@ export function startWorker() {
                             `[Worker] ⚠️ No products found for job ${jobId}. ` +
                             `Marking failed.`
                         );
-                        await prisma.scheduledJob.update({
-                            where: { id: jobId },
-                            data: { status: "failed" },
-                        });
+                        if (job.mode !== "time-window") {
+                            await failOneTimePublish(shop, job.campaignId, jobId, "No products found to publish");
+                        } else {
+                            await prisma.scheduledJob.update({
+                                where: { id: jobId },
+                                data: { status: "failed" },
+                            });
+                        }
                         continue;
                     }
 
                     console.log(`[Worker] 📦 ${itemsToProcess.length} price(s) found for job ${jobId}`);
+                    if (job.campaignId && job.mode !== "time-window") {
+                        console.log("[Worker] 🧾 Pricing apply started", {
+                            shop,
+                            campaignId: job.campaignId,
+                            jobId,
+                            productCount: itemsToProcess.length,
+                        });
+                    }
 
                     // ── STEP 2: Get Shopify admin client (offline token) ───────
                     const { admin } = await unauthenticated.admin(shop);
@@ -294,6 +650,17 @@ export function startWorker() {
                         }
                     }
 
+                    const isTimeWindow = job.mode === "time-window";
+                    if (job.campaignId && !isTimeWindow) {
+                        console.log("[Worker] 🧾 Pricing apply completed", {
+                            shop,
+                            campaignId: job.campaignId,
+                            jobId,
+                            successCount,
+                            failCount,
+                        });
+                    }
+
                     // ── STEP 4: Mark app live (only if something actually published) ─
                     if (successCount > 0) {
                         await prisma.appState.upsert({
@@ -303,11 +670,27 @@ export function startWorker() {
                         });
 
                         if (job.campaignId) {
-                            const nextCampaignStatus = failCount > 0 ? "partial" : "active";
+                            const nextCampaignStatus = isTimeWindow
+                                ? "active-window"
+                                : failCount > 0 ? "failed" : "published";
                             await prisma.campaign.updateMany({
                                 where: { id: job.campaignId, shop },
                                 data: { status: nextCampaignStatus },
                             });
+                            if (isTimeWindow) {
+                                await prisma.activityLog.create({
+                                    data: {
+                                        shop,
+                                        action: "WINDOW_ACTIVATED",
+                                        meta: {
+                                            campaignId: job.campaignId,
+                                            jobId,
+                                            productCount: successCount,
+                                            windowEndAt: job.windowEndAt?.toISOString() ?? null,
+                                        },
+                                    },
+                                });
+                            }
                             console.log("[Worker] 🏷️ Campaign status transitioned", {
                                 campaignId: job.campaignId,
                                 status: nextCampaignStatus,
@@ -316,10 +699,41 @@ export function startWorker() {
                     }
 
                     // ── STEP 5: Mark job done (processing → done) ─────────────
-                    await prisma.scheduledJob.update({
+                    await (prisma.scheduledJob as any).update({
                         where: { id: jobId },
-                        data: { status: "done" },
+                        data: successCount === 0
+                            ? { status: "failed" }
+                            : successCount > 0 && isTimeWindow
+                                ? { status: "active-window", activatedAt: new Date() }
+                                : { status: "done" },
                     });
+                    if (successCount === 0 && job.campaignId) {
+                        await failOneTimePublish(shop, job.campaignId, jobId, "No prices published successfully");
+                    }
+                    if (job.campaignId && !isTimeWindow) {
+                        await prisma.activityLog.create({
+                            data: {
+                                shop,
+                                action: failCount > 0 || successCount === 0 ? "PUBLISH_FAILED" : "PUBLISH_FINALIZED",
+                                meta: {
+                                    campaignId: job.campaignId,
+                                    jobId,
+                                    successCount,
+                                    failCount,
+                                    reason: failCount > 0 ? "One or more products failed to publish" : null,
+                                },
+                            },
+                        });
+                        console.log(failCount > 0 || successCount === 0
+                            ? "[Worker] ❌ Publish failed"
+                            : "[Worker] ✅ Publish finalized", {
+                            shop,
+                            campaignId: job.campaignId,
+                            jobId,
+                            successCount,
+                            failCount,
+                        });
+                    }
 
                     console.log(
                         `[Worker] 🏁 Job ${jobId} complete — success: ${successCount}, failed: ${failCount}`
@@ -332,10 +746,19 @@ export function startWorker() {
                 } catch (jobError) {
                     // Unhandled error mid-job → mark failed (processing → failed)
                     console.error(`[Worker] ❌ Job ${jobId} threw an unhandled error:`, jobError);
-                    await prisma.scheduledJob.update({
-                        where: { id: jobId },
-                        data: { status: "failed" },
-                    });
+                    if (job.mode !== "time-window") {
+                        await failOneTimePublish(
+                            shop,
+                            job.campaignId,
+                            jobId,
+                            jobError instanceof Error ? jobError.message : "Publish execution failed"
+                        );
+                    } else {
+                        await prisma.scheduledJob.update({
+                            where: { id: jobId },
+                            data: { status: "failed" },
+                        });
+                    }
                 }
             } // end while
 

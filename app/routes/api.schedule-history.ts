@@ -11,13 +11,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const shop = session.shop;
 
     try {
-        const jobs = await prisma.scheduledJob.findMany({
+        const jobs = await (prisma.scheduledJob as any).findMany({
             where: { shop },
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
                 title: true,
                 runAt: true,
+                mode: true,
+                windowEndAt: true,
+                activatedAt: true,
+                restoredAt: true,
                 status: true,
                 productCount: true,
                 products: true,

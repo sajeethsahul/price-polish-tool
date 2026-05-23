@@ -13,9 +13,40 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const body = await request.json().catch(() => ({}));
     const { runAt, products, title } = body;
+    const scheduleMode = body?.mode === "time-window" ? "time-window" : "one-time";
+    const windowEndAt = typeof body?.windowEndAt === "string" ? body.windowEndAt : undefined;
 
     if (!runAt) {
-        return json({ error: "runAt required" }, { status: 400 });
+        return json({ error: "Choose when pricing should publish." }, { status: 400 });
+    }
+
+    const runAtDate = new Date(runAt);
+    const windowEndAtDate = windowEndAt ? new Date(windowEndAt) : null;
+    const now = new Date();
+
+    if (Number.isNaN(runAtDate.getTime())) {
+        return json({ error: "Choose a valid publish time." }, { status: 400 });
+    }
+
+    if (runAtDate.getTime() <= now.getTime()) {
+        return json({ error: "Choose a future start time before scheduling." }, { status: 400 });
+    }
+
+    if (scheduleMode === "time-window") {
+        if (!windowEndAtDate || Number.isNaN(windowEndAtDate.getTime())) {
+            return json({ error: "Choose when original pricing should restore." }, { status: 400 });
+        }
+
+        if (windowEndAtDate.getTime() <= runAtDate.getTime()) {
+            return json({ error: "Window end must be after the start time." }, { status: 400 });
+        }
+
+        if (!Array.isArray(products) || products.length === 0) {
+            return json(
+                { error: "Choose products before scheduling a pricing window." },
+                { status: 400 }
+            );
+        }
     }
 
     // ── Auto-stage: Generate staged prices before creating the job ──
@@ -65,11 +96,13 @@ export async function action({ request }: ActionFunctionArgs) {
         }
     }
 
-    await prisma.scheduledJob.create({
+    await (prisma.scheduledJob as any).create({
         data: {
             shop,
             campaignId,
-            runAt: new Date(runAt),
+            runAt: runAtDate,
+            mode: scheduleMode,
+            windowEndAt: scheduleMode === "time-window" ? windowEndAtDate : null,
             title: title || "Scheduled Campaign",
             productCount: products ? products.length : 0,
             products: products || [],
@@ -77,16 +110,32 @@ export async function action({ request }: ActionFunctionArgs) {
     });
 
     if (campaignId) {
-        await prisma.campaign.create({
+        await (prisma.campaign as any).create({
             data: {
                 id: campaignId,
                 shop,
                 title: title || "Scheduled Campaign",
-                status: "scheduled",
-                runAt: new Date(runAt),
-                source: "schedule",
+                status: scheduleMode === "time-window" ? "scheduled-window" : "scheduled-publish",
+                runAt: runAtDate,
+                windowEndAt: scheduleMode === "time-window" ? windowEndAtDate : null,
+                source: scheduleMode === "time-window" ? "schedule-window" : "schedule",
             },
         });
+
+        if (scheduleMode === "time-window") {
+            await prisma.activityLog.create({
+                data: {
+                    shop,
+                    action: "WINDOW_SCHEDULED",
+                    meta: {
+                        campaignId,
+                        runAt: runAtDate.toISOString(),
+                        windowEndAt: windowEndAtDate?.toISOString(),
+                        productCount: products ? products.length : 0,
+                    },
+                },
+            });
+        }
     }
 
     return json({ success: true, stagedCount, failedCount, ...(campaignId ? { campaignId } : {}) });

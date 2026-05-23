@@ -2,12 +2,15 @@ import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
+import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 
 type CampaignHistoryItem = {
   campaignId: string;
   title: string;
   status: string;
   createdAt: Date;
+  runAt: Date | null;
+  windowEndAt: Date | null;
   productCount: number;
   source: string | null;
   latestBatchId: string | null;
@@ -17,12 +20,14 @@ type CampaignHistoryItem = {
   failedCount: number;
   unrecoverableCount: number;
   totalTrackedCount: number;
+  runtimeStatus: string;
 };
 
 function normalizeSource(source: string | null): string | null {
   if (!source) return null;
   if (source === "apply") return "manual";
   if (source === "schedule") return "scheduled";
+  if (source === "schedule-window") return "time-window";
   return source;
 }
 
@@ -63,13 +68,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   console.log("[Campaign History API] Fetch started", { shop });
 
   try {
-    const campaigns = await prisma.campaign.findMany({
+    const campaigns = await (prisma.campaign as any).findMany({
       where: { shop },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         title: true,
         status: true,
+        runAt: true,
+        windowEndAt: true,
         createdAt: true,
         source: true,
       },
@@ -95,7 +102,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           revertStatus: true,
         },
       }),
-      prisma.scheduledJob.findMany({
+      (prisma.scheduledJob as any).findMany({
         where: {
           shop,
           campaignId: { in: campaignIds },
@@ -104,6 +111,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
         select: {
           campaignId: true,
           productCount: true,
+          mode: true,
+          windowEndAt: true,
+          restoredAt: true,
+          status: true,
         },
       }),
     ]);
@@ -182,13 +193,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     const scheduledCountByCampaign = new Map<string, number>();
+    const scheduledWindowEndByCampaign = new Map<string, Date | null>();
+    const scheduledRestoredAtByCampaign = new Map<string, Date | null>();
+    const scheduledStatusByCampaign = new Map<string, string | null>();
     for (const row of scheduledRows) {
       if (!row.campaignId) continue;
       if (!scheduledCountByCampaign.has(row.campaignId)) {
         scheduledCountByCampaign.set(row.campaignId, row.productCount ?? 0);
       }
+      if (!scheduledWindowEndByCampaign.has(row.campaignId)) {
+        scheduledWindowEndByCampaign.set(row.campaignId, row.windowEndAt ?? null);
+      }
+      if (!scheduledRestoredAtByCampaign.has(row.campaignId)) {
+        scheduledRestoredAtByCampaign.set(row.campaignId, row.restoredAt ?? null);
+      }
+      if (!scheduledStatusByCampaign.has(row.campaignId)) {
+        scheduledStatusByCampaign.set(row.campaignId, row.status ?? null);
+      }
     }
 
+    const now = new Date();
     const result: CampaignHistoryItem[] = campaigns.map((campaign) => {
       const latestBatchId = latestBatchByCampaign.get(campaign.id) ?? null;
       const productCount =
@@ -196,22 +220,48 @@ export async function loader({ request }: LoaderFunctionArgs) {
         historyCountByCampaign.get(campaign.id) ??
         0;
       const totalTrackedCount = historyCountByCampaign.get(campaign.id) ?? 0;
-      const revertedCount = revertedCountByCampaign.get(campaign.id) ?? 0;
-      const failedCount = failedCountByCampaign.get(campaign.id) ?? 0;
+      let revertedCount = revertedCountByCampaign.get(campaign.id) ?? 0;
+      let failedCount = failedCountByCampaign.get(campaign.id) ?? 0;
       const unrevertedCount = unrevertedCountByCampaign.get(campaign.id) ?? 0;
-      const unrecoverableCount = unrecoverableCountByCampaign.get(campaign.id) ?? 0;
+      let unrecoverableCount = unrecoverableCountByCampaign.get(campaign.id) ?? 0;
       const retryableCount = Math.max(0, unrevertedCount - unrecoverableCount);
-      const effectiveStatus =
+      let effectiveStatus =
         unrecoverableCount > 0 && retryableCount === 0
           ? "unrecoverable"
           : campaign.status;
+      if (campaign.source === "schedule-window") {
+        const windowState = resolveWindowLifecycleState(
+          {
+            status: campaign.status,
+            source: campaign.source,
+            runAt: campaign.runAt,
+            windowEndAt: campaign.windowEndAt ?? scheduledWindowEndByCampaign.get(campaign.id) ?? null,
+            restoredAt: scheduledRestoredAtByCampaign.get(campaign.id) ?? null,
+            totalTrackedCount,
+            revertedCount,
+            unrecoverableCount,
+          },
+          now
+        );
+        if (windowState) {
+          effectiveStatus = windowState;
+        }
+        if (windowState === "scheduled-window" || windowState === "active-window") {
+          revertedCount = 0;
+          failedCount = 0;
+          unrecoverableCount = 0;
+        }
+      }
       const surfacedReason = unrecoverableReasonByCampaign.get(campaign.id)?.reason ?? null;
 
       return {
         campaignId: campaign.id,
         title: campaign.title,
         status: effectiveStatus,
+        runtimeStatus: effectiveStatus,
         createdAt: campaign.createdAt,
+        runAt: campaign.runAt,
+        windowEndAt: campaign.windowEndAt ?? scheduledWindowEndByCampaign.get(campaign.id) ?? null,
         productCount,
         source: normalizeSource(campaign.source),
         latestBatchId,

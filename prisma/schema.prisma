@@ -48,14 +48,15 @@ model PricingRule {
 }
 
 model Campaign {
-  id        String    @id @default(uuid())
-  shop      String
-  title     String    @default("Pricing Campaign")
-  status    String    @default("draft")
-  runAt     DateTime?
-  source    String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  shop        String
+  title       String    @default("Pricing Campaign")
+  status      String    @default("draft")
+  runAt       DateTime?
+  windowEndAt DateTime?
+  source      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([shop])
   @@index([shop, status])
@@ -63,19 +64,19 @@ model Campaign {
 }
 
 model PriceHistory {
-  id           String    @id @default(cuid())
-  shop         String
-  campaignId   String?
-  productId    String?
-  variantId    String
-  oldPrice     Float
-  newPrice     Float
-  isManual     Boolean   @default(false) // NEW
-  batchId      String
-  revertStatus String?
-  revertedAt   DateTime?
+  id                  String    @id @default(cuid())
+  shop                String
+  campaignId          String?
+  productId           String?
+  variantId           String
+  oldPrice            Float
+  newPrice            Float
+  isManual            Boolean   @default(false) // NEW
+  batchId             String
+  revertStatus        String?
+  revertedAt          DateTime?
   revertFailureReason String?
-  createdAt    DateTime  @default(now())
+  createdAt           DateTime  @default(now())
 
   @@index([shop, campaignId])
   @@index([shop, batchId])
@@ -142,16 +143,21 @@ model PushJob {
 }
 
 model ScheduledJob {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   shop         String
   campaignId   String?
   runAt        DateTime
-  status       String   @default("pending")
-  createdAt    DateTime @default(now())
-  title        String   @default("Scheduled Campaign")
-  productCount Int      @default(0)
+  mode         String    @default("one-time")
+  windowEndAt  DateTime?
+  activatedAt  DateTime?
+  restoredAt   DateTime?
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now())
+  title        String    @default("Scheduled Campaign")
+  productCount Int       @default(0)
   products     Json?
 
   @@index([shop, campaignId])
   @@index([campaignId])
+  @@index([shop, status, windowEndAt])
 }

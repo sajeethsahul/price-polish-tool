@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { cors, handlePreflight } from "../utils/cors";
+import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 
 type HistoryRow = {
   variantId: string;
@@ -11,6 +12,15 @@ type HistoryRow = {
   revertStatus: string | null;
   revertFailureReason: string | null;
   revertedAt: Date | null;
+};
+
+type ScheduledProductSnapshot = {
+  productId?: string | null;
+  variantId?: string | null;
+  title?: string | null;
+  variantTitle?: string | null;
+  oldPrice?: string | number | null;
+  newPrice?: string | number | null;
 };
 
 function toVariantGid(variantId: string) {
@@ -131,6 +141,178 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (history.length === 0) {
       if (includeAllStatuses) {
+        const scheduledCampaign = campaignId
+          ? await (prisma.campaign as any).findFirst({
+              where: {
+                id: campaignId,
+                shop,
+                status: { in: ["scheduled-window", "cancelled-window"] },
+                source: "schedule-window",
+              },
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                source: true,
+                runAt: true,
+                windowEndAt: true,
+              },
+            })
+          : null;
+
+        if (scheduledCampaign) {
+          const scheduledJob = await (prisma.scheduledJob as any).findFirst({
+            where: {
+              shop,
+              campaignId,
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              mode: true,
+              runAt: true,
+              windowEndAt: true,
+              productCount: true,
+              products: true,
+              title: true,
+            },
+          });
+
+          const products = Array.isArray(scheduledJob?.products)
+            ? scheduledJob.products as ScheduledProductSnapshot[]
+            : [];
+          const rows = products
+            .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
+            .map((product) => {
+              const originalPrice = Number(product.oldPrice);
+              const scheduledPrice = Number(product.newPrice);
+              return {
+                variantId: String(product.variantId),
+                productTitle: product.title || "Untitled Product",
+                variantTitle: product.variantTitle ?? null,
+                currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
+                scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
+                revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
+                status: "scheduled",
+                revertFailureReason: null,
+              };
+            });
+
+          return cors(new Response(JSON.stringify({
+            campaignId,
+            title: scheduledCampaign.title ?? scheduledJob?.title ?? "Scheduled Campaign",
+            productCount: scheduledJob?.productCount ?? rows.length,
+            latestBatchId: null,
+            rows,
+            revertedCount: 0,
+            failedCount: 0,
+            unrecoverableCount: 0,
+            totalTrackedCount: 0,
+            revertCompletedAt: null,
+            missingHistoricalRevertedFromCount: 0,
+            terminal: false,
+            preActivation: true,
+            schedule: {
+              type: scheduledJob?.mode === "time-window" ? "time-window" : "one-time",
+              status: scheduledCampaign.status,
+              runAt: scheduledJob?.runAt ?? scheduledCampaign.runAt ?? null,
+              windowEndAt: scheduledJob?.windowEndAt ?? scheduledCampaign.windowEndAt ?? null,
+              productCount: scheduledJob?.productCount ?? rows.length,
+            },
+            message: scheduledCampaign.status === "cancelled-window"
+              ? "This pricing window was cancelled before it started."
+              : "This pricing window is scheduled and has not started yet.",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          }));
+        }
+
+        const scheduledPublishCampaign = campaignId
+          ? await (prisma.campaign as any).findFirst({
+              where: {
+                id: campaignId,
+                shop,
+                status: { in: ["scheduled-publish", "cancelled-publish"] },
+                source: "schedule",
+              },
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                source: true,
+                runAt: true,
+                createdAt: true,
+              },
+            })
+          : null;
+
+        if (scheduledPublishCampaign) {
+          const scheduledJob = await (prisma.scheduledJob as any).findFirst({
+            where: {
+              shop,
+              campaignId,
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              mode: true,
+              runAt: true,
+              productCount: true,
+              products: true,
+              title: true,
+              createdAt: true,
+            },
+          });
+
+          const products = Array.isArray(scheduledJob?.products)
+            ? scheduledJob.products as ScheduledProductSnapshot[]
+            : [];
+          const rows = products
+            .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
+            .map((product) => {
+              const originalPrice = Number(product.oldPrice);
+              const scheduledPrice = Number(product.newPrice);
+              return {
+                variantId: String(product.variantId),
+                productTitle: product.title || "Untitled Product",
+                variantTitle: product.variantTitle ?? null,
+                currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
+                scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
+                revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
+                status: "scheduled",
+                revertFailureReason: null,
+              };
+            });
+
+          return cors(new Response(JSON.stringify({
+            campaignId,
+            title: scheduledPublishCampaign.title ?? scheduledJob?.title ?? "Scheduled Campaign",
+            productCount: scheduledJob?.productCount ?? rows.length,
+            latestBatchId: null,
+            rows,
+            revertedCount: 0,
+            failedCount: 0,
+            unrecoverableCount: 0,
+            totalTrackedCount: 0,
+            revertCompletedAt: null,
+            missingHistoricalRevertedFromCount: 0,
+            terminal: false,
+            prePublish: true,
+            schedule: {
+              type: "one-time",
+              status: scheduledPublishCampaign.status,
+              runAt: scheduledJob?.runAt ?? scheduledPublishCampaign.runAt ?? null,
+              productCount: scheduledJob?.productCount ?? rows.length,
+              createdAt: scheduledJob?.createdAt ?? scheduledPublishCampaign.createdAt ?? null,
+            },
+            message: scheduledPublishCampaign.status === "cancelled-publish"
+              ? "This scheduled publish was cancelled before it started."
+              : "This pricing publish is scheduled and has not started yet.",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          }));
+        }
+
         return cors(new Response(JSON.stringify({
           error: campaignId ? "No campaign details found" : "No campaign batch details found",
         }), {
@@ -182,9 +364,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const campaign = campaignId
-      ? await prisma.campaign.findUnique({
+      ? await (prisma.campaign as any).findUnique({
         where: { id: campaignId },
-        select: { id: true, title: true },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          source: true,
+          runAt: true,
+          windowEndAt: true,
+        },
+      })
+      : null;
+    const scheduledJob = campaignId && campaign?.source === "schedule-window"
+      ? await (prisma.scheduledJob as any).findFirst({
+        where: {
+          shop,
+          campaignId,
+          mode: "time-window",
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          status: true,
+          runAt: true,
+          windowEndAt: true,
+          restoredAt: true,
+        },
       })
       : null;
 
@@ -250,12 +455,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     const latestBatchId = history[0]?.batchId ?? batchId ?? null;
-    const revertedCount = history.filter((row) => row.revertStatus === "reverted").length;
-    const failedCount = history.filter((row) => row.revertStatus === "failed").length;
-    const unrecoverableCount = history.filter((row) => row.revertStatus === "unrecoverable").length;
+    let revertedCount = history.filter((row) => row.revertStatus === "reverted").length;
+    let failedCount = history.filter((row) => row.revertStatus === "failed").length;
+    let unrecoverableCount = history.filter((row) => row.revertStatus === "unrecoverable").length;
     const totalTrackedCount = history.length;
+    const runtimeWindowState = campaign?.source === "schedule-window"
+      ? resolveWindowLifecycleState({
+        status: campaign.status,
+        source: campaign.source,
+        runAt: campaign.runAt ?? scheduledJob?.runAt ?? null,
+        windowEndAt: campaign.windowEndAt ?? scheduledJob?.windowEndAt ?? null,
+        restoredAt: scheduledJob?.restoredAt ?? null,
+        totalTrackedCount,
+        revertedCount,
+        unrecoverableCount,
+      })
+      : null;
+    const shouldSuppressRestoreState =
+      runtimeWindowState === "scheduled-window" || runtimeWindowState === "active-window";
+    if (shouldSuppressRestoreState) {
+      revertedCount = 0;
+      failedCount = 0;
+      unrecoverableCount = 0;
+    }
     const revertCompletedAt =
-      history
+      shouldSuppressRestoreState
+        ? null
+        : history
         .filter((row) => row.revertStatus === "reverted" && row.revertedAt instanceof Date)
         .map((row) => row.revertedAt as Date)
         .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
@@ -274,7 +500,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       title: campaign?.title ?? "Legacy Batch Revert",
       productCount: history.length,
       latestBatchId,
-      rows,
+      rows: shouldSuppressRestoreState
+        ? rows.map((row) => ({ ...row, status: "pending", revertFailureReason: null }))
+        : rows,
       revertedCount,
       failedCount,
       unrecoverableCount,
@@ -282,6 +510,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       revertCompletedAt,
       missingHistoricalRevertedFromCount,
       terminal: false,
+      runtimeStatus: runtimeWindowState,
       message: null,
     }), {
       headers: { "Content-Type": "application/json" },

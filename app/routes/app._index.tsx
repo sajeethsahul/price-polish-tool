@@ -43,6 +43,7 @@ import {
 } from "../components/ImmediateApplyConfirmationModal";
 import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
 import { calculatePrice } from "../utils/pricing";
+import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 
 
 const BATCH_SIZE = 50;
@@ -70,6 +71,8 @@ interface CampaignHistoryItem {
   title: string;
   status: string;
   createdAt: string;
+  runAt?: string | null;
+  windowEndAt?: string | null;
   productCount: number;
   source: string | null;
   latestBatchId: string | null;
@@ -79,12 +82,15 @@ interface CampaignHistoryItem {
   failedCount: number;
   unrecoverableCount: number;
   totalTrackedCount: number;
+  runtimeStatus?: string;
 }
 
 interface CampaignRevertPreviewRow {
   variantId: string;
   productTitle: string;
+  variantTitle?: string | null;
   currentPrice: number | null;
+  scheduledPrice?: number | null;
   revertTargetPrice: number;
   status?: string;
   revertFailureReason?: string | null;
@@ -103,6 +109,16 @@ interface CampaignRevertPreviewData {
   totalTrackedCount?: number;
   missingHistoricalRevertedFromCount?: number;
   terminal?: boolean;
+  preActivation?: boolean;
+  prePublish?: boolean;
+  schedule?: {
+    type: "one-time" | "time-window" | string;
+    status: string;
+    runAt: string | null;
+    windowEndAt?: string | null;
+    productCount: number;
+    createdAt?: string | null;
+  };
   message?: string | null;
 }
 
@@ -160,7 +176,8 @@ interface CampaignTimelineMilestone {
 }
 
 type CampaignHistoryStatusFilter = "all" | "active" | "partial" | "scheduled" | "closed";
-type CampaignHistorySourceFilter = "all" | "manual" | "scheduled";
+type CampaignHistorySourceFilter = "all" | "manual" | "scheduled" | "time-window";
+type CampaignHistoryTimeframeFilter = "week" | "month" | "3_months" | "6_months" | "year" | "all";
 type RevertPreviewMovementFilter = "all" | "increase" | "decrease" | "large_movement";
 
 const OPERATIONAL_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
@@ -174,11 +191,133 @@ function normalizeCampaignStatus(status: string) {
 
 function isClosedCampaignStatus(status: string) {
   const normalized = normalizeCampaignStatus(status);
-  return normalized === "reverted" || normalized === "unrecoverable";
+  return normalized === "reverted" ||
+    normalized === "unrecoverable" ||
+    normalized === "auto-restored" ||
+    normalized === "window-stopped" ||
+    normalized === "cancelled-publish" ||
+    normalized === "cancelled-window";
 }
 
 function normalizeCampaignSource(source: string | null) {
   return (source ?? "").trim().toLowerCase();
+}
+
+function resolveCampaignRuntimeStatus(campaign: CampaignHistoryItem, now: Date = new Date()) {
+  if (normalizeCampaignSource(campaign.source) !== "time-window") {
+    const status = normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+    if (normalizeCampaignSource(campaign.source) === "scheduled" && status === "scheduled-publish") {
+      const runAtMs = campaign.runAt ? new Date(campaign.runAt).getTime() : null;
+      if (runAtMs != null && !Number.isNaN(runAtMs) && now.getTime() >= runAtMs) {
+        return "publishing";
+      }
+    }
+    return normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+  }
+
+  return resolveWindowLifecycleState({
+    status: campaign.status,
+    source: "schedule-window",
+    runAt: campaign.runAt,
+    windowEndAt: campaign.windowEndAt,
+    totalTrackedCount: campaign.totalTrackedCount,
+    revertedCount: campaign.revertedCount,
+    unrecoverableCount: campaign.unrecoverableCount,
+  }, now) ?? normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+}
+
+function formatCampaignSourceLabel(source: string | null) {
+  const normalized = normalizeCampaignSource(source);
+  if (normalized === "manual") return "Manual";
+  if (normalized === "scheduled") return "Scheduled";
+  if (normalized === "time-window") return "Time Window";
+  return source || "Unknown";
+}
+
+function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
+  if (normalizeCampaignSource(campaign.source) !== "time-window") return null;
+
+  const status = resolveCampaignRuntimeStatus(campaign);
+  const start = campaign.runAt ? new Date(campaign.runAt).toLocaleString() : null;
+  const end = campaign.windowEndAt ? new Date(campaign.windowEndAt).toLocaleString() : null;
+
+  if (status === "scheduled-window" && start && end) {
+    return `Pricing will publish at ${start} and automatically restore at ${end}.`;
+  }
+  if (status === "active-window" && end) {
+    return `Pricing is active now. Original pricing will automatically restore at ${end}.`;
+  }
+  if (status === "auto-restored") {
+    return "Original pricing was automatically restored when the window ended.";
+  }
+  if (status === "window-stopped") {
+    return "Original storefront pricing was restored before the scheduled end time.";
+  }
+  if (status === "cancelled-window") {
+    return "This pricing window was cancelled before it started.";
+  }
+  if (status === "partial") {
+    return "Automatic restore needs attention for one or more tracked products.";
+  }
+
+  return null;
+}
+
+function formatScheduledPublishSummary(campaign: CampaignHistoryItem, now: Date = new Date()) {
+  if (normalizeCampaignSource(campaign.source) !== "scheduled") return null;
+  const status = resolveCampaignRuntimeStatus(campaign, now);
+  const runAt = campaign.runAt ? new Date(campaign.runAt) : null;
+  if (status === "scheduled-publish" && runAt && !Number.isNaN(runAt.getTime())) {
+    return `Pricing will publish automatically at ${runAt.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    })}`;
+  }
+  if (status === "publishing") return "Applying scheduled pricing.";
+  if (status === "published") return "Pricing was published successfully.";
+  if (status === "cancelled-publish") return "This scheduled publish was cancelled before it started.";
+  if (status === "failed") return "Scheduled publish needs attention.";
+  return null;
+}
+
+function formatDurationParts(totalMs: number) {
+  const clampedMs = Math.max(0, totalMs);
+  const totalSeconds = Math.floor(clampedMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+function getTimeframeStart(filter: CampaignHistoryTimeframeFilter, now = new Date()) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  if (filter === "all") return null;
+  if (filter === "week") {
+    const day = start.getDay();
+    const daysSinceMonday = day === 0 ? 6 : day - 1;
+    start.setDate(start.getDate() - daysSinceMonday);
+    return start;
+  }
+  if (filter === "month") {
+    start.setDate(1);
+    return start;
+  }
+  if (filter === "3_months") {
+    start.setMonth(start.getMonth() - 3);
+    return start;
+  }
+  if (filter === "6_months") {
+    start.setMonth(start.getMonth() - 6);
+    return start;
+  }
+  start.setMonth(0, 1);
+  return start;
 }
 
 // ─── Animated Loader ───────────────────────────────────────────────────────
@@ -367,7 +506,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
   const [campaignHistoryStatusFilter, setCampaignHistoryStatusFilter] = useState<CampaignHistoryStatusFilter>("all");
   const [campaignHistorySourceFilter, setCampaignHistorySourceFilter] = useState<CampaignHistorySourceFilter>("all");
+  const [campaignHistoryTimeframeFilter, setCampaignHistoryTimeframeFilter] =
+    useState<CampaignHistoryTimeframeFilter>("month");
   const [campaignHistorySearchQuery, setCampaignHistorySearchQuery] = useState("");
+  const [campaignRuntimeNow, setCampaignRuntimeNow] = useState(() => new Date());
   const [revertPreviewOpen, setRevertPreviewOpen] = useState(false);
   const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
   const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] = useState(false);
@@ -828,6 +970,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [campaignDetailPage, campaignDetailTotalPages]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCampaignRuntimeNow(new Date());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const revertSafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
     if (!revertPreview || revertPreview.terminal) return [];
 
@@ -1168,8 +1317,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
   }, [handlePreview, resetRevertPreviewViewState, revertPreviewRetryFailedOnly, selectedCampaignForRevert, shopify]);
 
-  const handleRefreshCampaignHistory = useCallback(async () => {
-    setCampaignHistoryLoading(true);
+  const handleRefreshCampaignHistory = useCallback(async (showLoading = true) => {
+    if (showLoading) setCampaignHistoryLoading(true);
     console.log("[Campaign History UI] manual refresh started");
     try {
       const fetcher = await appFetch;
@@ -1183,9 +1332,124 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       if (shopify) shopify.toast.show("Failed to refresh campaign history", { isError: true });
       else console.error("BYPASS: Failed to refresh campaign history");
     } finally {
-      setCampaignHistoryLoading(false);
+      if (showLoading) setCampaignHistoryLoading(false);
     }
   }, [appFetch, shopify]);
+
+  const handleWindowLifecycleAction = useCallback(async (
+    campaign: CampaignHistoryItem,
+    action: "cancel-schedule" | "stop-window"
+  ) => {
+    const actionLabel = action === "cancel-schedule" ? "cancel schedule" : "stop window";
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/window-lifecycle-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: campaign.campaignId,
+          action,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Unable to ${actionLabel}.`);
+      }
+      if (shopify) {
+        shopify.toast.show(
+          action === "cancel-schedule"
+            ? "Pricing window cancelled"
+            : "Original pricing restored and window stopped"
+        );
+      }
+      const nextStatus = action === "cancel-schedule" ? "cancelled-window" : data.status ?? "window-stopped";
+      setCampaignHistory((current) =>
+        current.map((item) =>
+          item.campaignId === campaign.campaignId
+            ? {
+                ...item,
+                status: nextStatus,
+                runtimeStatus: nextStatus,
+                revertable: false,
+                ...(action === "stop-window"
+                  ? {
+                      revertedCount: data.restoredCount ?? item.revertedCount,
+                      failedCount: data.failedCount ?? item.failedCount,
+                      unrecoverableCount: data.unrecoverableCount ?? item.unrecoverableCount,
+                    }
+                  : {}),
+              }
+            : item
+        )
+      );
+      if (selectedCampaignForDetail?.campaignId === campaign.campaignId) {
+        setSelectedCampaignForDetail({
+          ...campaign,
+          status: nextStatus,
+          runtimeStatus: nextStatus,
+          revertable: false,
+        });
+        setCampaignDetail((current) =>
+          current
+            ? {
+                ...current,
+                preActivation: false,
+                runtimeStatus: nextStatus,
+                revertedCount: action === "stop-window" ? data.restoredCount ?? current.revertedCount : current.revertedCount,
+                failedCount: action === "stop-window" ? data.failedCount ?? current.failedCount : current.failedCount,
+                unrecoverableCount:
+                  action === "stop-window" ? data.unrecoverableCount ?? current.unrecoverableCount : current.unrecoverableCount,
+              }
+            : current
+        );
+      }
+      await handlePreview();
+    } catch (error) {
+      console.error("[Window Lifecycle] action failed", error);
+      if (shopify) {
+        shopify.toast.show(
+          action === "cancel-schedule"
+            ? "Unable to cancel pricing window"
+            : "Unable to stop pricing window",
+          { isError: true }
+        );
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [handlePreview, selectedCampaignForDetail, shopify]);
+
+  const handlePublishLifecycleAction = useCallback(async (campaign: CampaignHistoryItem) => {
+    setIsProcessing(true);
+    try {
+      const res = await fetch("/api/publish-lifecycle-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: campaign.campaignId,
+          action: "cancel-publish",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to cancel publish.");
+      }
+      setCampaignHistory((current) =>
+        current.map((item) =>
+          item.campaignId === campaign.campaignId
+            ? { ...item, status: "cancelled-publish", runtimeStatus: "cancelled-publish", revertable: false }
+            : item
+        )
+      );
+      if (shopify) shopify.toast.show("Scheduled publish cancelled");
+      await handlePreview();
+    } catch (error) {
+      console.error("[Publish Lifecycle] action failed", error);
+      if (shopify) shopify.toast.show("Unable to cancel scheduled publish", { isError: true });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [handlePreview, shopify]);
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
     if (value.length > 15) return;
@@ -1303,10 +1567,37 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const campaignStatusTone = useCallback((status: string) => {
     const normalized = status.toLowerCase();
     if (normalized === "unrecoverable") return "critical" as const;
-    if (normalized === "active" || normalized === "done") return "success" as const;
-    if (normalized === "reverted") return "info" as const;
-    if (normalized === "scheduled" || normalized === "pending") return "warning" as const;
+    if (normalized === "expired-window") return "warning" as const;
+    if (normalized === "active" || normalized === "active-window" || normalized === "done") return "success" as const;
+    if (
+      normalized === "reverted" ||
+      normalized === "auto-restored" ||
+      normalized === "window-stopped" ||
+      normalized === "cancelled-publish" ||
+      normalized === "cancelled-window"
+    ) return "info" as const;
+    if (normalized === "scheduled" || normalized === "scheduled-window" || normalized === "scheduled-publish" || normalized === "pending") return "warning" as const;
+    if (normalized === "publishing") return "attention" as const;
+    if (normalized === "published") return "success" as const;
+    if (normalized === "failed") return "critical" as const;
     return "attention" as const;
+  }, []);
+
+  const campaignStatusLabel = useCallback((status: string) => {
+    const normalized = status.toLowerCase();
+    if (normalized === "scheduled-window") return "Scheduled Window";
+    if (normalized === "active-window") return "Active Window";
+    if (normalized === "expired-window") return "Expired Window";
+    if (normalized === "auto-restored") return "Auto Restored";
+    if (normalized === "window-stopped") return "Window Stopped";
+    if (normalized === "cancelled-window") return "Cancelled Window";
+    if (normalized === "scheduled-publish") return "Scheduled Publish";
+    if (normalized === "cancelled-publish") return "Cancelled";
+    if (normalized === "publishing") return "Publishing";
+    if (normalized === "published") return "Published";
+    if (normalized === "failed") return "Failed";
+    if (normalized === "unrecoverable") return "Unrecoverable";
+    return status;
   }, []);
 
   const detailStatusTone = useCallback((status?: string | null) => {
@@ -1322,7 +1613,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     if (normalized === "reverted") return "Reverted";
     if (normalized === "failed") return "Failed";
     if (normalized === "unrecoverable") return "Unrecoverable";
+    if (normalized === "scheduled") return "Scheduled";
     return "Pending";
+  }, []);
+
+  const formatDetailScheduleType = useCallback((type?: string | null) => {
+    if (type === "time-window") return "Time Window";
+    return "One-time Publish";
   }, []);
 
   const formatTimelineTimestamp = useCallback((value?: string | null) => {
@@ -1353,7 +1650,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       },
     ];
 
-    if (normalizedStatus === "scheduled" || normalizedStatus === "pending") {
+    if (normalizedStatus === "scheduled-window") {
+      milestones.push({
+        key: "window-scheduled",
+        label: "Window Scheduled",
+        tone: "warning",
+        badgeLabel: "Queued",
+        timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
+        description: selectedCampaignForDetail.windowEndAt
+          ? "Pricing will publish at the window start and automatically restore at the window end."
+          : "Pricing window is queued for publishing and automatic restore.",
+      });
+    } else if (normalizedStatus === "scheduled" || normalizedStatus === "pending") {
       milestones.push({
         key: "scheduled",
         label: "Scheduled",
@@ -1363,7 +1671,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       });
     }
 
-    if (["active", "partial", "reverted", "unrecoverable"].includes(normalizedStatus)) {
+    if (normalizedStatus === "active-window") {
+      milestones.push({
+        key: "window-activated",
+        label: "Window Activated",
+        tone: "success",
+        badgeLabel: "Active",
+        timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
+        description: selectedCampaignForDetail.windowEndAt
+          ? "Pricing is active now and will automatically restore at the scheduled end time."
+          : "Pricing is active now and waiting for automatic restore.",
+      });
+    } else if (["active", "partial", "reverted", "unrecoverable", "auto-restored"].includes(normalizedStatus)) {
       milestones.push({
         key: "applied",
         label: "Applied",
@@ -1391,6 +1710,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         badgeLabel: "Completed",
         timestamp: revertCompletedTimestamp,
         description: "Pricing successfully restored to original storefront values.",
+      });
+    }
+
+    if (normalizedStatus === "auto-restored") {
+      milestones.push({
+        key: "auto-restored",
+        label: "Auto Restored",
+        tone: "success",
+        badgeLabel: "Completed",
+        timestamp: formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? selectedCampaignForDetail.windowEndAt ?? null),
+        description: "Original storefront pricing was automatically restored after the window ended.",
       });
     }
 
@@ -1424,12 +1754,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const campaignHistoryCounts = useMemo(() => {
     return campaignHistory.reduce(
       (acc, campaign) => {
-        const status = normalizeCampaignStatus(campaign.status);
-        if (status === "active") {
+        const status = resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow);
+        if (status === "active" || status === "active-window" || status === "published") {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
-        } else if (status === "scheduled" || status === "pending") {
+        } else if (status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending") {
           acc.scheduled += 1;
         } else if (isClosedCampaignStatus(status)) {
           acc.closed += 1;
@@ -1438,7 +1768,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       },
       { active: 0, partial: 0, scheduled: 0, closed: 0 }
     );
-  }, [campaignHistory]);
+  }, [campaignHistory, campaignRuntimeNow]);
 
   const handleCampaignHistoryStatusFilterChange = useCallback((value: string) => {
     const nextValue = value as CampaignHistoryStatusFilter;
@@ -1456,6 +1786,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     });
   }, []);
 
+  const handleCampaignHistoryTimeframeFilterChange = useCallback((value: string) => {
+    setCampaignHistoryTimeframeFilter(value as CampaignHistoryTimeframeFilter);
+    console.log("[Campaign History UI] campaign history timeframe changed", {
+      timeframe: value,
+    });
+  }, []);
+
   const handleCampaignHistorySearchChange = useCallback((value: string) => {
     if (value.length > 120) return;
     setCampaignHistorySearchQuery(value);
@@ -1468,16 +1805,21 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     const normalizedQuery = campaignHistorySearchQuery.trim().toLowerCase();
 
     return campaignHistory.filter((campaign) => {
-      const status = normalizeCampaignStatus(campaign.status);
+      const status = resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow);
       const source = normalizeCampaignSource(campaign.source);
       const title = campaign.title.toLowerCase();
       const campaignId = campaign.campaignId.toLowerCase();
+      const timeframeStart = getTimeframeStart(campaignHistoryTimeframeFilter, campaignRuntimeNow);
+      const campaignCreatedAt = new Date(campaign.createdAt).getTime();
+      const matchesTimeframe =
+        !timeframeStart ||
+        (!Number.isNaN(campaignCreatedAt) && campaignCreatedAt >= timeframeStart.getTime());
 
       const matchesStatus = (() => {
         if (campaignHistoryStatusFilter === "all") return true;
-        if (campaignHistoryStatusFilter === "active") return status === "active";
+        if (campaignHistoryStatusFilter === "active") return status === "active" || status === "active-window" || status === "published";
         if (campaignHistoryStatusFilter === "partial") return status === "partial";
-        if (campaignHistoryStatusFilter === "scheduled") return status === "scheduled" || status === "pending";
+        if (campaignHistoryStatusFilter === "scheduled") return status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending";
         return isClosedCampaignStatus(status);
       })();
 
@@ -1489,9 +1831,16 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         title.includes(normalizedQuery) ||
         campaignId.includes(normalizedQuery);
 
-      return matchesStatus && matchesSource && matchesSearch;
+      return matchesTimeframe && matchesStatus && matchesSource && matchesSearch;
     });
-  }, [campaignHistory, campaignHistoryStatusFilter, campaignHistorySourceFilter, campaignHistorySearchQuery]);
+  }, [
+    campaignHistory,
+    campaignHistorySearchQuery,
+    campaignHistorySourceFilter,
+    campaignHistoryStatusFilter,
+    campaignHistoryTimeframeFilter,
+    campaignRuntimeNow,
+  ]);
 
   const visibleCampaignHistory = useMemo(() => {
     if (!hideClosedCampaigns) return filteredCampaignHistory;
@@ -1506,8 +1855,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const campaignHistorySummary = useMemo(() => {
     return visibleCampaignHistory.reduce(
       (acc, campaign) => {
-        const status = normalizeCampaignStatus(campaign.status);
-        if (status === "active") {
+        const status = resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow);
+        if (status === "active" || status === "active-window" || status === "published") {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
@@ -1518,7 +1867,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       },
       { active: 0, partial: 0, closed: 0 }
     );
-  }, [visibleCampaignHistory]);
+  }, [campaignRuntimeNow, visibleCampaignHistory]);
 
   const campaignHistoryStatusOptions = useMemo(
     () => [
@@ -1536,6 +1885,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       { label: "All Sources", value: "all" },
       { label: "Manual", value: "manual" },
       { label: "Scheduled", value: "scheduled" },
+      { label: "Time Window", value: "time-window" },
+    ],
+    []
+  );
+
+  const campaignHistoryTimeframeOptions = useMemo(
+    () => [
+      { label: "Current Week", value: "week" },
+      { label: "Current Month", value: "month" },
+      { label: "Last 3 Months", value: "3_months" },
+      { label: "Last 6 Months", value: "6_months" },
+      { label: "This Year", value: "year" },
+      { label: "All Time", value: "all" },
     ],
     []
   );
@@ -1563,6 +1925,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     hideClosedCampaigns,
     visibleCampaignHistory.length,
   ]);
+
+  useEffect(() => {
+    if (!campaignHistoryExpanded) return;
+    void handleRefreshCampaignHistory(false);
+  }, [campaignHistoryExpanded, handleRefreshCampaignHistory]);
 
   const toggleCampaignHistoryExpanded = useCallback(() => {
     setCampaignHistoryExpanded((prev) => {
@@ -1941,6 +2308,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           onChange={handleCampaignHistorySourceFilterChange}
                         />
                       </div>
+                      <div style={{ flex: "1 1 180px", minWidth: "170px" }}>
+                        <Select
+                          label="Timeframe"
+                          options={campaignHistoryTimeframeOptions}
+                          value={campaignHistoryTimeframeFilter}
+                          onChange={handleCampaignHistoryTimeframeFilterChange}
+                        />
+                      </div>
                       <div style={{ flex: "2 1 260px", minWidth: "220px" }}>
                         <TextField
                           label="Search Campaigns"
@@ -1990,13 +2365,78 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       <Text as="p" variant="bodyMd" fontWeight="medium">
                                         {campaign.title}
                                       </Text>
-                                      <Badge tone={campaignStatusTone(campaign.status)}>
-                                        {campaign.status.toLowerCase() === "unrecoverable" ? "Unrecoverable" : campaign.status}
+                                      <Badge tone={campaignStatusTone(resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow))}>
+                                        {campaignStatusLabel(resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow))}
                                       </Badge>
+                                      {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
+                                        <Badge tone="success">Pricing Currently Active</Badge>
+                                      )}
                                     </InlineStack>
+                                    {formatTimeWindowSummary(campaign) && (
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        {formatTimeWindowSummary(campaign)}
+                                      </Text>
+                                    )}
+                                    {formatScheduledPublishSummary(campaign, campaignRuntimeNow) && (
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        {formatScheduledPublishSummary(campaign, campaignRuntimeNow)}
+                                      </Text>
+                                    )}
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && campaign.runAt && (
+                                      <Box padding="200" background="bg-surface" borderRadius="200">
+                                        <BlockStack gap="100">
+                                          <InlineStack gap="200" blockAlign="center" wrap>
+                                            <Badge tone="warning">Scheduled</Badge>
+                                            <Text as="p" variant="headingSm">
+                                              {`Starts in ${formatDurationParts(new Date(campaign.runAt).getTime() - campaignRuntimeNow.getTime())}`}
+                                            </Text>
+                                          </InlineStack>
+                                          <Text as="p" variant="bodySm" tone="subdued">
+                                            {`Publishing at ${new Date(campaign.runAt).toLocaleTimeString([], {
+                                              hour: "numeric",
+                                              minute: "2-digit",
+                                            })}`}
+                                          </Text>
+                                        </BlockStack>
+                                      </Box>
+                                    )}
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing" && (
+                                      <Box padding="200" background="bg-surface" borderRadius="200">
+                                        <InlineStack gap="200" blockAlign="center" wrap>
+                                          <Spinner size="small" />
+                                          <BlockStack gap="050">
+                                            <Text as="p" variant="bodySm" fontWeight="medium">
+                                              Publishing...
+                                            </Text>
+                                            <Text as="p" variant="bodySm" tone="subdued">
+                                              Applying scheduled pricing
+                                            </Text>
+                                          </BlockStack>
+                                        </InlineStack>
+                                      </Box>
+                                    )}
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && campaign.windowEndAt && (
+                                      <Box padding="200" background="bg-surface" borderRadius="200">
+                                        <BlockStack gap="150">
+                                          <InlineStack gap="200" blockAlign="center" wrap>
+                                            <Badge tone="success">Live</Badge>
+                                            <Text as="p" variant="headingSm">
+                                              {`Restores in ${formatDurationParts(new Date(campaign.windowEndAt).getTime() - campaignRuntimeNow.getTime())}`}
+                                            </Text>
+                                          </InlineStack>
+                                          <Text as="p" variant="bodySm" tone="subdued">
+                                            {`Auto restore scheduled for ${new Date(campaign.windowEndAt).toLocaleTimeString([], {
+                                              hour: "numeric",
+                                              minute: "2-digit",
+                                              second: "2-digit",
+                                            })}`}
+                                          </Text>
+                                        </BlockStack>
+                                      </Box>
+                                    )}
                                     <InlineStack gap="400" wrap>
                                       <Text as="p" variant="bodySm" tone="subdued">
-                                        Source: {campaign.source || "unknown"}
+                                        Source: {formatCampaignSourceLabel(campaign.source)}
                                       </Text>
                                       <Text as="p" variant="bodySm" tone="subdued">
                                         Products: {campaign.productCount}
@@ -2004,6 +2444,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       <Text as="p" variant="bodySm" tone="subdued">
                                         Created: {new Date(campaign.createdAt).toLocaleString()}
                                       </Text>
+                                      {campaign.source === "time-window" && campaign.runAt && campaign.windowEndAt && (
+                                        <Text as="p" variant="bodySm" tone="subdued">
+                                          Window: {new Date(campaign.runAt).toLocaleString()} to {new Date(campaign.windowEndAt).toLocaleString()}
+                                        </Text>
+                                      )}
                                     </InlineStack>
                                   </BlockStack>
                                 </div>
@@ -2039,6 +2484,45 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                     >
                                       View
                                     </Button>
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-window" && (
+                                      <Button
+                                        size="slim"
+                                        variant="secondary"
+                                        disabled={isProcessing}
+                                        loading={isProcessing}
+                                        onClick={() => {
+                                          void handleWindowLifecycleAction(campaign, "cancel-schedule");
+                                        }}
+                                      >
+                                        Cancel Schedule
+                                      </Button>
+                                    )}
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && (
+                                      <Button
+                                        size="slim"
+                                        variant="secondary"
+                                        disabled={isProcessing}
+                                        loading={isProcessing}
+                                        onClick={() => {
+                                          void handlePublishLifecycleAction(campaign);
+                                        }}
+                                      >
+                                        Cancel Publish
+                                      </Button>
+                                    )}
+                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
+                                      <Button
+                                        size="slim"
+                                        tone="critical"
+                                        disabled={isProcessing}
+                                        loading={isProcessing}
+                                        onClick={() => {
+                                          void handleWindowLifecycleAction(campaign, "stop-window");
+                                        }}
+                                      >
+                                        Stop Window
+                                      </Button>
+                                    )}
                                     {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
                                       <Button
                                         size="slim"
@@ -2050,7 +2534,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                         Retry Failed Reverts
                                       </Button>
                                     )}
-                                    {campaign.revertable && (
+                                    {campaign.revertable && normalizeCampaignSource(campaign.source) !== "time-window" && (
                                       <Button
                                         size="slim"
                                         tone="critical"
@@ -2759,15 +3243,114 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       <strong>Campaign:</strong> {campaignDetail.title}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      <strong>Tracked items:</strong> {campaignDetail.totalTrackedCount ?? campaignDetail.rows.length}
+                      <strong>{campaignDetail.preActivation || campaignDetail.prePublish ? "Scheduled products" : "Tracked items"}:</strong>{" "}
+                      {campaignDetail.preActivation || campaignDetail.prePublish
+                        ? campaignDetail.productCount
+                        : campaignDetail.totalTrackedCount ?? campaignDetail.rows.length}
                     </Text>
                   </InlineStack>
 
-                  <InlineStack gap="200" wrap>
-                    <Badge tone="success">{`Reverted: ${campaignDetail.revertedCount ?? 0}`}</Badge>
-                    <Badge tone="warning">{`Failed: ${campaignDetail.failedCount ?? 0}`}</Badge>
-                    <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
-                  </InlineStack>
+                  {campaignDetail.preActivation || campaignDetail.prePublish ? (
+                    <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                      <BlockStack gap="200">
+                        <InlineStack gap="200" wrap>
+                          <Badge tone={
+                            campaignDetail.schedule?.status === "cancelled-window" ||
+                            campaignDetail.schedule?.status === "cancelled-publish"
+                              ? "info"
+                              : "warning"
+                          }>
+                            {campaignDetail.schedule?.status === "cancelled-window"
+                              ? "Cancelled Window"
+                              : campaignDetail.schedule?.status === "cancelled-publish"
+                                ? "Cancelled"
+                                : campaignDetail.prePublish
+                                  ? "Publish Scheduled"
+                                  : "Window Scheduled"}
+                          </Badge>
+                          <Badge tone="attention">
+                            {formatDetailScheduleType(campaignDetail.schedule?.type)}
+                          </Badge>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm">
+                          {campaignDetail.schedule?.status === "cancelled-window"
+                            ? "This pricing window was cancelled before it started."
+                            : campaignDetail.schedule?.status === "cancelled-publish"
+                              ? "This scheduled publish was cancelled before it started."
+                              : campaignDetail.prePublish
+                                ? "This pricing publish is scheduled and has not started yet."
+                                : "This pricing window is scheduled and has not started yet."}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {campaignDetail.schedule?.status === "cancelled-window" ||
+                          campaignDetail.schedule?.status === "cancelled-publish"
+                            ? "No storefront pricing was changed for this cancelled schedule."
+                            : campaignDetail.prePublish
+                              ? "Applied storefront details will appear after publishing completes."
+                              : "Tracked storefront pricing details will appear once the publish window activates."}
+                        </Text>
+                        <InlineStack gap="400" wrap>
+                          {campaignDetail.schedule?.runAt && (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Publish start: {new Date(campaignDetail.schedule.runAt).toLocaleString()}
+                            </Text>
+                          )}
+                          {campaignDetail.schedule?.windowEndAt && (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Automatic restore: {new Date(campaignDetail.schedule.windowEndAt).toLocaleString()}
+                            </Text>
+                          )}
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Intended pricing scope: {campaignDetail.productCount} scheduled products
+                          </Text>
+                          {campaignDetail.schedule?.createdAt && (
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              Created: {new Date(campaignDetail.schedule.createdAt).toLocaleString()}
+                            </Text>
+                          )}
+                        </InlineStack>
+                      </BlockStack>
+                    </Box>
+                  ) : (
+                    <BlockStack gap="200">
+                      {selectedCampaignForDetail &&
+                        resolveCampaignRuntimeStatus(selectedCampaignForDetail, campaignRuntimeNow) === "active-window" && (
+                          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                            <BlockStack gap="150">
+                              <InlineStack gap="200" wrap>
+                                <Badge tone="success">Pricing Currently Active</Badge>
+                                <Badge tone="attention">Time Window</Badge>
+                              </InlineStack>
+                              <InlineStack gap="400" wrap>
+                                {selectedCampaignForDetail.runAt && (
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Active since: {new Date(selectedCampaignForDetail.runAt).toLocaleString()}
+                                  </Text>
+                                )}
+                                {selectedCampaignForDetail.windowEndAt && (
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Restore time: {new Date(selectedCampaignForDetail.windowEndAt).toLocaleString()}
+                                  </Text>
+                                )}
+                              </InlineStack>
+                              {selectedCampaignForDetail.windowEndAt && (
+                                <Text as="p" variant="bodySm" fontWeight="medium">
+                                  {`Remaining duration: ${formatDurationParts(
+                                    new Date(selectedCampaignForDetail.windowEndAt).getTime() -
+                                      campaignRuntimeNow.getTime()
+                                  )}`}
+                                </Text>
+                              )}
+                            </BlockStack>
+                          </Box>
+                        )}
+                      <InlineStack gap="200" wrap>
+                        <Badge tone="success">{`Reverted: ${campaignDetail.revertedCount ?? 0}`}</Badge>
+                        <Badge tone="warning">{`Failed: ${campaignDetail.failedCount ?? 0}`}</Badge>
+                        <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
+                      </InlineStack>
+                    </BlockStack>
+                  )}
 
                   {campaignOperationalTimeline.length > 0 && (
                     <Box padding="300" background="bg-surface" borderRadius="200">
@@ -2847,7 +3430,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           }-${
                             (campaignDetailPage - 1) * campaignDetailPageSize +
                             campaignDetailPaginatedRows.length
-                          } of ${campaignDetailRows.length} tracked items`}
+                          } of ${campaignDetailRows.length} ${
+                            campaignDetail.preActivation || campaignDetail.prePublish ? "scheduled products" : "tracked items"
+                          }`}
                         </Text>
                         <div style={{ minWidth: 140 }}>
                           <Select
@@ -2879,7 +3464,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               fontWeight="medium"
                               alignment="end"
                             >
-                              Reverted From
+                              {campaignDetail.preActivation || campaignDetail.prePublish ? "Original Price" : "Reverted From"}
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -2889,7 +3474,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               fontWeight="medium"
                               alignment="end"
                             >
-                              Restored To
+                              {campaignDetail.preActivation || campaignDetail.prePublish ? "Scheduled Price" : "Restored To"}
                             </Text>
                           </div>
                           <InlineStack align="start">
@@ -2920,6 +3505,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                     {compactVariantIdentifier(row.variantId)}
                                   </Text>
                                 </div>
+                                {(campaignDetail.preActivation || campaignDetail.prePublish) && row.variantTitle && (
+                                  <div style={{ overflowWrap: "anywhere" }}>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      {row.variantTitle}
+                                    </Text>
+                                  </div>
+                                )}
                                 {row.revertFailureReason && (
                                   <div style={{ overflowWrap: "anywhere" }}>
                                     <Text as="p" variant="bodySm" tone="subdued">
@@ -2945,9 +3537,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 variant="bodySm"
                                 fontWeight="medium"
                                 alignment="end"
-                                tone="success"
+                                tone={campaignDetail.preActivation || campaignDetail.prePublish ? undefined : "success"}
                               >
-                                {formatMoney(row.revertTargetPrice, currencyCode)}
+                                {campaignDetail.preActivation || campaignDetail.prePublish
+                                  ? row.scheduledPrice == null
+                                    ? "-"
+                                    : formatMoney(row.scheduledPrice, currencyCode)
+                                  : formatMoney(row.revertTargetPrice, currencyCode)}
                               </Text>
                             </div>
                             <InlineStack align="start" blockAlign="center">

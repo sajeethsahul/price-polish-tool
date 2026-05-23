@@ -1,5 +1,66 @@
 import type { LoaderFunctionArgs } from "react-router";
 import prisma from "../db.server";
+import { isWindowActive } from "../utils/window-lifecycle";
+
+type ProxyPriceRow = {
+  variantId: string;
+  campaignId: string | null;
+  newPrice: number;
+  revertStatus: string | null;
+};
+
+type ProxyCampaignState = {
+  id: string;
+  status: string;
+  source: string | null;
+  runAt: Date | null;
+  windowEndAt: Date | null;
+};
+
+function isClosedCampaignStatus(status: string | null | undefined) {
+  const normalized = (status ?? "").toLowerCase();
+  return normalized === "reverted" ||
+    normalized === "unrecoverable" ||
+    normalized === "auto-restored";
+}
+
+function isActiveWindowCampaign(campaign: ProxyCampaignState, now: Date) {
+  const status = campaign.status.toLowerCase();
+  const source = (campaign.source ?? "").toLowerCase();
+
+  return source === "schedule-window" &&
+    status === "active-window" &&
+    isWindowActive(campaign, now);
+}
+
+function qualifiesForStorefrontInfluence(
+  row: ProxyPriceRow,
+  campaignById: Map<string, ProxyCampaignState>,
+  now: Date
+) {
+  const revertStatus = (row.revertStatus ?? "").toLowerCase();
+  if (revertStatus === "reverted" || revertStatus === "unrecoverable") {
+    return false;
+  }
+
+  if (!row.campaignId) {
+    return true;
+  }
+
+  const campaign = campaignById.get(row.campaignId);
+  if (!campaign) {
+    return false;
+  }
+
+  const source = (campaign.source ?? "").toLowerCase();
+  const status = campaign.status.toLowerCase();
+
+  if (source === "schedule-window" || status.includes("window")) {
+    return isActiveWindowCampaign(campaign, now);
+  }
+
+  return !isClosedCampaignStatus(campaign.status);
+}
 
 // Handles: /api/proxy/settings
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -53,12 +114,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       console.warn("[PROXY] ⚠️ NO RULE FOUND", { shop });
     }
 
-    // ================= FETCH LATEST APPLIED PRICES =================
-    const polishedProducts = await prisma.priceHistory.findMany({
+    // ================= FETCH ACTIVE STOREFRONT INFLUENCE =================
+    const latestRows = await prisma.priceHistory.findMany({
       where: { shop },
       select: {
         variantId: true,
+        campaignId: true,
         newPrice: true,
+        revertStatus: true,
       },
       distinct: ["variantId"],
       orderBy: [
@@ -67,9 +130,40 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ],
     });
 
+    const campaignIds = [
+      ...new Set(
+        latestRows
+          .map((row) => row.campaignId)
+          .filter((campaignId): campaignId is string => typeof campaignId === "string" && campaignId.length > 0)
+      ),
+    ];
+
+    const campaigns = campaignIds.length > 0
+      ? await (prisma.campaign as any).findMany({
+          where: {
+            shop,
+            id: { in: campaignIds },
+          },
+          select: {
+            id: true,
+            status: true,
+            source: true,
+            runAt: true,
+            windowEndAt: true,
+          },
+        }) as ProxyCampaignState[]
+      : [];
+
+    const campaignById = new Map(campaigns.map((campaign) => [campaign.id, campaign]));
+    const now = new Date();
+    const polishedProducts = latestRows.filter((row) =>
+      qualifiesForStorefrontInfluence(row, campaignById, now)
+    );
+
     console.log("[PROXY] DATA FETCHED", {
       shop,
       productsCount: polishedProducts.length,
+      excludedInactiveCount: latestRows.length - polishedProducts.length,
     });
 
     // ================= RESPONSE =================

@@ -34,12 +34,17 @@ interface ScheduledJob {
   id: string;
   title: string;
   runAt: string;
+  mode?: "one-time" | "time-window" | string;
+  windowEndAt?: string | null;
+  activatedAt?: string | null;
+  restoredAt?: string | null;
   status: string;
   productCount: number;
   products: ProductSnapshot[] | null;
 }
 
 type ScheduleScope = "all" | "selected" | "filtered";
+type ScheduleMode = "one-time" | "time-window";
 
 interface ScheduleConflictNotice {
   id: string;
@@ -91,13 +96,16 @@ export function ScheduledHistoryModal({
   const [isScheduling, setIsScheduling] = useState(false);
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const [selectedTab, setSelectedTab] = useState<"create" | "history">("create");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("one-time");
   const [scheduleApplyMode, setScheduleApplyMode] = useState<ScheduleScope>("all");
   const [scheduleTitle, setScheduleTitle] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
+  const [windowEndTime, setWindowEndTime] = useState("");
   const [scheduleTitleError, setScheduleTitleError] = useState<string | undefined>();
   const [scheduleTimeError, setScheduleTimeError] = useState<string | undefined>();
+  const [windowEndTimeError, setWindowEndTimeError] = useState<string | undefined>();
   const [historyFilter, setHistoryFilter] = useState<
-    "all" | "upcoming" | "completed" | "failed" | "overdue"
+    "all" | "upcoming" | "active" | "completed" | "restored" | "failed" | "overdue"
   >("all");
   const [historyPageSize, setHistoryPageSize] = useState(15);
   const [historyPage, setHistoryPage] = useState(1);
@@ -135,8 +143,12 @@ export function ScheduledHistoryModal({
       setIsScheduling(false);
       setSelectedJob(null);
       setSelectedTab("create");
+      setScheduleMode("one-time");
+      setScheduleTime("");
+      setWindowEndTime("");
       setScheduleTitleError(undefined);
       setScheduleTimeError(undefined);
+      setWindowEndTimeError(undefined);
       setHistoryFilter("all");
       setHistoryPage(1);
       setSelectedJobPageSize(15);
@@ -154,22 +166,32 @@ export function ScheduledHistoryModal({
 
   const scheduleCenterData = useMemo(() => {
     const nowMs = Date.now();
-    const queueStatuses = new Set(["pending", "processing"]);
+    const queueStatuses = new Set(["pending", "processing", "restoring"]);
+    const activeWindowStatuses = new Set(["active-window"]);
 
     const parsedJobs = jobs
       .map((job) => {
         const runAtDate = new Date(job.runAt);
+        const windowEndDate = job.windowEndAt ? new Date(job.windowEndAt) : null;
         return {
           ...job,
+          isTimeWindow: job.mode === "time-window",
           runAtDate,
           runAtMs: runAtDate.getTime(),
+          windowEndDate,
+          windowEndMs: windowEndDate ? windowEndDate.getTime() : null,
           normalizedStatus: job.status.toLowerCase(),
         };
       })
       .filter((job) => !Number.isNaN(job.runAtMs));
 
     const upcoming = parsedJobs
-      .filter((job) => queueStatuses.has(job.normalizedStatus) || job.runAtMs >= nowMs)
+      .filter(
+        (job) =>
+          queueStatuses.has(job.normalizedStatus) ||
+          activeWindowStatuses.has(job.normalizedStatus) ||
+          job.runAtMs >= nowMs
+      )
       .sort((a, b) => a.runAtMs - b.runAtMs);
 
     const history = parsedJobs
@@ -193,6 +215,7 @@ export function ScheduledHistoryModal({
       upcomingProductCount,
       nowMs,
       queueStatuses,
+      activeWindowStatuses,
     };
   }, [jobs]);
 
@@ -267,14 +290,42 @@ export function ScheduledHistoryModal({
       });
     }
 
+    if (scheduleMode === "time-window" && scheduleTime && windowEndTime) {
+      const startMs = new Date(scheduleTime).getTime();
+      const endMs = new Date(windowEndTime).getTime();
+      if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs > startMs) {
+        const durationHours = (endMs - startMs) / (1000 * 60 * 60);
+        if (durationHours >= 24) {
+          notices.push({
+            id: "schedule-window-duration",
+            severity: "informational",
+            message: "This pricing window runs for more than one day before automatic restore.",
+          });
+        }
+        if (storefrontWide && durationHours >= 12) {
+          notices.push({
+            id: "schedule-storefront-wide-window",
+            severity: "warning",
+            message: "Most storefront products will stay in this window until automatic restore.",
+          });
+        }
+      }
+    }
+
     return notices;
-  }, [previews.length, scheduleApplyMode, scopedItemsForSchedule]);
+  }, [previews.length, scheduleApplyMode, scheduleMode, scheduleTime, scopedItemsForSchedule, windowEndTime]);
 
   const scheduleConflictNotices = useMemo<ScheduleConflictNotice[]>(() => {
     if (!scheduleTime) return [];
 
     const publishAtMs = new Date(scheduleTime).getTime();
     if (Number.isNaN(publishAtMs)) return [];
+    const restoreAtMs =
+      scheduleMode === "time-window" && windowEndTime
+        ? new Date(windowEndTime).getTime()
+        : publishAtMs;
+    if (Number.isNaN(restoreAtMs)) return [];
+    const candidateEndMs = Math.max(publishAtMs, restoreAtMs);
 
     const candidateVariantIds = new Set(
       scopedItemsForSchedule
@@ -303,6 +354,18 @@ export function ScheduledHistoryModal({
       return getJobVariantIds(job).size >= catalogSize;
     });
 
+    const getJobWindowEndMs = (job: ScheduledJob & { runAtMs: number; windowEndMs?: number | null }) => {
+      if (job.mode === "time-window" && typeof job.windowEndMs === "number") {
+        return job.windowEndMs;
+      }
+      return job.runAtMs;
+    };
+
+    const windowsOverlap = (job: ScheduledJob & { runAtMs: number; windowEndMs?: number | null }) => {
+      const jobEndMs = getJobWindowEndMs(job);
+      return publishAtMs <= jobEndMs && job.runAtMs <= candidateEndMs;
+    };
+
     const exactPublishTimeOverlap = scheduleCenterData.upcoming.filter(
       (job) => Math.floor(job.runAtMs / 60000) === candidateMinute
     );
@@ -314,10 +377,13 @@ export function ScheduledHistoryModal({
     const overlappingVariantIds = new Set<string>();
     let productOverlapJobCount = 0;
     let overlapScheduledLaterCount = 0;
+    let activeWindowOverlapCount = 0;
+    let restoreWindowOverlapCount = 0;
 
     for (const job of scheduleCenterData.upcoming) {
       const jobVariantIds = getJobVariantIds(job);
       if (jobVariantIds.size === 0) continue;
+      const overlapsWindowTiming = windowsOverlap(job);
 
       let hasOverlap = false;
       for (const variantId of candidateVariantIds) {
@@ -331,6 +397,17 @@ export function ScheduledHistoryModal({
         productOverlapJobCount += 1;
         if (job.runAtMs > publishAtMs) {
           overlapScheduledLaterCount += 1;
+        }
+        if (overlapsWindowTiming && job.status.toLowerCase() === "active-window") {
+          activeWindowOverlapCount += 1;
+        }
+        if (
+          overlapsWindowTiming &&
+          scheduleMode === "time-window" &&
+          job.mode === "time-window" &&
+          typeof job.windowEndMs === "number"
+        ) {
+          restoreWindowOverlapCount += 1;
         }
       }
     }
@@ -374,6 +451,26 @@ export function ScheduledHistoryModal({
       });
     }
 
+    if (activeWindowOverlapCount > 0) {
+      notices.push({
+        id: "active-window-overlap",
+        severity: "warning",
+        message: `${activeWindowOverlapCount} active pricing window${
+          activeWindowOverlapCount === 1 ? "" : "s"
+        } may overlap this operation.`,
+      });
+    }
+
+    if (restoreWindowOverlapCount > 0) {
+      notices.push({
+        id: "restore-window-overlap",
+        severity: "informational",
+        message: `${restoreWindowOverlapCount} time window${
+          restoreWindowOverlapCount === 1 ? "" : "s"
+        } include restore timing inside this window.`,
+      });
+    }
+
     if (nearbyPublishTimeOverlap.length > 0) {
       notices.push({
         id: "nearby-time-overlap",
@@ -405,7 +502,7 @@ export function ScheduledHistoryModal({
     }
 
     return notices;
-  }, [scheduleTime, scopedItemsForSchedule, previews.length, scheduleCenterData.upcoming]);
+  }, [scheduleMode, scheduleTime, scopedItemsForSchedule, previews.length, scheduleCenterData.upcoming, windowEndTime]);
 
   const warningNoticeCount = useMemo(
     () => scheduleConflictNotices.filter((notice) => notice.severity === "warning").length,
@@ -430,34 +527,43 @@ export function ScheduledHistoryModal({
       .map((job) => {
         const runAtDate = new Date(job.runAt);
         const runAtMs = runAtDate.getTime();
+        const windowEndMs = job.windowEndAt ? new Date(job.windowEndAt).getTime() : null;
         const normalizedStatus = job.status.toLowerCase();
         const isQueueStatus = scheduleCenterData.queueStatuses.has(normalizedStatus);
+        const isActiveWindow = scheduleCenterData.activeWindowStatuses.has(normalizedStatus);
         const isOverdue = isQueueStatus && runAtMs < scheduleCenterData.nowMs;
-        const isUpcoming = isQueueStatus || runAtMs >= scheduleCenterData.nowMs;
+        const isUpcoming = isQueueStatus || isActiveWindow || runAtMs >= scheduleCenterData.nowMs;
         const isFailed = normalizedStatus === "failed" || normalizedStatus === "error";
+        const isAutoRestored = normalizedStatus === "auto-restored";
         const isCompleted =
           normalizedStatus === "done" ||
           normalizedStatus === "completed" ||
-          normalizedStatus === "success";
+          normalizedStatus === "success" ||
+          isAutoRestored;
         return {
           ...job,
           runAtMs,
+          windowEndMs,
           normalizedStatus,
+          isActiveWindow,
           isOverdue,
           isUpcoming,
           isFailed,
+          isAutoRestored,
           isCompleted,
         };
       })
       .filter((job) => !Number.isNaN(job.runAtMs));
-  }, [jobs, scheduleCenterData.nowMs, scheduleCenterData.queueStatuses]);
+  }, [jobs, scheduleCenterData.activeWindowStatuses, scheduleCenterData.nowMs, scheduleCenterData.queueStatuses]);
 
   const filteredHistoryRows = useMemo(() => {
     const sortedRows = [...historyRows].sort((a, b) => b.runAtMs - a.runAtMs);
     if (historyFilter === "all") return sortedRows;
     if (historyFilter === "upcoming") return sortedRows.filter((job) => job.isUpcoming);
+    if (historyFilter === "active") return sortedRows.filter((job) => job.isActiveWindow);
     if (historyFilter === "overdue") return sortedRows.filter((job) => job.isOverdue);
     if (historyFilter === "failed") return sortedRows.filter((job) => job.isFailed);
+    if (historyFilter === "restored") return sortedRows.filter((job) => job.isAutoRestored);
     if (historyFilter === "completed") {
       return sortedRows.filter((job) => job.isCompleted || (!job.isUpcoming && !job.isFailed));
     }
@@ -503,6 +609,14 @@ export function ScheduledHistoryModal({
         return <Badge tone="warning">Pending</Badge>;
       case "processing":
         return <Badge tone="info">Processing</Badge>;
+      case "active-window":
+        return <Badge tone="attention">Active Window</Badge>;
+      case "restoring":
+        return <Badge tone="info">Restoring</Badge>;
+      case "auto-restored":
+        return <Badge tone="success">Auto Restored</Badge>;
+      case "restore-failed":
+        return <Badge tone="critical">Restore Failed</Badge>;
       case "done":
       case "success":
       case "completed":
@@ -518,7 +632,9 @@ export function ScheduledHistoryModal({
   const historyFilterOptions = [
     { label: `${SELECT_OPTION_PREFIX}All`, value: "all" },
     { label: `${SELECT_OPTION_PREFIX}Upcoming`, value: "upcoming" },
+    { label: `${SELECT_OPTION_PREFIX}Active windows`, value: "active" },
     { label: `${SELECT_OPTION_PREFIX}Completed`, value: "completed" },
+    { label: `${SELECT_OPTION_PREFIX}Auto restored`, value: "restored" },
     { label: `${SELECT_OPTION_PREFIX}Failed`, value: "failed" },
     { label: `${SELECT_OPTION_PREFIX}Overdue`, value: "overdue" },
   ];
@@ -555,6 +671,48 @@ export function ScheduledHistoryModal({
       : `${absDays} day${absDays > 1 ? "s" : ""} ago`;
   };
 
+  const formatScheduleWindow = (job: ScheduledJob) => {
+    if (job.mode !== "time-window" || !job.windowEndAt) {
+      return formatDateTime(job.runAt);
+    }
+
+    return `${formatDateTime(job.runAt)} to ${formatDateTime(job.windowEndAt)}`;
+  };
+
+  const formatScheduleTiming = (job: ScheduledJob & { normalizedStatus?: string }) => {
+    if (job.mode === "time-window") {
+      if (job.normalizedStatus === "active-window" && job.windowEndAt) {
+        return `Restores ${formatRelativeTime(job.windowEndAt)}`;
+      }
+      if (job.normalizedStatus === "auto-restored") {
+        return "Window completed";
+      }
+      return `Publishes ${formatRelativeTime(job.runAt)}`;
+    }
+
+    return formatRelativeTime(job.runAt);
+  };
+
+  const formatWindowDuration = () => {
+    if (scheduleMode !== "time-window" || !scheduleTime || !windowEndTime) return null;
+    const startMs = new Date(scheduleTime).getTime();
+    const endMs = new Date(windowEndTime).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) return null;
+
+    const totalMinutes = Math.round((endMs - startMs) / (1000 * 60));
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours < 24) return minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
+
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours > 0
+      ? `${days} day${days === 1 ? "" : "s"} ${remainingHours} hr`
+      : `${days} day${days === 1 ? "" : "s"}`;
+  };
+
   const submitSchedule = async () => {
     const normalizedTitle = scheduleTitle.trim();
     if (!normalizedTitle) {
@@ -564,10 +722,44 @@ export function ScheduledHistoryModal({
     setScheduleTitleError(undefined);
 
     if (!scheduleTime) {
-      setScheduleTimeError("Choose when this schedule should run.");
+      setScheduleTimeError(
+        scheduleMode === "time-window"
+          ? "Choose when pricing should publish."
+          : "Choose when this schedule should run."
+      );
+      return;
+    }
+    const scheduleStartMs = new Date(scheduleTime).getTime();
+    if (Number.isNaN(scheduleStartMs)) {
+      setScheduleTimeError("Choose a valid publish time.");
+      return;
+    }
+    if (scheduleStartMs <= Date.now()) {
+      setScheduleTimeError("Choose a future start time before scheduling.");
       return;
     }
     setScheduleTimeError(undefined);
+
+    if (scheduleMode === "time-window") {
+      if (!windowEndTime) {
+        setWindowEndTimeError("Choose when original pricing should restore.");
+        return;
+      }
+      const scheduleEndMs = new Date(windowEndTime).getTime();
+      if (Number.isNaN(scheduleEndMs)) {
+        setWindowEndTimeError("Choose a valid restore time.");
+        return;
+      }
+      if (scheduleEndMs === scheduleStartMs) {
+        setWindowEndTimeError("Start and end times need to be different.");
+        return;
+      }
+      if (scheduleEndMs <= scheduleStartMs) {
+        setWindowEndTimeError("Window end must be after the start time.");
+        return;
+      }
+      setWindowEndTimeError(undefined);
+    }
 
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules before scheduling.", {
@@ -608,6 +800,10 @@ export function ScheduledHistoryModal({
         body: JSON.stringify({
           title: normalizedTitle,
           runAt: new Date(scheduleTime).toISOString(),
+          mode: scheduleMode,
+          ...(scheduleMode === "time-window"
+            ? { windowEndAt: new Date(windowEndTime).toISOString() }
+            : {}),
           products,
           applyMode: scheduleApplyMode,
           collectionId,
@@ -620,8 +816,13 @@ export function ScheduledHistoryModal({
       }
 
       const count = result.stagedCount || scopedItemsForSchedule.length;
-      shopify.toast.show(`${count} prices staged and scheduled successfully`);
+      shopify.toast.show(
+        scheduleMode === "time-window"
+          ? `${count} prices scheduled with automatic restore`
+          : `${count} prices staged and scheduled successfully`
+      );
       setScheduleTime("");
+      setWindowEndTime("");
       setSelectedTab("history");
       setLoading(true);
       await loadScheduleHistory();
@@ -644,59 +845,65 @@ export function ScheduledHistoryModal({
         size="large"
       >
         <Modal.Section>
-          <BlockStack gap="300">
-            <Text variant="bodySm" as="p" tone="subdued">
-              Immediate operations run directly from the dashboard. Use Schedule Center for future
-              pricing operations.
-            </Text>
+          <div
+            style={{
+              minHeight: "min(560px, 72vh)",
+              height: "72vh",
+              maxHeight: "72vh",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ flex: "0 0 auto" }}>
+              <BlockStack gap="300">
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Immediate operations run directly from the dashboard. Use Schedule Center for future
+                  pricing operations.
+                </Text>
 
-            <Box
-              background="bg-surface-secondary"
-              padding="100"
-              borderRadius="200"
-              borderColor="border"
-              borderWidth="025"
-            >
-              <InlineStack gap="100" wrap={false}>
-                <Button
-                  size="slim"
-                  fullWidth
-                  pressed={selectedTab === "create"}
-                  variant={selectedTab === "create" ? "primary" : "tertiary"}
-                  onClick={() => setSelectedTab("create")}
+                <Box
+                  background="bg-surface-secondary"
+                  padding="100"
+                  borderRadius="200"
+                  borderColor="border"
+                  borderWidth="025"
                 >
-                  Create Schedule
-                </Button>
-                <Button
-                  size="slim"
-                  fullWidth
-                  pressed={selectedTab === "history"}
-                  variant={selectedTab === "history" ? "primary" : "tertiary"}
-                  onClick={() => setSelectedTab("history")}
-                >
-                  Schedule History
-                </Button>
-              </InlineStack>
-            </Box>
+                  <InlineStack gap="100" wrap={false}>
+                    <Button
+                      size="slim"
+                      fullWidth
+                      pressed={selectedTab === "create"}
+                      variant={selectedTab === "create" ? "primary" : "tertiary"}
+                      onClick={() => setSelectedTab("create")}
+                    >
+                      Create Schedule
+                    </Button>
+                    <Button
+                      size="slim"
+                      fullWidth
+                      pressed={selectedTab === "history"}
+                      variant={selectedTab === "history" ? "primary" : "tertiary"}
+                      onClick={() => setSelectedTab("history")}
+                    >
+                      Schedule History
+                    </Button>
+                  </InlineStack>
+                </Box>
+              </BlockStack>
+            </div>
 
             <div
               style={{
-                minHeight: 560,
-                maxHeight: "72vh",
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
+                flex: "1 1 auto",
+                minHeight: 0,
+                overflowY: "auto",
+                paddingRight: 4,
+                paddingTop: 12,
               }}
             >
               {selectedTab === "create" ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
+                <div>
                     <BlockStack gap="400">
                       <BlockStack gap="150">
                         <Text as="p" variant="bodySm" tone="subdued">
@@ -725,10 +932,27 @@ export function ScheduledHistoryModal({
                             <Text as="p" variant="bodySm" fontWeight="medium">
                               Scheduling mode
                             </Text>
-                            <Badge tone="success">One-time Publish</Badge>
+                            <Badge tone={scheduleMode === "time-window" ? "attention" : "success"}>
+                              {scheduleMode === "time-window" ? "Time Window" : "One-time Publish"}
+                            </Badge>
                           </InlineStack>
 
                           <BlockStack gap="300">
+                            <Select
+                              label="Schedule type"
+                              options={[
+                                { label: `${SELECT_OPTION_PREFIX}One-time Publish`, value: "one-time" },
+                                { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
+                              ]}
+                              value={scheduleMode}
+                              onChange={(value) => {
+                                setScheduleMode(value as ScheduleMode);
+                                setScheduleTimeError(undefined);
+                                setWindowEndTimeError(undefined);
+                              }}
+                              disabled={isScheduling}
+                            />
+
                             <Select
                               label="Schedule pricing scope"
                               options={[
@@ -757,7 +981,7 @@ export function ScheduledHistoryModal({
                             />
 
                             <TextField
-                              label="Publish at"
+                              label={scheduleMode === "time-window" ? "Window Start" : "Publish at"}
                               type="datetime-local"
                               value={scheduleTime}
                               onChange={(value) => {
@@ -770,16 +994,53 @@ export function ScheduledHistoryModal({
                               error={scheduleTimeError}
                               disabled={isScheduling}
                             />
+                            {scheduleMode === "time-window" && (
+                              <TextField
+                                label="Window End"
+                                type="datetime-local"
+                                value={windowEndTime}
+                                onChange={(value) => {
+                                  setWindowEndTime(value);
+                                  if (windowEndTimeError && value) {
+                                    setWindowEndTimeError(undefined);
+                                  }
+                                }}
+                                autoComplete="off"
+                                error={windowEndTimeError}
+                                disabled={isScheduling}
+                              />
+                            )}
                           </BlockStack>
                         </BlockStack>
                       </Box>
 
                       <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {`This schedule includes ${scopedItemsForSchedule.length} product${
-                            scopedItemsForSchedule.length === 1 ? "" : "s"
-                          } using the current ${scheduleApplyMode} scope.`}
-                        </Text>
+                        <BlockStack gap="100">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {`This schedule includes ${scopedItemsForSchedule.length} product${
+                              scopedItemsForSchedule.length === 1 ? "" : "s"
+                            } using the current ${scheduleApplyMode} scope.`}
+                          </Text>
+                          {scheduleMode === "time-window" && (
+                            <>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {scheduleTime
+                                  ? `Pricing will publish at ${formatDateTime(scheduleTime)}.`
+                                  : "Pricing will publish at the window start."}
+                              </Text>
+                              <Text as="p" variant="bodySm" tone="subdued">
+                                {windowEndTime
+                                  ? `Original storefront pricing will automatically restore at ${formatDateTime(windowEndTime)}.`
+                                  : "Original storefront pricing will automatically restore at the window end."}
+                              </Text>
+                              {formatWindowDuration() && (
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  {`Window duration: ${formatWindowDuration()}.`}
+                                </Text>
+                              )}
+                            </>
+                          )}
+                        </BlockStack>
                       </Box>
 
                       {scheduleOperationalSafeguards.length > 0 && (
@@ -862,42 +1123,9 @@ export function ScheduledHistoryModal({
                         </Box>
                       )}
                     </BlockStack>
-                  </div>
-
-                  <div style={{ marginTop: "auto" }}>
-                    <Box
-                      borderColor="border"
-                      borderBlockStartWidth="025"
-                      paddingBlockStart="300"
-                      paddingBlockEnd="100"
-                    >
-                      <InlineStack align="end" gap="200">
-                        <Button onClick={onClose} disabled={isScheduling}>
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="primary"
-                          tone="success"
-                          onClick={() => {
-                            void submitSchedule();
-                          }}
-                          loading={isScheduling}
-                          disabled={
-                            isScheduling ||
-                            loading ||
-                            !hasRules ||
-                            !hasActivePlan ||
-                            scopedItemsForSchedule.length === 0
-                          }
-                        >
-                          Schedule Pricing
-                        </Button>
-                      </InlineStack>
-                    </Box>
-                  </div>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", height: "100%", paddingRight: 4 }}>
+                <div>
                   <BlockStack gap="300">
                     <InlineStack gap="200" wrap align="space-between" blockAlign="end">
                       <div style={{ minWidth: 220 }}>
@@ -907,7 +1135,7 @@ export function ScheduledHistoryModal({
                           value={historyFilter}
                           onChange={(value) =>
                             setHistoryFilter(
-                              value as "all" | "upcoming" | "completed" | "failed" | "overdue"
+                              value as "all" | "upcoming" | "active" | "completed" | "restored" | "failed" | "overdue"
                             )
                           }
                           disabled={loading}
@@ -959,11 +1187,18 @@ export function ScheduledHistoryModal({
                         <div>
                           <DataTable
                             columnContentTypes={["text", "text", "text", "text", "text"]}
-                            headings={["Campaign", "Scheduled for", "Timing", "Products", "Status"]}
+                            headings={["Campaign", "Schedule", "Timing", "Products", "Status"]}
                             rows={paginatedHistoryRows.map((job) => [
-                              job.title,
-                              formatDateTime(job.runAt),
-                              formatRelativeTime(job.runAt),
+                              <BlockStack key={`${job.id}-title`} gap="100">
+                                <Text as="span" variant="bodySm">
+                                  {job.title}
+                                </Text>
+                                {job.mode === "time-window" && (
+                                  <Badge tone="attention">Time Window</Badge>
+                                )}
+                              </BlockStack>,
+                              formatScheduleWindow(job),
+                              formatScheduleTiming(job),
                               <Button
                                 key={`${job.id}-history-products`}
                                 variant="plain"
@@ -1002,7 +1237,42 @@ export function ScheduledHistoryModal({
                 </div>
               )}
             </div>
-          </BlockStack>
+            {selectedTab === "create" && (
+              <div style={{ flex: "0 0 auto" }}>
+                <Box
+                  background="bg-surface"
+                  borderColor="border"
+                  borderBlockStartWidth="025"
+                  paddingBlockStart="300"
+                  paddingBlockEnd="100"
+                  paddingInlineEnd="100"
+                >
+                  <InlineStack align="end" gap="200">
+                    <Button onClick={onClose} disabled={isScheduling}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="primary"
+                      tone="success"
+                      onClick={() => {
+                        void submitSchedule();
+                      }}
+                      loading={isScheduling}
+                      disabled={
+                        isScheduling ||
+                        loading ||
+                        !hasRules ||
+                        !hasActivePlan ||
+                        scopedItemsForSchedule.length === 0
+                      }
+                    >
+                      {scheduleMode === "time-window" ? "Schedule Window" : "Schedule Pricing"}
+                    </Button>
+                  </InlineStack>
+                </Box>
+              </div>
+            )}
+          </div>
         </Modal.Section>
       </Modal>
 

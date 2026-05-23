@@ -54,13 +54,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             prisma.campaign.count({
                 where: {
                     shop,
-                    status: { notIn: ["reverted", "unrecoverable"] },
+                    status: { notIn: ["reverted", "unrecoverable", "auto-restored"] },
                 },
             }),
             prisma.campaign.count({
                 where: {
                     shop,
-                    status: { in: ["reverted", "unrecoverable"] },
+                    status: { in: ["reverted", "unrecoverable", "auto-restored"] },
                 },
             }),
         ]);
