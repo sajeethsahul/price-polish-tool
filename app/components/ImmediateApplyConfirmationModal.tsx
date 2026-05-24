@@ -19,6 +19,7 @@ export interface ImmediateApplyConfirmationModalProps {
   initialCampaignTitle: string;
   impactSummary: ImmediateApplyImpactSummary;
   safeguardNotices?: OperationalSafeguardNotice[];
+  validateCampaignTitle?: (campaignTitle: string) => string | undefined;
   onClose: () => void;
   onConfirm: (campaignTitle: string) => Promise<boolean>;
 }
@@ -31,6 +32,7 @@ export function ImmediateApplyConfirmationModal({
   initialCampaignTitle,
   impactSummary,
   safeguardNotices = [],
+  validateCampaignTitle,
   onClose,
   onConfirm,
 }: ImmediateApplyConfirmationModalProps) {
@@ -49,6 +51,14 @@ export function ImmediateApplyConfirmationModal({
     if (!normalizedTitle) {
       setTitleError("Campaign title is required before applying pricing.");
       return;
+    }
+
+    if (validateCampaignTitle) {
+      const validationError = validateCampaignTitle(normalizedTitle);
+      if (validationError) {
+        setTitleError(validationError);
+        return;
+      }
     }
 
     setTitleError(undefined);
@@ -101,7 +111,7 @@ export function ImmediateApplyConfirmationModal({
       <Modal.Section>
         <BlockStack gap="300">
           <Text as="p" tone="subdued" variant="bodySm">
-            {`Apply pricing now to ${itemCount} ${scopeLabel}. Use Schedule Center for future runs.`}
+            {`Applying pricing to: ${itemCount} ${scopeLabel}.`}
           </Text>
           <BlockStack gap="100">
             <Text as="p" variant="bodySm">
@@ -170,9 +180,17 @@ export function ImmediateApplyConfirmationModal({
               value={campaignTitle}
               onChange={(value) => {
                 setCampaignTitle(value);
-                if (titleError && value.trim()) {
+                const normalized = value.trim();
+                if (!normalized) {
                   setTitleError(undefined);
+                  return;
                 }
+                if (!validateCampaignTitle) {
+                  if (titleError) setTitleError(undefined);
+                  return;
+                }
+                const validationError = validateCampaignTitle(normalized);
+                setTitleError(validationError);
               }}
               placeholder="e.g., Weekend Price Refresh"
               autoComplete="off"

@@ -1,0 +1,17 @@
+/* Global styles for Shopify Polaris component refinements */
+
+/* Add subtle left spacing to dropdown options for improved readability */
+.Polaris-Select__Option {
+  padding-left: 0px !important;
+}
+
+/* Also ensure the dropdown trigger has consistent spacing */
+.Polaris-Select__SelectedOption {
+  padding-left: 0px !important;
+}
+
+/* Use text-indent for native select option lists on Windows/Chrome */
+.Polaris-Select__Input option {
+  text-indent: 0px;
+}
+

@@ -65,27 +65,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }),
         ]);
 
-        // Calculate total optimizations (successful BULK or APPLY)
-        const successLogs = logs.filter(l => 
-            l.action === "BULK_SUCCESS" || 
-            l.action === "BULK_PARTIAL_FAILURE"
-        );
-
-        let totalApplied = 0;
-        let totalFailed = 0;
-
-        successLogs.forEach(log => {
-            const meta = (log.meta as any) || {};
-            totalApplied += meta.successCount || 0;
-            totalFailed += meta.failedCount || 0;
+        // Calculate operational metrics for Phase 8C.2
+        const campaignStatusCounts = await prisma.campaign.groupBy({
+            by: ['status'],
+            where: { shop },
+            _count: { status: true },
         });
 
-        const lastUpdate = successLogs[0]?.createdAt.toISOString() || "";
-        const successRate = (totalApplied + totalFailed) > 0 
-            ? (totalApplied / (totalApplied + totalFailed)) * 100 
-            : 100;
+        let activeCampaignsCount = 0;
+        let scheduledRunsCount = 0;
+
+        campaignStatusCounts.forEach(group => {
+            const status = group.status.toLowerCase();
+            if (['published', 'active-window', 'publishing'].includes(status)) {
+                activeCampaignsCount += group._count.status;
+            }
+            if (['scheduled-publish', 'scheduled-window'].includes(status)) {
+                scheduledRunsCount += group._count.status;
+            }
+        });
 
         const isLive = appState?.isLive === true;
+        
+        // Check for enabled live pricing rules
+        const pricingRule = await prisma.pricingRule.findUnique({
+            where: { shop }
+        });
+        // A live rule is active if isLive is true and there are live settings (or default rule exists)
+        const livePricingRulesCount = isLive && pricingRule ? 1 : 0;
+
         let influencedVariantCount = 0;
         let retryableRevertCount = 0;
         let unrecoverableCount = 0;
@@ -116,9 +124,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const canGoLive = stagedPendingCount > 0;
 
         return cors(new Response(JSON.stringify({
-            totalApplied,
-            lastUpdate,
-            successRate,
+            activeCampaignsCount,
+            scheduledRunsCount,
+            livePricingRulesCount,
+            productsUnderAutomationCount: influencedVariantCount,
             isLive,
             storefrontControl: {
                 influencedVariantCount,
@@ -138,9 +147,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }));
     } catch (error) {
         return cors(new Response(JSON.stringify({
-            totalApplied: 0,
-            lastUpdate: "",
-            successRate: 100,
+            activeCampaignsCount: 0,
+            scheduledRunsCount: 0,
+            livePricingRulesCount: 0,
+            productsUnderAutomationCount: 0,
             isLive: false,
             storefrontControl: {
                 influencedVariantCount: 0,

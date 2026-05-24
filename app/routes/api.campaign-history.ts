@@ -4,6 +4,8 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 
+const SELECT_OPTION_PREFIX = "\u2002";
+
 type CampaignHistoryItem = {
   campaignId: string;
   title: string;

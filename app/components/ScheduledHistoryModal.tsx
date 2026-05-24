@@ -72,6 +72,7 @@ export interface ScheduledHistoryModalProps {
   collectionId: string;
   hasActivePlan: boolean;
   hasRules: boolean;
+  existingCampaignTitles?: string[];
   shopify: {
     toast: {
       show: (message: string, options?: { isError?: boolean }) => void;
@@ -89,6 +90,7 @@ export function ScheduledHistoryModal({
   collectionId,
   hasActivePlan,
   hasRules,
+  existingCampaignTitles = [],
   shopify,
 }: ScheduledHistoryModalProps) {
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
@@ -144,6 +146,8 @@ export function ScheduledHistoryModal({
       setSelectedJob(null);
       setSelectedTab("create");
       setScheduleMode("one-time");
+      setScheduleApplyMode("all");
+      setScheduleTitle("");
       setScheduleTime("");
       setWindowEndTime("");
       setScheduleTitleError(undefined);
@@ -228,6 +232,20 @@ export function ScheduledHistoryModal({
     }
     return previews;
   }, [scheduleApplyMode, previews, selectedItems, filteredPreviews]);
+
+  const normalizedExistingScheduleTitles = useMemo(() => {
+    const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+    const set = new Set<string>();
+    for (const title of existingCampaignTitles) {
+      const normalized = normalize(String(title ?? ""));
+      if (normalized) set.add(normalized);
+    }
+    for (const job of jobs) {
+      const normalized = normalize(String(job?.title ?? ""));
+      if (normalized) set.add(normalized);
+    }
+    return set;
+  }, [existingCampaignTitles, jobs]);
 
   const scheduleOperationalSafeguards = useMemo<OperationalSafeguardNotice[]>(() => {
     if (scopedItemsForSchedule.length <= 1) return [];
@@ -719,6 +737,13 @@ export function ScheduledHistoryModal({
       setScheduleTitleError("Campaign title is required for scheduled pricing.");
       return;
     }
+
+    const normalizedKey = normalizedTitle.replace(/\s+/g, " ").toLowerCase();
+    if (normalizedExistingScheduleTitles.has(normalizedKey)) {
+      setScheduleTitleError("A campaign with this title already exists. Choose a unique title.");
+      return;
+    }
+
     setScheduleTitleError(undefined);
 
     if (!scheduleTime) {
@@ -1017,9 +1042,9 @@ export function ScheduledHistoryModal({
                       <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            {`This schedule includes ${scopedItemsForSchedule.length} product${
+                            {`Scheduling pricing update for: ${scopedItemsForSchedule.length} product${
                               scopedItemsForSchedule.length === 1 ? "" : "s"
-                            } using the current ${scheduleApplyMode} scope.`}
+                            }.`}
                           </Text>
                           {scheduleMode === "time-window" && (
                             <>

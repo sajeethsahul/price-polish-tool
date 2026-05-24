@@ -34,6 +34,8 @@ import { calculatePrice } from "../utils/pricing";
 
 // ================= LOADER =================
 
+const SELECT_OPTION_PREFIX = "\u2002";
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session } = await authenticate.admin(request);
 
@@ -308,8 +310,8 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                             label="Type"
                                             name="adjustmentType"
                                             options={[
-                                                { label: "Percentage", value: "percentage" },
-                                                { label: "Fixed amount", value: "fixed" },
+                                                { label: `${SELECT_OPTION_PREFIX}Percentage`, value: "percentage" },
+                                                { label: `${SELECT_OPTION_PREFIX}Fixed amount`, value: "fixed" },
                                             ]}
                                             value={adjustmentType}
                                             disabled={isSubmitting}
@@ -322,8 +324,8 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                             label="Direction"
                                             name="adjustmentDirection"
                                             options={[
-                                                { label: "Increase", value: "increase" },
-                                                { label: "Decrease", value: "decrease" },
+                                                { label: `${SELECT_OPTION_PREFIX}Increase`, value: "increase" },
+                                                { label: `${SELECT_OPTION_PREFIX}Decrease`, value: "decrease" },
                                             ]}
                                             value={adjustmentDirection}
                                             disabled={isSubmitting}
@@ -359,14 +361,14 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                             label="Ending"
                                             name="endingOption"
                                             options={[
-                                                { label: "None", value: "none" },
-                                                { label: ".00", value: "0.00" },
-                                                { label: ".25", value: "0.25" },
-                                                { label: ".49", value: "0.49" },
-                                                { label: ".50", value: "0.50" },
-                                                { label: ".75", value: "0.75" },
-                                                { label: ".95", value: "0.95" },
-                                                { label: ".99", value: "0.99" },
+                                                { label: `${SELECT_OPTION_PREFIX}None`, value: "none" },
+                                                { label: `${SELECT_OPTION_PREFIX}.00`, value: "0.00" },
+                                                { label: `${SELECT_OPTION_PREFIX}.25`, value: "0.25" },
+                                                { label: `${SELECT_OPTION_PREFIX}.49`, value: "0.49" },
+                                                { label: `${SELECT_OPTION_PREFIX}.50`, value: "0.50" },
+                                                { label: `${SELECT_OPTION_PREFIX}.75`, value: "0.75" },
+                                                { label: `${SELECT_OPTION_PREFIX}.95`, value: "0.95" },
+                                                { label: `${SELECT_OPTION_PREFIX}.99`, value: "0.99" },
                                             ]}
                                             value={endingOption}
                                             disabled={isSubmitting}
@@ -379,10 +381,10 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
                                             label="Rounding"
                                             name="roundingPrecision"
                                             options={[
-                                                { label: "Standard currency rounding", value: "standard" },
-                                                { label: "Whole number only", value: "whole" },
-                                                { label: "Keep cents", value: "keep-cents" },
-                                                { label: "Nearest 0.05", value: "nearest-0.05" },
+                                                { label: `${SELECT_OPTION_PREFIX}Standard currency rounding`, value: "standard" },
+                                                { label: `${SELECT_OPTION_PREFIX}Whole number only`, value: "whole" },
+                                                { label: `${SELECT_OPTION_PREFIX}Keep cents`, value: "keep-cents" },
+                                                { label: `${SELECT_OPTION_PREFIX}Nearest 0.05`, value: "nearest-0.05" },
                                             ]}
                                             value={roundingPrecision}
                                             disabled={isSubmitting}

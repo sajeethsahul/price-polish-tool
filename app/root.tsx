@@ -16,10 +16,16 @@ import {
   Button,
 } from "@shopify/polaris";
 
+import globalStyles from "./styles/global.css?url";
+
 export const links = () => [
   {
     rel: "stylesheet",
     href: "https://unpkg.com/@shopify/polaris@12.0.0/build/esm/styles.css",
+  },
+  {
+    rel: "stylesheet",
+    href: globalStyles,
   },
 ];
 

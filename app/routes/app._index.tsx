@@ -42,7 +42,7 @@ import {
   type ImmediateApplyImpactSummary,
 } from "../components/ImmediateApplyConfirmationModal";
 import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
-import { calculatePrice } from "../utils/pricing";
+import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 
 
@@ -55,6 +55,10 @@ const VERY_LARGE_OPERATION_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
 const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
 const MAJOR_MOVEMENT_THRESHOLD = 40;
+
+
+
+
 
 type PreviewItem = PricingPreviewItem;
 type ImmediateApplyScope = "all" | "selected" | "single";
@@ -135,9 +139,10 @@ interface StorefrontControlMetrics {
 }
 
 interface DashboardMetrics {
-  totalApplied: number;
-  lastUpdate: string;
-  successRate: number;
+  activeCampaignsCount: number;
+  scheduledRunsCount: number;
+  livePricingRulesCount: number;
+  productsUnderAutomationCount: number;
   isLive: boolean;
   hasActivePlan: boolean;
   storefrontControl: StorefrontControlMetrics;
@@ -156,9 +161,10 @@ const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
 };
 
 const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
-  totalApplied: 0,
-  lastUpdate: "",
-  successRate: 100,
+  activeCampaignsCount: 0,
+  scheduledRunsCount: 0,
+  livePricingRulesCount: 0,
+  productsUnderAutomationCount: 0,
   isLive: false,
   hasActivePlan: true,
   storefrontControl: DEFAULT_STOREFRONT_CONTROL_METRICS,
@@ -179,9 +185,17 @@ type CampaignHistoryStatusFilter = "all" | "active" | "partial" | "scheduled" | 
 type CampaignHistorySourceFilter = "all" | "manual" | "scheduled" | "time-window";
 type CampaignHistoryTimeframeFilter = "week" | "month" | "3_months" | "6_months" | "year" | "all";
 type RevertPreviewMovementFilter = "all" | "increase" | "decrease" | "large_movement";
+type PreviewSortOrder =
+  | "highest_increase"
+  | "highest_decrease"
+  | "alphabetical_az"
+  | "alphabetical_za"
+  | "highest_final_price"
+  | "lowest_final_price";
 
 const OPERATIONAL_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
 const SELECT_OPTION_PREFIX = "\u2002";
+const SORT_OPTION_PREFIX = "\u2009\u2009\u2009";
 const REVERT_PREVIEW_DEFAULT_PAGE_SIZE = 15;
 const REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD = 15;
 
@@ -532,16 +546,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"all" | "increase" | "decrease" | "high_impact">("all");
-  const [sortOrder, setSortOrder] = useState<string>("name_asc");
+  const [sortOrder, setSortOrder] = useState<PreviewSortOrder>("alphabetical_az");
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [roundingStep, setRoundingStep] = useState(1);
   const [charmPricing, setCharmPricing] = useState(true);
+  const [previewPricingRule, setPreviewPricingRule] = useState<PricingRuleLike | null>(null);
   const [metrics, setMetrics] = useState<DashboardMetrics>(DEFAULT_DASHBOARD_METRICS);
   const collectionId = "";
   const [immediateApplyModalOpen, setImmediateApplyModalOpen] = useState(false);
   const [immediateApplyScope, setImmediateApplyScope] = useState<ImmediateApplyScope>("selected");
   const [immediateApplySingleItem, setImmediateApplySingleItem] = useState<PreviewItem | null>(null);
+  const [immediateApplyModalItems, setImmediateApplyModalItems] = useState<PreviewItem[]>([]);
   const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] = useState(false);
 
   // Billing placeholders — do not modify
@@ -600,6 +616,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       setActiveMarkup(data.markupPercent ?? 0);
       setRoundingStep(data.roundingStep ?? 1);
       setCharmPricing(data.charmPricing ?? true);
+      setPreviewPricingRule({
+        adjustmentType: data.adjustmentType ?? "percentage",
+        adjustmentDirection: data.adjustmentDirection ?? ((data.markupPercent ?? 0) < 0 ? "decrease" : "increase"),
+        adjustmentValue: data.adjustmentValue ?? Math.abs(data.markupPercent ?? 0),
+        endingOption: data.endingOption ?? ((data.charmPricing ?? true) ? "0.99" : ((data.roundingStep ?? 0) > 0 ? Number(data.roundingStep).toFixed(2) : "none")),
+        roundingPrecision: data.roundingPrecision ?? "standard",
+        minPrice: data.minPrice ?? null,
+        maxPrice: data.maxPrice ?? null,
+      });
       setMetrics(prev => ({
         ...prev,
         ...metricsData,
@@ -799,6 +824,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         ? "product"
         : "selected products";
 
+  const immediateApplyContextItems = immediateApplyModalItems.length > 0 ? immediateApplyModalItems : immediateApplyItems;
+
   const immediateApplyImpactSummary = useMemo<ImmediateApplyImpactSummary>(() => {
     const summary: ImmediateApplyImpactSummary = {
       increaseCount: 0,
@@ -809,14 +836,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       singleItemDirection: null,
     };
 
-    if (immediateApplyItems.length === 0) {
+    if (immediateApplyContextItems.length === 0) {
       return summary;
     }
 
     let totalPercentChange = 0;
     let validPercentCount = 0;
 
-    for (const item of immediateApplyItems) {
+    for (const item of immediateApplyContextItems) {
       const oldPrice = Number.parseFloat(item.oldPrice);
       const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
       const proposedPrice = Number.parseFloat(proposedRaw);
@@ -849,7 +876,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       summary.averageChangePercent = totalPercentChange / validPercentCount;
     }
 
-    if (immediateApplyItems.length === 1) {
+    if (immediateApplyContextItems.length === 1) {
       summary.singleItemDirection =
         summary.largestMovementDirection === "increase"
           ? "increase"
@@ -859,10 +886,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
 
     return summary;
-  }, [immediateApplyItems]);
+  }, [immediateApplyContextItems]);
 
   const immediateApplySafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
-    if (immediateApplyItems.length <= 1) {
+    if (immediateApplyContextItems.length <= 1) {
       return [];
     }
 
@@ -870,13 +897,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     const totalVisibleProducts = previews.length;
     const affectsMostVisible =
       totalVisibleProducts > 0 &&
-      immediateApplyItems.length >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
+      immediateApplyContextItems.length >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
     const largestMovement = Math.abs(immediateApplyImpactSummary.largestMovementPercent ?? 0);
     const isStorefrontWide =
-      totalVisibleProducts > 0 && immediateApplyItems.length >= Math.ceil(totalVisibleProducts * 0.95);
+      totalVisibleProducts > 0 && immediateApplyContextItems.length >= Math.ceil(totalVisibleProducts * 0.95);
     const isAllProductsScope = immediateApplyScope === "all";
 
-    if (isAllProductsScope || immediateApplyItems.length >= LARGE_OPERATION_THRESHOLD) {
+    if (isAllProductsScope || immediateApplyContextItems.length >= LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "immediate-large-operation",
         severity: "informational",
@@ -900,7 +927,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       });
     }
 
-    if (immediateApplyItems.length >= VERY_LARGE_OPERATION_THRESHOLD) {
+    if (immediateApplyContextItems.length >= VERY_LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "immediate-very-large-operation",
         severity: "warning",
@@ -925,21 +952,59 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
 
     return notices;
-  }, [immediateApplyItems.length, immediateApplyImpactSummary.largestMovementPercent, immediateApplyScope, previews.length]);
+  }, [immediateApplyContextItems.length, immediateApplyImpactSummary.largestMovementPercent, immediateApplyScope, previews.length]);
+
+  const normalizeCampaignTitle = useCallback((value: string) => {
+    return value.trim().replace(/\s+/g, " ").toLowerCase();
+  }, []);
+
+  const existingCampaignTitleSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const campaign of campaignHistory) {
+      const normalized = normalizeCampaignTitle(campaign.title ?? "");
+      if (normalized) set.add(normalized);
+    }
+    return set;
+  }, [campaignHistory, normalizeCampaignTitle]);
+
+  const validateCampaignTitle = useCallback((title: string) => {
+    const normalized = normalizeCampaignTitle(title);
+    if (!normalized) return undefined;
+    if (existingCampaignTitleSet.has(normalized)) {
+      return "A campaign with this title already exists. Choose a unique title.";
+    }
+    return undefined;
+  }, [existingCampaignTitleSet, normalizeCampaignTitle]);
+
+  const campaignHistoryTitles = useMemo(
+    () => campaignHistory.map((campaign) => campaign.title),
+    [campaignHistory]
+  );
 
   const openImmediateApplyModal = useCallback((scope: ImmediateApplyScope, item?: PreviewItem) => {
+    const scopeItems =
+      scope === "all"
+        ? previews
+        : scope === "single"
+          ? item
+            ? [item]
+            : []
+          : previews.filter((preview) => selectedItems.has(String(preview.variantId)));
+
     setImmediateApplyScope(scope);
     if (scope === "single" && item) {
       setImmediateApplySingleItem(item);
     } else {
       setImmediateApplySingleItem(null);
     }
+    setImmediateApplyModalItems(scopeItems);
     setImmediateApplyModalOpen(true);
-  }, []);
+  }, [previews, selectedItems]);
 
   const closeImmediateApplyModal = useCallback(() => {
     setImmediateApplyModalOpen(false);
     setImmediateApplySingleItem(null);
+    setImmediateApplyModalItems([]);
   }, []);
 
   const handleApplySingle = useCallback((item: PreviewItem) => {
@@ -976,6 +1041,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }, 1000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortOrder]);
 
   const revertSafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
     if (!revertPreview || revertPreview.terminal) return [];
@@ -1095,47 +1164,147 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const filteredPreviews = useMemo(() => {
     console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
-    let result = previews.filter(p => {
-      const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const currentNewPrice = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
-      const price = currentNewPrice;
-      const matchesMin = minPrice === "" || price >= parseFloat(minPrice);
-      const matchesMax = maxPrice === "" || price <= parseFloat(maxPrice);
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
+    const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
 
-      const oldP = parseFloat(p.oldPrice);
-      const newP = currentNewPrice;
-      const diffPercent = oldP !== 0 ? ((newP - oldP) / oldP) * 100 : 0;
+    const derived = previews.map(p => {
+      const livePrice = parseFloat(p.oldPrice);
+      const finalPrice = p.overriddenPrice !== undefined
+        ? parseFloat(p.overriddenPrice) || 0
+        : parseFloat(p.newPrice);
+      const delta = finalPrice - livePrice;
+      const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
+      return {
+        ...p,
+        livePrice,
+        finalPrice,
+        delta,
+        deltaPercent,
+      };
+    });
+
+    let result = derived.filter(p => {
+      const matchesSearch = normalizedQuery.length === 0 || p.title.toLowerCase().includes(normalizedQuery);
+      const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
+      const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
 
       let matchesSmartFilter = true;
-      if (activeFilter === "increase") matchesSmartFilter = newP > oldP;
-      else if (activeFilter === "decrease") matchesSmartFilter = newP < oldP;
-      else if (activeFilter === "high_impact") matchesSmartFilter = Math.abs(diffPercent) >= 10;
+      if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
+      else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
+      else if (activeFilter === "high_impact") matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
 
       return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
     });
 
     result.sort((a, b) => {
-      const oldA = parseFloat(a.oldPrice);
-      const newA = a.overriddenPrice !== undefined ? parseFloat(a.overriddenPrice) || 0 : parseFloat(a.newPrice);
-      const diffA = oldA !== 0 ? ((newA - oldA) / oldA) * 100 : 0;
-
-      const oldB = parseFloat(b.oldPrice);
-      const newB = b.overriddenPrice !== undefined ? parseFloat(b.overriddenPrice) || 0 : parseFloat(b.newPrice);
-      const diffB = oldB !== 0 ? ((newB - oldB) / oldB) * 100 : 0;
-
       switch (sortOrder) {
-        case "name_asc": return a.title.localeCompare(b.title);
-        case "name_desc": return b.title.localeCompare(a.title);
-        case "price_asc": return newA - newB;
-        case "price_desc": return newB - newA;
-        case "change_asc": return diffA - diffB;
-        case "change_desc": return diffB - diffA;
-        default: return 0;
+        case "alphabetical_az":
+          return a.title.localeCompare(b.title);
+        case "alphabetical_za":
+          return b.title.localeCompare(a.title);
+        case "highest_increase":
+          return (b.delta - a.delta) || a.title.localeCompare(b.title);
+        case "highest_decrease":
+          return (a.delta - b.delta) || a.title.localeCompare(b.title);
+        case "highest_final_price":
+          return (b.finalPrice - a.finalPrice) || a.title.localeCompare(b.title);
+        case "lowest_final_price":
+          return (a.finalPrice - b.finalPrice) || a.title.localeCompare(b.title);
+        default:
+          return 0;
       }
     });
 
     return result;
   }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
+
+  const previewImpactSummary = useMemo(() => {
+    const rows = filteredPreviews;
+    let affectedCount = 0;
+    let sumDelta = 0;
+    let sumFinal = 0;
+    let maxIncreaseDelta = 0;
+    let maxDecreaseDelta = 0;
+    let hasIncrease = false;
+    let hasDecrease = false;
+
+    for (const item of rows) {
+      const oldP = parseFloat(item.oldPrice);
+      const finalP = item.overriddenPrice !== undefined
+        ? parseFloat(item.overriddenPrice) || 0
+        : parseFloat(item.newPrice);
+
+      if (!isFinite(oldP) || !isFinite(finalP)) continue;
+      sumFinal += finalP;
+      const delta = finalP - oldP;
+
+      if (delta !== 0) {
+        affectedCount += 1;
+        sumDelta += delta;
+        if (delta > 0) hasIncrease = true;
+        if (delta < 0) hasDecrease = true;
+        if (delta > maxIncreaseDelta) maxIncreaseDelta = delta;
+        if (delta < maxDecreaseDelta) maxDecreaseDelta = delta;
+      }
+    }
+
+    const averageDelta = affectedCount > 0 ? sumDelta / affectedCount : 0;
+    const averageFinalPrice = rows.length > 0 ? sumFinal / rows.length : 0;
+
+    let safeguardAdjustedCount = 0;
+    if (previewPricingRule) {
+      for (const item of rows) {
+        if (item.overriddenPrice !== undefined) continue;
+        const base = parseFloat(item.originalBasePrice);
+        if (!isFinite(base)) continue;
+
+        const unclamped = calculatePrice(base, {
+          ...previewPricingRule,
+          minPrice: null,
+          maxPrice: null,
+        });
+        const final = calculatePrice(base, previewPricingRule);
+        const clampAdjusted = Math.abs(unclamped - final) > 0.01;
+
+        const finalWithoutEnding = calculatePrice(base, {
+          ...previewPricingRule,
+          endingOption: "none",
+        });
+        const endingOption = String(previewPricingRule.endingOption ?? "none").trim().toLowerCase();
+        const endingAdjusted =
+          endingOption !== "" &&
+          endingOption !== "none" &&
+          Math.abs(final - finalWithoutEnding) > 0.01;
+
+        const finalWithoutRounding = calculatePrice(base, {
+          ...previewPricingRule,
+          roundingPrecision: "standard",
+        });
+        const roundingPrecision = String(previewPricingRule.roundingPrecision ?? "standard").trim().toLowerCase();
+        const roundingAdjusted =
+          roundingPrecision !== "" &&
+          roundingPrecision !== "standard" &&
+          Math.abs(final - finalWithoutRounding) > 0.01;
+
+        if (clampAdjusted || endingAdjusted || roundingAdjusted) {
+          safeguardAdjustedCount += 1;
+        }
+      }
+    }
+
+    return {
+      totalCount: rows.length,
+      affectedCount,
+      hasIncrease,
+      hasDecrease,
+      averageDelta,
+      maxIncreaseDelta,
+      maxDecreaseDelta,
+      averageFinalPrice,
+      safeguardAdjustedCount,
+    };
+  }, [filteredPreviews, previewPricingRule]);
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
@@ -1871,33 +2040,33 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const campaignHistoryStatusOptions = useMemo(
     () => [
-      { label: "All", value: "all" },
-      { label: `Active (${campaignHistoryCounts.active})`, value: "active" },
-      { label: `Partial (${campaignHistoryCounts.partial})`, value: "partial" },
-      { label: "Scheduled", value: "scheduled" },
-      { label: "Closed", value: "closed" },
+      { label: `${SELECT_OPTION_PREFIX}All`, value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}Active (${campaignHistoryCounts.active})`, value: "active" },
+      { label: `${SELECT_OPTION_PREFIX}Partial (${campaignHistoryCounts.partial})`, value: "partial" },
+      { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
+      { label: `${SELECT_OPTION_PREFIX}Closed`, value: "closed" },
     ],
     [campaignHistoryCounts.active, campaignHistoryCounts.partial]
   );
 
   const campaignHistorySourceOptions = useMemo(
     () => [
-      { label: "All Sources", value: "all" },
-      { label: "Manual", value: "manual" },
-      { label: "Scheduled", value: "scheduled" },
-      { label: "Time Window", value: "time-window" },
+      { label: `${SELECT_OPTION_PREFIX}All Sources`, value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}Manual`, value: "manual" },
+      { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
+      { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
     ],
     []
   );
 
   const campaignHistoryTimeframeOptions = useMemo(
     () => [
-      { label: "Current Week", value: "week" },
-      { label: "Current Month", value: "month" },
-      { label: "Last 3 Months", value: "3_months" },
-      { label: "Last 6 Months", value: "6_months" },
-      { label: "This Year", value: "year" },
-      { label: "All Time", value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}Current Week`, value: "week" },
+      { label: `${SELECT_OPTION_PREFIX}Current Month`, value: "month" },
+      { label: `${SELECT_OPTION_PREFIX}Last 3 Months`, value: "3_months" },
+      { label: `${SELECT_OPTION_PREFIX}Last 6 Months`, value: "6_months" },
+      { label: `${SELECT_OPTION_PREFIX}This Year`, value: "year" },
+      { label: `${SELECT_OPTION_PREFIX}All Time`, value: "all" },
     ],
     []
   );
@@ -1999,7 +2168,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, []);
 
   const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
+  
   const paginatedPreviews = useMemo(() => {
+    console.count("Preview Dataset Recompute");
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredPreviews.slice(start, start + PAGE_SIZE);
   }, [filteredPreviews, currentPage]);
@@ -2025,6 +2196,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   if (loading && ruleExists === null) {
     return <DashboardLoader />;
   }
+
+  
 
   return (
     <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh" }}>
@@ -2157,21 +2330,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               </Card>
             )}
 
-            {/* Safety Info Banner */}
+            {/* Operational Info Banner */}
             <Banner tone="info">
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyMd">
-                  Safe to use — all pricing changes can be reviewed and undone anytime.
-                </Text>
-
-                <Text as="p" variant="bodyMd">
-                  Your original storefront prices are preserved securely for rollback and recovery.
-                </Text>
-
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Scheduled pricing updates run automatically at the selected time without requiring manual action.
-                </Text>
-              </BlockStack>
+              <Text as="p" variant="bodyMd">
+                Original storefront prices are preserved securely and can be restored at any time.
+              </Text>
             </Banner>
 
             {/* Live Mode Warning */}
@@ -2196,55 +2359,76 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
               </Banner>
             )}
 
-            {/* SAAS Metrics Grid */}
+            {/* Storefront Operations Overview */}
             {/* Keep metrics visible during preview refresh to avoid layout jump */}
             {previews.length > 0 && (
               <Box paddingBlockEnd="300">
                 <Grid>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
                     <Card>
-                      <Box padding="300" background="bg-surface-success" borderRadius="200">
+                      <Box padding="300" background={previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "bg-surface-success" : "bg-surface-critical"} borderRadius="200">
                         <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Potential Revenue Lift</Text>
-                          <Text as="p" variant="headingLg" tone="success">
-                            {`+${formatMoney(previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0), currencyCode)}`}
+                          <Text as="p" variant="bodySm" tone="subdued">Estimated Pricing Impact</Text>
+                          <Text as="p" variant="headingLg" tone={previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "success" : "critical"}>
+                            {(() => {
+                              const lift = previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0);
+                              const sign = lift > 0 ? "+" : lift < 0 ? "-" : "";
+                              return `${sign}${formatMoney(Math.abs(lift), currencyCode)}`;
+                            })()}
                           </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Projected storefront pricing delta</Text>
                         </BlockStack>
                       </Box>
                     </Card>
                   </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
                     <Card>
                       <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Success Rate</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Active Campaigns</Text>
                           <Text as="p" variant="headingLg">
-                            {`${metrics.successRate.toFixed(1)}%`}
+                            {metrics.activeCampaignsCount}
                           </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Currently affecting storefront pricing</Text>
                         </BlockStack>
                       </Box>
                     </Card>
                   </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
                     <Card>
                       <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Total Optimizations</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Scheduled Runs</Text>
                           <Text as="p" variant="headingLg">
-                            {metrics.totalApplied}
+                            {metrics.scheduledRunsCount}
                           </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Queued pricing operations</Text>
                         </BlockStack>
                       </Box>
                     </Card>
                   </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 3, xl: 3 }}>
                     <Card>
                       <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Last Update</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Live Pricing Rules</Text>
                           <Text as="p" variant="headingLg">
-                            {metrics.lastUpdate ? timeAgo(metrics.lastUpdate) : "Never"}
+                            {metrics.livePricingRulesCount}
                           </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Active storefront automation rules</Text>
+                        </BlockStack>
+                      </Box>
+                    </Card>
+                  </Grid.Cell>
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 3, xl: 3 }}>
+                    <Card>
+                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                        <BlockStack gap="100" align="start">
+                          <Text as="p" variant="bodySm" tone="subdued">Products Under Automation</Text>
+                          <Text as="p" variant="headingLg">
+                            {metrics.productsUnderAutomationCount}
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">Products managed by pricing workflows</Text>
                         </BlockStack>
                       </Box>
                     </Card>
@@ -2866,15 +3050,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               <Select
                                 label="Sort by"
                                 options={[
-                                  { label: "Name (A-Z)", value: "name_asc" },
-                                  { label: "Name (Z-A)", value: "name_desc" },
-                                  { label: "Price (Low to High)", value: "price_asc" },
-                                  { label: "Price (High to Low)", value: "price_desc" },
-                                  { label: "% Change (Asc)", value: "change_asc" },
-                                  { label: "% Change (Desc)", value: "change_desc" },
+                                  { label: `${SORT_OPTION_PREFIX}Alphabetical (A–Z)`, value: "alphabetical_az" },
+                                  { label: `${SORT_OPTION_PREFIX}Alphabetical (Z–A)`, value: "alphabetical_za" },
+                                  { label: `${SORT_OPTION_PREFIX}Highest Increase`, value: "highest_increase" },
+                                  { label: `${SORT_OPTION_PREFIX}Highest Decrease`, value: "highest_decrease" },
+                                  { label: `${SORT_OPTION_PREFIX}Highest Final Price`, value: "highest_final_price" },
+                                  { label: `${SORT_OPTION_PREFIX}Lowest Final Price`, value: "lowest_final_price" },
                                 ]}
                                 value={sortOrder}
-                                onChange={setSortOrder}
+                                onChange={(value) => setSortOrder(value as PreviewSortOrder)}
                               />
                             </div>
                             <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
@@ -2904,6 +3088,96 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           </InlineStack>
                         </BlockStack>
                       </Card>
+
+                      {previews.length > 0 && (
+                        <Card>
+                          <Box padding="300">
+                            <BlockStack gap="200">
+                              <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
+                                <Text as="h3" variant="headingMd">Preview Summary</Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                  {`Based on ${previewImpactSummary.totalCount} products in your current view`}
+                                </Text>
+                              </InlineStack>
+                              <Divider />
+                              {previewImpactSummary.affectedCount === 0 ? (
+                                <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    No pricing changes detected in the current view.
+                                  </Text>
+                                </Box>
+                              ) : (
+                                <Grid>
+                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="050">
+                                      <Text as="p" variant="bodySm" tone="subdued">Products affected</Text>
+                                      <Text as="p" variant="headingLg">
+                                        {previewImpactSummary.affectedCount}
+                                      </Text>
+                                    </BlockStack>
+                                  </Box>
+                                </Grid.Cell>
+                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="050">
+                                      <Text as="p" variant="bodySm" tone="subdued">Average change</Text>
+                                      <Text as="p" variant="headingLg" tone={previewImpactSummary.averageDelta >= 0 ? "success" : "critical"}>
+                                        {`${previewImpactSummary.averageDelta >= 0 ? "+" : ""}${formatMoney(previewImpactSummary.averageDelta, currencyCode)}`}
+                                      </Text>
+                                    </BlockStack>
+                                  </Box>
+                                </Grid.Cell>
+                                {previewImpactSummary.hasIncrease && (
+                                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                    <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                      <BlockStack gap="050">
+                                        <Text as="p" variant="bodySm" tone="subdued">Largest increase</Text>
+                                        <Text as="p" variant="headingLg" tone="success">
+                                          {`+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+                                  </Grid.Cell>
+                                )}
+                                {previewImpactSummary.hasDecrease && (
+                                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                    <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                      <BlockStack gap="050">
+                                        <Text as="p" variant="bodySm" tone="subdued">Largest decrease</Text>
+                                        <Text as="p" variant="headingLg" tone="critical">
+                                          {formatMoney(previewImpactSummary.maxDecreaseDelta, currencyCode)}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+                                  </Grid.Cell>
+                                )}
+                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="050">
+                                      <Text as="p" variant="bodySm" tone="subdued">Avg final price</Text>
+                                      <Text as="p" variant="headingLg">
+                                        {formatMoney(previewImpactSummary.averageFinalPrice, currencyCode)}
+                                      </Text>
+                                    </BlockStack>
+                                  </Box>
+                                </Grid.Cell>
+                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
+                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                                    <BlockStack gap="050">
+                                      <Text as="p" variant="bodySm" tone="subdued">Safeguard adjustments</Text>
+                                      <Text as="p" variant="headingLg">
+                                        {previewImpactSummary.safeguardAdjustedCount}
+                                      </Text>
+                                    </BlockStack>
+                                  </Box>
+                                </Grid.Cell>
+                              </Grid>
+                              )}
+                            </BlockStack>
+                          </Box>
+                        </Card>
+                      )}
 
                       {/* 🔹 3. PRODUCT GRID CARD */}
                       <Card>
@@ -2939,6 +3213,71 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                 </Box>
                               </Box>
                             )}
+
+                            {paginatedPreviews.length > 0 && previewPricingRule && (
+                              <Box paddingBlockEnd="400" paddingInline="300">
+                                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                                  <InlineStack gap="200" blockAlign="center" wrap>
+                                    <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Preview Context:</Text>
+                                    <Text as="span" variant="bodySm" tone="subdued">
+                                      {previewPricingRule.adjustmentDirection === "decrease" ? "Decrease" : "Increase"}{" "}
+                                      {previewPricingRule.adjustmentType === "fixed" ? formatMoney(previewPricingRule.adjustmentValue ?? 0, currencyCode) : `${previewPricingRule.adjustmentValue}%`}
+                                      {previewPricingRule.endingOption && previewPricingRule.endingOption !== "none" ? ` • Rounded to ${previewPricingRule.endingOption}` : ""}
+                                    </Text>
+                                  </InlineStack>
+                                </Box>
+                              </Box>
+                            )}
+
+                            {paginatedPreviews.length > 0 && (
+                              <Box
+                                paddingBlockEnd="200"
+                                paddingInline="300"
+                                borderBlockEndWidth="025"
+                                borderColor="border-secondary"
+                              >
+                                <div style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: "16px",
+                                  width: "100%",
+                                }}>
+                                  <div style={{ flex: 1, paddingLeft: "76px" }}>
+                                    <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Product</Text>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "24px",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+                                      <Box minWidth="80px" paddingInlineEnd="100">
+                                        <div style={{ textAlign: "right" }}>
+                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Original Catalog</Text>
+                                        </div>
+                                      </Box>
+                                      <Box minWidth="80px" paddingInlineEnd="100">
+                                        <div style={{ textAlign: "right" }}>
+                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Live Storefront</Text>
+                                        </div>
+                                      </Box>
+                                      <Box width="100px">
+                                        <div style={{ textAlign: "left" }}>
+                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">New Preview</Text>
+                                        </div>
+                                      </Box>
+                                    </div>
+                                    <div style={{ minWidth: "140px" }} />
+                                  </div>
+                                </div>
+                              </Box>
+                            )}
+
+                            
+
                             {paginatedPreviews.map((p) => {
                               const currentPrice = parseFloat(p.oldPrice);
                               const originalPrice = parseFloat(p.originalBasePrice);
@@ -2948,6 +3287,49 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               const isChanged = currentPrice !== targetPrice;
                               const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
                               const isSelected = selectedItems.has(p.variantId);
+                              const rowSafeguardNotices: string[] = [];
+
+                              if (!isManual && previewPricingRule && isFinite(originalPrice)) {
+                                const minPrice = typeof previewPricingRule.minPrice === "number" && isFinite(previewPricingRule.minPrice)
+                                  ? previewPricingRule.minPrice
+                                  : null;
+                                const maxPrice = typeof previewPricingRule.maxPrice === "number" && isFinite(previewPricingRule.maxPrice)
+                                  ? previewPricingRule.maxPrice
+                                  : null;
+
+                                if (minPrice != null) {
+                                  const withoutMin = calculatePrice(originalPrice, { ...previewPricingRule, minPrice: null });
+                                  if (withoutMin + 0.01 < minPrice && Math.abs(targetPrice - minPrice) < 0.01) {
+                                    rowSafeguardNotices.push("Adjusted to minimum allowed price.");
+                                  }
+                                }
+
+                                if (maxPrice != null) {
+                                  const withoutMax = calculatePrice(originalPrice, { ...previewPricingRule, maxPrice: null });
+                                  if (withoutMax - 0.01 > maxPrice && Math.abs(targetPrice - maxPrice) < 0.01) {
+                                    rowSafeguardNotices.push("Adjusted to maximum allowed price.");
+                                  }
+                                }
+
+                                const roundingPrecision = String(previewPricingRule.roundingPrecision ?? "standard").trim().toLowerCase();
+                                if (roundingPrecision !== "" && roundingPrecision !== "standard") {
+                                  const standardRoundedFinal = calculatePrice(originalPrice, {
+                                    ...previewPricingRule,
+                                    roundingPrecision: "standard",
+                                  });
+
+                                  if (Math.abs(targetPrice - standardRoundedFinal) > 0.01) {
+                                    if (roundingPrecision === "nearest-0.05") {
+                                      rowSafeguardNotices.push("Rounded to nearest 0.05.");
+                                    } else if (roundingPrecision === "whole") {
+                                      rowSafeguardNotices.push("Rounded to whole amount.");
+                                    } else {
+                                      rowSafeguardNotices.push("Rounded for storefront consistency.");
+                                    }
+                                  }
+                                }
+
+                              }
 
                               return (
                                 <Box
@@ -2977,18 +3359,20 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                       <div
                                         style={{
                                           display: "flex",
-                                          alignItems: "center",
+                                          alignItems: "flex-start",
                                           gap: "12px",
                                           minWidth: 0,
                                           flex: 1, overflowX: "hidden"
                                         }}
                                       >
-                                        <Checkbox
-                                          label=""
-                                          labelHidden
-                                          checked={isSelected}
-                                          onChange={() => toggleSelection(p.variantId)}
-                                        />
+                                        <div style={{ paddingTop: "2px" }}>
+                                          <Checkbox
+                                            label=""
+                                            labelHidden
+                                            checked={isSelected}
+                                            onChange={() => toggleSelection(p.variantId)}
+                                          />
+                                        </div>
 
                                         <Thumbnail source={p.image || ""} alt={p.title} size="small" />
 
@@ -2996,6 +3380,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                           <Text as="span" variant="bodyMd" fontWeight="medium">
                                             {p.title}
                                           </Text>
+                                          
+                                          {p.variantTitle && p.variantTitle !== "Default Title" && (
+                                            <Text as="span" variant="bodySm" tone="subdued">
+                                              {p.variantTitle}
+                                            </Text>
+                                          )}
+
+                                          {rowSafeguardNotices.length > 0 && (
+                                            <Text as="span" variant="bodySm" tone="subdued">
+                                              {rowSafeguardNotices.join(" • ")}
+                                            </Text>
+                                          )}
 
                                           <div
                                             style={{
@@ -3003,27 +3399,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                               gap: "6px",
                                               flexWrap: "wrap",
                                               opacity: 0.92,
+                                              marginTop: "4px"
                                             }}
                                           >
-                                            {isChanged ? (
-                                              <Badge tone={targetPrice > currentPrice ? "success" : "attention"}>
-                                                {targetPrice > currentPrice
-                                                  ? "Profit Optimized"
-                                                  : "Price Reduced"}
-                                              </Badge>
-                                            ) : (
-                                              <Badge tone="info">No change</Badge>
-                                            )}
-
-                                            {isPolished && (
-                                              <Badge tone="success">Polished</Badge>
-                                            )}
-
                                             {isManual && (
                                               <Badge tone="attention">Manual override</Badge>
                                             )}
 
-                                            {Math.abs(diffFromOriginal) >= 10 && (
+                                            {Math.abs(diffFromOriginal) >= 20 && (
                                               <Badge tone="warning">High impact</Badge>
                                             )}
                                           </div>
@@ -3035,107 +3418,122 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                         style={{
                                           display: "flex",
                                           alignItems: "center",
-                                          gap: "12px",
+                                          gap: "24px",
                                           flexShrink: 0,
                                           flexWrap: "wrap",
                                           justifyContent: "flex-end",
                                           fontVariantNumeric: "tabular-nums",
                                         }}
                                       >
-                                        <BlockStack gap="100" inlineAlign="end">
-                                          <Text as="span" variant="bodySm" tone="subdued">
-                                            Original:{" "}
-                                            {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
-                                          </Text>
+                                        <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
+                                          <Box minWidth="80px" paddingInlineEnd="100">
+                                            <BlockStack gap="0" inlineAlign="end">
+                                              <Text as="span" variant="bodyMd" tone="subdued">
+                                                {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
+                                              </Text>
+                                            </BlockStack>
+                                          </Box>
 
-                                          <Text
-                                            as="span"
-                                            variant="bodySm"
-                                            tone="subdued"
-                                            textDecorationLine={
-                                              isPolished || isChanged ? "line-through" : undefined
-                                            }
-                                          >
-                                            Current: {formatMoney(parseFloat(p.oldPrice), currencyCode)}
-                                          </Text>
-                                        </BlockStack>
-
-                                        <Box width="92px" minWidth="88px">
-                                          <TextField
-                                            label=""
-                                            labelHidden
-                                            value={
-                                              p.overriddenPrice !== undefined
-                                                ? p.overriddenPrice
-                                                : p.newPrice
-                                            }
-                                            onChange={(val) => handlePriceChange(p.variantId, val)}
-                                            autoComplete="off"
-                                            prefix={currencySymbol}
-                                            size="slim"
-                                            maxLength={15}
-                                          />
-                                        </Box>
-
-                                        {(isPolished || isChanged) && (
-                                          <Text
-                                            as="span"
-                                            variant="bodySm"
-                                            tone={targetPrice > originalPrice ? "success" : "caution"}
-                                            fontWeight="medium"
-                                          >
-                                            {`${targetPrice > originalPrice ? "+" : ""}${diffFromOriginal.toFixed(
-                                              1
-                                            )}%`}
-                                          </Text>
-                                        )}
-
-                                        {isManual && (
-                                          <Button
-                                            size="slim"
-                                            variant="tertiary"
-                                            onClick={() => resetOverride(p.variantId)}
-                                          >
-                                            Reset
-                                          </Button>
-                                        )}
-
-                                        {isChanged ? (
-                                          <Button
-                                            size="slim"
-                                            onClick={() => handleApplySingle(p)}
-                                            loading={updatingItem === p.variantId}
-                                            disabled={
-                                              !hasActivePlan ||
-                                              !!updatingItem ||
-                                              isProcessing ||
-                                              (isManual && p.overriddenPrice === "") ||
-                                              !hasRules
-                                            }
-                                            tone="success"
-                                          >
-                                            Apply
-                                          </Button>
-                                        ) : (
-                                          <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
-                                            <span style={{ display: "inline-block" }}>
-                                              <Button
-                                                size="slim"
-                                                onClick={() => handleApplySingle(p)}
-                                                loading={updatingItem === p.variantId}
-                                                disabled={
-                                                  !hasActivePlan ||
-                                                  !!updatingItem ||
-                                                  isProcessing ||
-                                                  (isManual && p.overriddenPrice === "") ||
-                                                  !hasRules
+                                          <Box minWidth="80px" paddingInlineEnd="100">
+                                            <BlockStack gap="0" inlineAlign="end">
+                                              <Text
+                                                as="span"
+                                                variant="bodyMd"
+                                                tone={isPolished || isChanged ? "subdued" : "base"}
+                                                textDecorationLine={
+                                                  isPolished || isChanged ? "line-through" : undefined
                                                 }
                                               >
-                                                Apply
-                                              </Button>
-                                            </span>
-                                          </Tooltip>
-                                        )}
+                                                {formatMoney(parseFloat(p.oldPrice), currencyCode)}
+                                              </Text>
+                                            </BlockStack>
+                                          </Box>
+
+                                          <Box width="100px">
+                                            <BlockStack gap="0" inlineAlign="start">
+                                              <TextField
+                                                label=""
+                                                labelHidden
+                                                value={
+                                                  p.overriddenPrice !== undefined
+                                                    ? p.overriddenPrice
+                                                    : p.newPrice
+                                                }
+                                                onChange={(val) => handlePriceChange(p.variantId, val)}
+                                                autoComplete="off"
+                                                prefix={currencySymbol}
+                                                size="slim"
+                                                maxLength={15}
+                                              />
+                                            </BlockStack>
+                                          </Box>
+                                        </div>
+
+                                        <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: "140px", justifyContent: "flex-end" }}>
+                                          {(isPolished || isChanged) && Math.abs(diffFromOriginal) > 0.01 && (
+                                            <InlineStack gap="100" blockAlign="center">
+                                              <Icon
+                                                source={targetPrice > originalPrice ? ChevronUpIcon : ChevronDownIcon}
+                                                tone={targetPrice > originalPrice ? "success" : "critical"}
+                                              />
+                                              <Text
+                                                as="span"
+                                                variant="bodySm"
+                                                tone={targetPrice > originalPrice ? "success" : "critical"}
+                                                fontWeight="medium"
+                                              >
+                                                {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
+                                              </Text>
+                                            </InlineStack>
+                                          )}
+
+                                          {isManual && (
+                                            <Button
+                                              size="slim"
+                                              variant="tertiary"
+                                              onClick={() => resetOverride(p.variantId)}
+                                            >
+                                              Reset
+                                            </Button>
+                                          )}
+
+                                          {isChanged ? (
+                                            <Button
+                                              size="slim"
+                                              onClick={() => handleApplySingle(p)}
+                                              loading={updatingItem === p.variantId}
+                                              disabled={
+                                                !hasActivePlan ||
+                                                !!updatingItem ||
+                                                isProcessing ||
+                                                (isManual && p.overriddenPrice === "") ||
+                                                !hasRules
+                                              }
+                                              tone="success"
+                                            >
+                                              Apply
+                                            </Button>
+                                          ) : (
+                                            <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                                              <span style={{ display: "inline-block" }}>
+                                                <Button
+                                                  size="slim"
+                                                  onClick={() => handleApplySingle(p)}
+                                                  loading={updatingItem === p.variantId}
+                                                  disabled={
+                                                    !hasActivePlan ||
+                                                    !!updatingItem ||
+                                                    isProcessing ||
+                                                    (isManual && p.overriddenPrice === "") ||
+                                                    !hasRules
+                                                  }
+                                                >
+                                                  Apply
+                                                </Button>
+                                              </span>
+                                            </Tooltip>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
 
@@ -3179,13 +3577,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             open={immediateApplyModalOpen}
             onClose={closeImmediateApplyModal}
             scopeLabel={immediateApplyScopeLabel}
-            itemCount={immediateApplyItems.length}
+            itemCount={immediateApplyContextItems.length}
             impactSummary={immediateApplyImpactSummary}
             safeguardNotices={immediateApplySafeguardNotices}
             isProcessing={isProcessing}
-            initialCampaignTitle={applyCampaignTitle}
+            initialCampaignTitle=""
+            validateCampaignTitle={validateCampaignTitle}
             onConfirm={async (campaignTitle) => {
-              const ok = await handleApplyBatch(immediateApplyItems, campaignTitle);
+              const ok = await handleApplyBatch(immediateApplyContextItems, campaignTitle);
               if (ok) {
                 setApplyCampaignTitle(campaignTitle);
               }
@@ -3205,6 +3604,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             collectionId={collectionId}
             hasActivePlan={hasActivePlan}
             hasRules={hasRules}
+            existingCampaignTitles={campaignHistoryTitles}
             shopify={shopify}
           />
         )}
