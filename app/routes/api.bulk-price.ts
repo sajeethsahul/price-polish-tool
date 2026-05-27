@@ -100,6 +100,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await prisma.priceHistory.createMany({
       data: items.map((item: any) => ({
         shop,
+        productId: item.productId ?? null,
         variantId: item.variantId,
         oldPrice: parseFloat(item.oldPrice),
         newPrice: parseFloat(item.newPrice),

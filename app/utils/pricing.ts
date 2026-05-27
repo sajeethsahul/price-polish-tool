@@ -1,3 +1,5 @@
+import type { PricingEngineInput } from "../types/pricing";
+
 export type PricingRuleLike = {
   adjustmentType?: string;
   adjustmentDirection?: string;
@@ -88,13 +90,15 @@ function clamp(value: number, minPrice?: number | null, maxPrice?: number | null
 }
 
 export function calculatePrice(price: number, markup: number, rounding: number, charm: boolean): number;
+export function calculatePrice(input: PricingEngineInput, rule: PricingRuleLike): number;
 export function calculatePrice(price: number, rule: PricingRuleLike): number;
 export function calculatePrice(
-  price: number,
+  priceOrInput: number | PricingEngineInput,
   markupOrRule: number | PricingRuleLike,
   rounding?: number,
   charm?: boolean
 ): number {
+  const price = typeof priceOrInput === "number" ? priceOrInput : Number(priceOrInput?.basePrice ?? 0);
   if (!isFinite(price)) return 0;
 
   const rule: PricingRuleLike = typeof markupOrRule === "number"

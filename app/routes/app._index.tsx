@@ -846,7 +846,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     for (const item of immediateApplyContextItems) {
       const oldPrice = Number.parseFloat(item.oldPrice);
       const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
-      const proposedPrice = Number.parseFloat(proposedRaw);
+      const proposedPrice = Number(proposedRaw);
 
       if (!Number.isFinite(oldPrice) || !Number.isFinite(proposedPrice) || oldPrice <= 0) {
         continue;
@@ -1171,7 +1171,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     const derived = previews.map(p => {
       const livePrice = parseFloat(p.oldPrice);
       const finalPrice = p.overriddenPrice !== undefined
-        ? parseFloat(p.overriddenPrice) || 0
+        ? Number(p.overriddenPrice) || 0
         : parseFloat(p.newPrice);
       const delta = finalPrice - livePrice;
       const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
@@ -1232,7 +1232,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     for (const item of rows) {
       const oldP = parseFloat(item.oldPrice);
       const finalP = item.overriddenPrice !== undefined
-        ? parseFloat(item.overriddenPrice) || 0
+        ? Number(item.overriddenPrice) || 0
         : parseFloat(item.newPrice);
 
       if (!isFinite(oldP) || !isFinite(finalP)) continue;
@@ -1644,7 +1644,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
     previews.forEach(p => {
       const base = parseFloat(p.originalBasePrice);
-      const final = parseFloat(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
+      const final = Number(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
       const markupAdded = base * (activeMarkup / 100);
       const roundingAdj = final - (base + markupAdded);
       const netGain = final - base;
@@ -2133,7 +2133,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
     previews.forEach(p => {
       const oldP = parseFloat(p.oldPrice);
-      const newP = p.overriddenPrice !== undefined ? parseFloat(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
+      const newP = p.overriddenPrice !== undefined ? Number(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
       if (oldP !== newP) {
         totalOld += oldP;
         totalNew += newP;
@@ -2366,12 +2366,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                 <Grid>
                   <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
                     <Card>
-                      <Box padding="300" background={previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "bg-surface-success" : "bg-surface-critical"} borderRadius="200">
+                      <Box padding="300" background={previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "bg-surface-success" : "bg-surface-critical"} borderRadius="200">
                         <BlockStack gap="100" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">Estimated Pricing Impact</Text>
-                          <Text as="p" variant="headingLg" tone={previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "success" : "critical"}>
+                          <Text as="p" variant="headingLg" tone={previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "success" : "critical"}>
                             {(() => {
-                              const lift = previews.reduce((sum, p) => sum + ((parseFloat(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0);
+                              const lift = previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0);
                               const sign = lift > 0 ? "+" : lift < 0 ? "-" : "";
                               return `${sign}${formatMoney(Math.abs(lift), currencyCode)}`;
                             })()}
@@ -3282,7 +3282,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               const currentPrice = parseFloat(p.oldPrice);
                               const originalPrice = parseFloat(p.originalBasePrice);
                               const isManual = p.overriddenPrice !== undefined;
-                              const targetPrice = isManual ? parseFloat(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
+                              const targetPrice = isManual ? Number(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
                               const isPolished = currentPrice !== originalPrice;
                               const isChanged = currentPrice !== targetPrice;
                               const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
@@ -3454,11 +3454,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                               <TextField
                                                 label=""
                                                 labelHidden
-                                                value={
+                                                value={String(
                                                   p.overriddenPrice !== undefined
                                                     ? p.overriddenPrice
                                                     : p.newPrice
-                                                }
+                                                )}
                                                 onChange={(val) => handlePriceChange(p.variantId, val)}
                                                 autoComplete="off"
                                                 prefix={currencySymbol}

@@ -19,16 +19,8 @@ import type {
   OperationalSafeguardNotice,
   OperationalSafeguardSeverity,
   PricingPreviewItem,
+  ScheduledProductSnapshot,
 } from "../types/pricing";
-
-interface ProductSnapshot {
-  productId: string;
-  variantId: string;
-  title: string;
-  variantTitle?: string;
-  oldPrice: string | number;
-  newPrice: string | number;
-}
 
 interface ScheduledJob {
   id: string;
@@ -40,7 +32,7 @@ interface ScheduledJob {
   restoredAt?: string | null;
   status: string;
   productCount: number;
-  products: ProductSnapshot[] | null;
+  products: ScheduledProductSnapshot[] | null;
 }
 
 type ScheduleScope = "all" | "selected" | "filtered";
@@ -262,7 +254,7 @@ export function ScheduledHistoryModal({
     for (const item of scopedItemsForSchedule) {
       const oldPrice = Number.parseFloat(item.oldPrice);
       const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
-      const proposedPrice = Number.parseFloat(proposedRaw);
+      const proposedPrice = Number(proposedRaw);
       if (!Number.isFinite(oldPrice) || !Number.isFinite(proposedPrice) || oldPrice <= 0) continue;
       const deltaPercent = ((proposedPrice - oldPrice) / oldPrice) * 100;
       largestMovement = Math.max(largestMovement, Math.abs(deltaPercent));
@@ -812,8 +804,15 @@ export function ScheduledHistoryModal({
       variantId: item.variantId,
       title: item.title,
       variantTitle: item.variantTitle,
+      sku: item.sku ?? null,
+      image: item.image ?? null,
       oldPrice: item.oldPrice,
       newPrice: item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice,
+      originalBasePrice: item.originalBasePrice,
+      compareAtPrice: item.compareAtPrice ?? null,
+      storefrontVariantPrice: item.storefrontVariantPrice ?? item.oldPrice,
+      originalVariantPrice: item.originalVariantPrice ?? item.originalBasePrice,
+      scheduledPrice: item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice,
       isManual: item.overriddenPrice !== undefined,
     }));
 

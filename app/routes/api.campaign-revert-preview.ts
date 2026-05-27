@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
+import type { ScheduledProductSnapshot } from "../types/pricing";
 
 type HistoryRow = {
   variantId: string;
@@ -12,15 +13,6 @@ type HistoryRow = {
   revertStatus: string | null;
   revertFailureReason: string | null;
   revertedAt: Date | null;
-};
-
-type ScheduledProductSnapshot = {
-  productId?: string | null;
-  variantId?: string | null;
-  title?: string | null;
-  variantTitle?: string | null;
-  oldPrice?: string | number | null;
-  newPrice?: string | number | null;
 };
 
 function toVariantGid(variantId: string) {
@@ -184,8 +176,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const rows = products
             .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
             .map((product) => {
-              const originalPrice = Number(product.oldPrice);
-              const scheduledPrice = Number(product.newPrice);
+              const originalPrice = Number(product.originalVariantPrice ?? product.originalBasePrice ?? product.oldPrice);
+              const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
               return {
                 variantId: String(product.variantId),
                 productTitle: product.title || "Untitled Product",
@@ -270,8 +262,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           const rows = products
             .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
             .map((product) => {
-              const originalPrice = Number(product.oldPrice);
-              const scheduledPrice = Number(product.newPrice);
+              const originalPrice = Number(product.originalVariantPrice ?? product.originalBasePrice ?? product.oldPrice);
+              const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
               return {
                 variantId: String(product.variantId),
                 productTitle: product.title || "Untitled Product",

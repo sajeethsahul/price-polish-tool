@@ -4,6 +4,7 @@ import { cors, handlePreflight } from "../utils/cors";
 import { calculatePrice } from "../utils/pricing";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
+import type { PricingPreviewItem } from "../types/pricing";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log("[PREVIEW] Route started");
@@ -63,7 +64,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 nodes {
                   id
                   title
+                  sku
                   price
+                  compareAtPrice
                 }
               }
             }
@@ -131,10 +134,11 @@ console.log("[PREVIEW] History rows:", histories.length);
 
         console.log("[PREVIEW] Last update loaded:", !!lastUpdate);
 
-        const previews = nodes.map((product: any) => {
+        const previews: PricingPreviewItem[] = nodes.map((product: any) => {
             const variant = product.variants.nodes[0];
             const variantId = variant?.id || "";
             const currentPrice = parseFloat(variant?.price ?? "0");
+            const compareAtPrice = Number(variant?.compareAtPrice ?? NaN);
 
             const history = latestHistoryMap[variantId];
             const historyOld = history ? parseFloat(String(history.oldPrice)) : NaN;
@@ -165,11 +169,15 @@ console.log("[PREVIEW] History rows:", histories.length);
                 productId: product.id,
                 title: product.title,
                 variantTitle: variant?.title ?? "",
+                sku: variant?.sku ?? null,
                 image: product.featuredImage?.url ?? "",
                 variantId: variantId,
                 oldPrice: currentPrice.toFixed(2),
                 newPrice: newPrice.toFixed(2),
                 originalBasePrice: basePrice.toFixed(2),
+                compareAtPrice: Number.isFinite(compareAtPrice) ? compareAtPrice.toFixed(2) : null,
+                storefrontVariantPrice: currentPrice.toFixed(2),
+                originalVariantPrice: basePrice.toFixed(2),
             };
         });
 

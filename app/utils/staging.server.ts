@@ -1,13 +1,7 @@
 import prisma from "../db.server";
+import type { ScheduledProductSnapshot } from "../types/pricing";
 
-type ProductInput = {
-  variantId: string;
-  productId: string;
-  oldPrice: string | number;
-  newPrice: string | number;
-  overriddenPrice?: string;
-  isManual?: boolean;
-};
+type ProductInput = ScheduledProductSnapshot;
 
 type StagedItem = {
   variantId: string;

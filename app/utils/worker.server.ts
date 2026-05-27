@@ -2,6 +2,7 @@ import prisma from "../db.server";
 import { unauthenticated } from "../shopify.server";
 import { revertCampaignPrices } from "./revert.server";
 import { isWindowExpired } from "./window-lifecycle";
+import type { ScheduledProductSnapshot } from "../types/pricing";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -26,6 +27,38 @@ type ClaimedJob = {
     createdAt: Date;
     products?: any;
 };
+
+type WorkerPriceItem = {
+    variantId: string;
+    productId: string | null;
+    stagedPrice: number;
+    originalPrice: number;
+    isManual: boolean;
+};
+
+function coerceSnapshotAmount(...values: Array<string | number | null | undefined>) {
+    for (const value of values) {
+        const amount = Number(value);
+        if (Number.isFinite(amount)) {
+            return amount;
+        }
+    }
+    return 0;
+}
+
+function toWorkerPriceItem(snapshot: ScheduledProductSnapshot): WorkerPriceItem {
+    return {
+        variantId: snapshot.variantId,
+        productId: snapshot.productId ?? null,
+        stagedPrice: coerceSnapshotAmount(snapshot.scheduledPrice, snapshot.newPrice),
+        originalPrice: coerceSnapshotAmount(
+            snapshot.originalVariantPrice,
+            snapshot.originalBasePrice,
+            snapshot.oldPrice
+        ),
+        isManual: snapshot.isManual === true,
+    };
+}
 
 async function failOneTimePublish(
     shop: string,
@@ -495,24 +528,12 @@ export function startWorker() {
                     }
 
                     // ── STEP 1: Fetch products from snapshot (or fallback) ──
-                    let itemsToProcess: Array<{
-                        variantId: string;
-                        productId: string | null;
-                        stagedPrice: number;
-                        originalPrice: number;
-                        isManual: boolean;
-                    }> = [];
+                    let itemsToProcess: WorkerPriceItem[] = [];
                     
                     if (job.products && Array.isArray(job.products) && job.products.length > 0) {
                         console.log(`[Worker] 📚 Job ${jobId} using snapshot products (${job.products.length})`);
                         // Use frozen snapshot from schedule creation
-                        itemsToProcess = job.products.map((p: any) => ({
-                            variantId: p.variantId,
-                            productId: p.productId,
-                            stagedPrice: Number(p.newPrice),
-                            originalPrice: Number(p.oldPrice),
-                            isManual: p.isManual === true
-                        }));
+                        itemsToProcess = (job.products as ScheduledProductSnapshot[]).map(toWorkerPriceItem);
                     } else if (job.campaignId) {
                         console.log(`[Worker] 🧭 Job ${jobId} using campaign-scoped staged fallback (campaignId=${job.campaignId})`);
                         const staged = await prisma.stagedPrice.findMany({

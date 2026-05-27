@@ -40,3 +40,4 @@ extensions/**/assets/*.gif
 .cursor/
 # TREA local workspace
 .trae/
+*.bat

@@ -3,6 +3,39 @@ import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { stagePrices } from "../utils/staging.server";
+import type { ScheduledProductSnapshot } from "../types/pricing";
+
+function normalizeScheduledProductSnapshot(product: any): ScheduledProductSnapshot | null {
+    if (!product || typeof product !== "object") {
+        return null;
+    }
+
+    const productId = typeof product.productId === "string" ? product.productId : "";
+    const variantId = typeof product.variantId === "string" ? product.variantId : "";
+
+    if (!productId || !variantId) {
+        return null;
+    }
+
+    return {
+        productId,
+        variantId,
+        title: typeof product.title === "string" && product.title.length > 0
+            ? product.title
+            : "Untitled Product",
+        variantTitle: typeof product.variantTitle === "string" ? product.variantTitle : null,
+        sku: typeof product.sku === "string" ? product.sku : null,
+        image: typeof product.image === "string" ? product.image : null,
+        oldPrice: product.oldPrice,
+        newPrice: product.newPrice,
+        originalBasePrice: product.originalBasePrice ?? null,
+        compareAtPrice: product.compareAtPrice ?? null,
+        storefrontVariantPrice: product.storefrontVariantPrice ?? product.oldPrice ?? null,
+        originalVariantPrice: product.originalVariantPrice ?? product.originalBasePrice ?? product.oldPrice ?? null,
+        scheduledPrice: product.scheduledPrice ?? product.newPrice ?? null,
+        isManual: product.isManual === true,
+    };
+}
 
 export async function action({ request }: ActionFunctionArgs) {
     const auth = await authenticate.admin(request);
@@ -12,7 +45,12 @@ export async function action({ request }: ActionFunctionArgs) {
     const shop = session.shop;
 
     const body = await request.json().catch(() => ({}));
-    const { runAt, products, title } = body;
+    const { runAt, title } = body;
+    const products = Array.isArray(body?.products)
+        ? body.products
+            .map((product: any) => normalizeScheduledProductSnapshot(product))
+            .filter((product: ScheduledProductSnapshot | null): product is ScheduledProductSnapshot => product !== null)
+        : [];
     const scheduleMode = body?.mode === "time-window" ? "time-window" : "one-time";
     const windowEndAt = typeof body?.windowEndAt === "string" ? body.windowEndAt : undefined;
 
