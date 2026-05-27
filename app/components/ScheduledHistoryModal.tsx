@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import {
   Modal,
   DataTable,
@@ -127,6 +127,9 @@ export function ScheduledHistoryModal({
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [overlapWarningOpen, setOverlapWarningOpen] = useState(false);
+  const overlapWarningBypassRef = useRef(false);
+  const [overlapDetailTab, setOverlapDetailTab] = useState<"variants" | "windows">("windows");
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const [selectedTab, setSelectedTab] = useState<"create" | "history">("create");
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("one-time");
@@ -174,6 +177,9 @@ export function ScheduledHistoryModal({
       setJobs([]);
       setLoading(false);
       setIsScheduling(false);
+      setOverlapWarningOpen(false);
+      overlapWarningBypassRef.current = false;
+      setOverlapDetailTab("windows");
       setSelectedJob(null);
       setSelectedTab("create");
       setScheduleMode("one-time");
@@ -382,7 +388,26 @@ export function ScheduledHistoryModal({
         .filter((variantId) => variantId.length > 0)
     );
 
-    if (candidateVariantIds.size === 0) return [];
+    //if (candidateVariantIds.size === 0) return [];
+
+    const getJobProductIds = (job: ScheduledJob) => {
+  if (!Array.isArray(job.products)) return new Set<string>();
+
+  return new Set(
+    job.products
+      .map((product) => String(product.productId))
+      .filter((productId) => productId.length > 0)
+  );
+};
+
+    const candidateProductIds = new Set(
+  scopedItemsForSchedule
+    .map((item) => String(item.productId))
+    .filter((productId) => productId.length > 0)
+);
+
+  if (candidateProductIds.size === 0) return [];
+
 
     const notices: ScheduleConflictNotice[] = [];
     const candidateMinute = Math.floor(publishAtMs / 60000);
@@ -411,14 +436,35 @@ export function ScheduledHistoryModal({
     };
 
     const windowsOverlap = (job: ScheduledJob & { runAtMs: number; windowEndMs?: number | null }) => {
-      const jobEndMs = getJobWindowEndMs(job);
-      return publishAtMs <= jobEndMs && job.runAtMs <= candidateEndMs;
+
+     
+      const normalizeEnd = (startMs: number, endMs: number) => (endMs > startMs ? endMs : startMs + 1);
+
+      const candidateStart = publishAtMs;
+      const candidateEnd = normalizeEnd(candidateStart, candidateEndMs);
+
+      const existingStart = job.runAtMs;
+      const existingEnd = normalizeEnd(existingStart, getJobWindowEndMs(job));
+
+        console.log("[OVERLAP TEST]", {
+          candidateStart,
+          candidateEnd,
+          existingStart,
+          existingEnd,
+          overlap: candidateStart < existingEnd && candidateEnd > existingStart,
+          status: job.status,
+          campaign: job.title,
+        });
+      return candidateStart < existingEnd && candidateEnd > existingStart;
+       
     };
 
-    const exactPublishTimeOverlap = scheduleCenterData.upcoming.filter(
-      (job) => Math.floor(job.runAtMs / 60000) === candidateMinute
-    );
+    const exactPublishTimeOverlap = scheduleCenterData.upcoming.filter((job) => {
+      if (!windowsOverlap(job)) return false;
+      return Math.floor(job.runAtMs / 60000) === candidateMinute;
+    });
     const nearbyPublishTimeOverlap = scheduleCenterData.upcoming.filter((job) => {
+      if (!windowsOverlap(job)) return false;
       const deltaMs = Math.abs(job.runAtMs - publishAtMs);
       return deltaMs > 0 && deltaMs <= CONFLICT_NEARBY_WINDOW_MS;
     });
@@ -429,37 +475,56 @@ export function ScheduledHistoryModal({
     let activeWindowOverlapCount = 0;
     let restoreWindowOverlapCount = 0;
 
-    for (const job of scheduleCenterData.upcoming) {
-      const jobVariantIds = getJobVariantIds(job);
-      if (jobVariantIds.size === 0) continue;
-      const overlapsWindowTiming = windowsOverlap(job);
+ for (const job of scheduleCenterData.upcoming) {
+  const jobVariantIds = getJobVariantIds(job);
+  const jobProductIds = getJobProductIds(job);
 
-      let hasOverlap = false;
-      for (const variantId of candidateVariantIds) {
-        if (jobVariantIds.has(variantId)) {
-          overlappingVariantIds.add(variantId);
-          hasOverlap = true;
-        }
-      }
+  const hasVariantScope =
+  candidateVariantIds.size > 0 &&
+  jobVariantIds.size > 0 &&
+  candidateVariantIds.size === candidateProductIds.size &&
+  jobVariantIds.size === jobProductIds.size;
 
-      if (hasOverlap) {
-        productOverlapJobCount += 1;
-        if (job.runAtMs > publishAtMs) {
-          overlapScheduledLaterCount += 1;
-        }
-        if (overlapsWindowTiming && job.status.toLowerCase() === "active-window") {
-          activeWindowOverlapCount += 1;
-        }
-        if (
-          overlapsWindowTiming &&
-          scheduleMode === "time-window" &&
-          job.mode === "time-window" &&
-          typeof job.windowEndMs === "number"
-        ) {
-          restoreWindowOverlapCount += 1;
-        }
-      }
+  const overlapsScope = hasVariantScope
+    ? [...candidateVariantIds].some((id) => jobVariantIds.has(id))
+    : [...candidateProductIds].some((id) => jobProductIds.has(id));
+
+  if (!overlapsScope) continue;
+
+  const overlapsWindowTiming = windowsOverlap(job);
+
+  if (!overlapsWindowTiming) continue;
+
+  const overlappingScopeIds = hasVariantScope
+    ? [...candidateVariantIds].filter((id) => jobVariantIds.has(id))
+    : [...candidateProductIds].filter((id) => jobProductIds.has(id));
+
+  const hasOverlap = overlappingScopeIds.length > 0;
+
+  for (const id of overlappingScopeIds) {
+    overlappingVariantIds.add(id);
+  }
+
+  if (hasOverlap) {
+    productOverlapJobCount += 1;
+
+    if (job.runAtMs > publishAtMs) {
+      overlapScheduledLaterCount += 1;
     }
+
+    if (job.status.toLowerCase() === "active-window") {
+      activeWindowOverlapCount += 1;
+    }
+
+    if (
+      scheduleMode === "time-window" &&
+      job.mode === "time-window" &&
+      typeof job.windowEndMs === "number"
+    ) {
+      restoreWindowOverlapCount += 1;
+    }
+  }
+}
 
     if (exactPublishTimeOverlap.length > 0) {
       notices.push({
@@ -471,11 +536,12 @@ export function ScheduledHistoryModal({
       });
     }
 
-    if (likelyAllProductsJobs.length > 0) {
+    const overlappingAllProductsJobs = likelyAllProductsJobs.filter(windowsOverlap);
+    if (overlappingAllProductsJobs.length > 0) {
       notices.push({
         id: "all-products-overlap",
         severity: "warning",
-        message: "An existing all-products schedule may overlap with this operation.",
+        message: "An existing all-products schedule may overlap with this time window.",
       });
     }
 
@@ -484,11 +550,20 @@ export function ScheduledHistoryModal({
       (overlappingVariantIds.size >= 10 &&
         overlappingVariantIds.size >= Math.ceil(candidateVariantIds.size * 0.6));
 
+    if (overlappingVariantIds.size > 0) {
+      notices.push({
+        id: "overlapping-scope",
+        severity: "warning",
+        message:
+          "Some selected products already belong to another scheduled pricing campaign during this time window.",
+      });
+    }
+
     if (hasLargeOverlap) {
       notices.push({
         id: "large-product-overlap",
         severity: "warning",
-        message: `${overlappingVariantIds.size} selected products already participate in future pricing runs.`,
+        message: `${overlappingVariantIds.size} selected products overlap with scheduled pricing during this time window.`,
       });
     } else if (overlappingVariantIds.size > 0) {
       notices.push({
@@ -496,7 +571,7 @@ export function ScheduledHistoryModal({
         severity: "informational",
         message: `${overlappingVariantIds.size} selected product${
           overlappingVariantIds.size === 1 ? "" : "s"
-        } already participate in future pricing runs.`,
+        } overlap with scheduled pricing during this time window.`,
       });
     }
 
@@ -552,6 +627,117 @@ export function ScheduledHistoryModal({
 
     return notices;
   }, [scheduleMode, scheduleTime, scopedItemsForSchedule, previews.length, scheduleCenterData.upcoming, windowEndTime]);
+
+  const scheduleOverlapContext = useMemo(() => {
+    if (!scheduleTime) {
+      return {
+        overlappingVariantCount: 0,
+        overlappingWindowCount: 0,
+        overlappingTitles: [] as string[],
+        overlappingVariantIds: [] as string[],
+        overlappingWindowJobs: [] as string[],
+      };
+    }
+
+    const candidateStartMs = new Date(scheduleTime).getTime();
+    if (Number.isNaN(candidateStartMs)) {
+      return {
+        overlappingVariantCount: 0,
+        overlappingWindowCount: 0,
+        overlappingTitles: [] as string[],
+        overlappingVariantIds: [] as string[],
+        overlappingWindowJobs: [] as string[],
+      };
+    }
+
+    const rawCandidateEndMs =
+      scheduleMode === "time-window" && windowEndTime
+        ? new Date(windowEndTime).getTime()
+        : candidateStartMs;
+    if (Number.isNaN(rawCandidateEndMs)) {
+      return {
+        overlappingVariantCount: 0,
+        overlappingWindowCount: 0,
+        overlappingTitles: [] as string[],
+        overlappingVariantIds: [] as string[],
+        overlappingWindowJobs: [] as string[],
+      };
+    }
+
+    const normalizeEnd = (startMs: number, endMs: number) => (endMs > startMs ? endMs : startMs + 1);
+    const candidateEndMs = normalizeEnd(candidateStartMs, Math.max(candidateStartMs, rawCandidateEndMs));
+
+    const candidateVariantIds = new Set(
+      scopedItemsForSchedule
+        .map((item) => String(item.variantId))
+        .filter((variantId) => variantId.length > 0)
+    );
+
+    if (candidateVariantIds.size === 0) {
+      return {
+        overlappingVariantCount: 0,
+        overlappingWindowCount: 0,
+        overlappingTitles: [] as string[],
+        overlappingVariantIds: [] as string[],
+        overlappingWindowJobs: [] as string[],
+      };
+    }
+
+    const overlappingVariantIds = new Set<string>();
+    const overlappingWindowJobs = new Map<string, string>();
+
+    for (const job of scheduleCenterData.upcoming) {
+      const existingStart = job.runAtMs;
+      const existingEnd = normalizeEnd(existingStart, job.mode === "time-window" && typeof job.windowEndMs === "number"
+        ? job.windowEndMs
+        : existingStart);
+
+      const overlaps = candidateStartMs < existingEnd && candidateEndMs > existingStart;
+      if (!overlaps) continue;
+
+      const jobVariantIds = Array.isArray(job.products)
+        ? new Set(
+          job.products
+            .map((product) => String((product as any)?.variantId ?? ""))
+            .filter((variantId) => variantId.length > 0)
+        )
+        : new Set<string>();
+      if (jobVariantIds.size === 0) continue;
+
+      let hasIntersection = false;
+      for (const variantId of candidateVariantIds) {
+        if (jobVariantIds.has(variantId)) {
+          overlappingVariantIds.add(variantId);
+          hasIntersection = true;
+        }
+      }
+
+      if (hasIntersection && job.mode === "time-window") {
+        const windowLabel = job.windowEndAt
+          ? `${formatDateTime(job.runAt)} → ${formatDateTime(job.windowEndAt)}`
+          : `${formatDateTime(job.runAt)}`;
+        overlappingWindowJobs.set(job.id, `${job.title || "Scheduled Campaign"} (${windowLabel})`);
+      }
+    }
+
+    const windowJobs = [...overlappingWindowJobs.values()];
+    return {
+      overlappingVariantCount: overlappingVariantIds.size,
+      overlappingWindowCount: overlappingWindowJobs.size,
+      overlappingTitles: windowJobs.slice(0, 3),
+      overlappingVariantIds: [...overlappingVariantIds],
+      overlappingWindowJobs: windowJobs,
+    };
+  }, [scheduleMode, scheduleTime, scopedItemsForSchedule, scheduleCenterData.upcoming, windowEndTime]);
+
+  const shouldShowOverlapWarningModal =
+    scheduleOverlapContext.overlappingVariantCount > 0 && scheduleOverlapContext.overlappingWindowCount > 0;
+
+  const overlapVariantItems = useMemo(() => {
+    if (scheduleOverlapContext.overlappingVariantIds.length === 0) return [];
+    const set = new Set(scheduleOverlapContext.overlappingVariantIds);
+    return scopedItemsForSchedule.filter((item) => set.has(String(item.variantId)));
+  }, [scheduleOverlapContext.overlappingVariantIds, scopedItemsForSchedule]);
 
   const warningNoticeCount = useMemo(
     () => scheduleConflictNotices.filter((notice) => notice.severity === "warning").length,
@@ -692,7 +878,7 @@ export function ScheduledHistoryModal({
     { label: `${SELECT_OPTION_PREFIX}Overdue`, value: "overdue" },
   ];
 
-  const formatDateTime = (dateString: string) => {
+  function formatDateTime(dateString: string) {
     const parsed = new Date(dateString);
     if (Number.isNaN(parsed.getTime())) return "Invalid date";
     return parsed.toLocaleString(undefined, {
@@ -702,9 +888,9 @@ export function ScheduledHistoryModal({
       hour: "numeric",
       minute: "2-digit",
     });
-  };
+  }
 
-  const formatRelativeTime = (dateString: string) => {
+  function formatRelativeTime(dateString: string) {
     const nowMs = Date.now();
     const targetMs = new Date(dateString).getTime();
     if (Number.isNaN(targetMs)) return "Unknown timing";
@@ -722,7 +908,7 @@ export function ScheduledHistoryModal({
     return deltaMs >= 0
       ? `In ${absDays} day${absDays > 1 ? "s" : ""}`
       : `${absDays} day${absDays > 1 ? "s" : ""} ago`;
-  };
+  }
 
   const formatScheduleWindow = (job: ScheduledJob) => {
     if (job.mode !== "time-window" || !job.windowEndAt) {
@@ -821,6 +1007,14 @@ export function ScheduledHistoryModal({
       setWindowEndTimeError(undefined);
     }
 
+    if (overlapWarningBypassRef.current) {
+      overlapWarningBypassRef.current = false;
+    } else if (shouldShowOverlapWarningModal) {
+      setOverlapDetailTab("windows");
+      setOverlapWarningOpen(true);
+      return;
+    }
+
     if (!hasRules) {
       shopify.toast.show("Configure pricing rules before scheduling.", {
         isError: true,
@@ -906,6 +1100,9 @@ export function ScheduledHistoryModal({
         open={open}
         onClose={() => {
           setSelectedJob(null);
+          setOverlapWarningOpen(false);
+          overlapWarningBypassRef.current = false;
+          setOverlapDetailTab("windows");
           onClose();
         }}
         title="Schedule Center"
@@ -1340,6 +1537,145 @@ export function ScheduledHistoryModal({
               </div>
             )}
           </div>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
+        open={overlapWarningOpen}
+        onClose={() => {
+          setOverlapWarningOpen(false);
+          setOverlapDetailTab("windows");
+        }}
+        title="Scheduling Overlap Detected"
+        primaryAction={{
+          content: "Continue scheduling",
+          onAction: () => {
+            overlapWarningBypassRef.current = true;
+            setOverlapWarningOpen(false);
+            setOverlapDetailTab("windows");
+            void submitSchedule();
+          },
+        }}
+        secondaryActions={[
+          {
+            content: "Review selection",
+            onAction: () => {
+              setOverlapWarningOpen(false);
+              setOverlapDetailTab("windows");
+            },
+          },
+          {
+            content: "Cancel",
+            onAction: () => {
+              setOverlapWarningOpen(false);
+              setOverlapDetailTab("windows");
+            },
+          },
+        ]}
+      >
+        <Modal.Section>
+          <BlockStack gap="200">
+            <Text as="p" variant="bodySm">
+              Some selected products already belong to another scheduled pricing campaign during this time window.
+            </Text>
+            <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+              <BlockStack gap="150">
+                <Box
+                  background="bg-surface"
+                  padding="100"
+                  borderRadius="200"
+                  borderColor="border"
+                  borderWidth="025"
+                >
+                  <InlineStack gap="100" wrap={false}>
+                    <Button
+                      size="slim"
+                      fullWidth
+                      pressed={overlapDetailTab === "windows"}
+                      variant={overlapDetailTab === "windows" ? "primary" : "tertiary"}
+                      onClick={() => setOverlapDetailTab("windows")}
+                    >
+                      {`Overlapping windows (${scheduleOverlapContext.overlappingWindowCount})`}
+                    </Button>
+                    <Button
+                      size="slim"
+                      fullWidth
+                      pressed={overlapDetailTab === "variants"}
+                      variant={overlapDetailTab === "variants" ? "primary" : "tertiary"}
+                      onClick={() => setOverlapDetailTab("variants")}
+                    >
+                      {`Overlapping variants (${scheduleOverlapContext.overlappingVariantCount})`}
+                    </Button>
+                  </InlineStack>
+                </Box>
+
+                {overlapDetailTab === "variants" && (
+                  <Box padding="200" background="bg-surface" borderRadius="200">
+                    <BlockStack gap="150">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        These selected items overlap with another scheduled window.
+                      </Text>
+                      <BlockStack gap="100">
+                        {overlapVariantItems.slice(0, 8).map((item) => {
+                          const subtitle = buildVariantSubtitle({
+                            productTitle: item.title ?? null,
+                            variantTitle: item.variantTitle ?? null,
+                            sku: item.sku ?? null,
+                          });
+                          const fallbackId = String(item.variantId ?? "").split("/").pop() ?? "";
+                          const line = subtitle ? `${item.title} • ${subtitle}` : item.title;
+                          return (
+                            <Text
+                              key={String(item.variantId)}
+                              as="p"
+                              variant="bodySm"
+                              tone="subdued"
+                            >
+                              {subtitle ? line : `${line}${fallbackId ? ` • Variant ${fallbackId}` : ""}`}
+                            </Text>
+                          );
+                        })}
+                        {overlapVariantItems.length > 8 && (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {`+${overlapVariantItems.length - 8} more overlapping variant${
+                              overlapVariantItems.length - 8 === 1 ? "" : "s"
+                            }`}
+                          </Text>
+                        )}
+                      </BlockStack>
+                    </BlockStack>
+                  </Box>
+                )}
+
+                {overlapDetailTab === "windows" && (
+                  <Box padding="200" background="bg-surface" borderRadius="200">
+                    <BlockStack gap="150">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        These scheduled windows overlap your selected time range.
+                      </Text>
+                      <BlockStack gap="100">
+                        {scheduleOverlapContext.overlappingWindowJobs.slice(0, 6).map((job) => (
+                          <Text key={job} as="p" variant="bodySm" tone="subdued">
+                            {job}
+                          </Text>
+                        ))}
+                        {scheduleOverlapContext.overlappingWindowJobs.length > 6 && (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {`+${scheduleOverlapContext.overlappingWindowJobs.length - 6} more overlapping window${
+                              scheduleOverlapContext.overlappingWindowJobs.length - 6 === 1 ? "" : "s"
+                            }`}
+                          </Text>
+                        )}
+                      </BlockStack>
+                    </BlockStack>
+                  </Box>
+                )}
+              </BlockStack>
+            </Box>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Continue to schedule anyway, or review your selection and timing to avoid operational overlap.
+            </Text>
+          </BlockStack>
         </Modal.Section>
       </Modal>
 
