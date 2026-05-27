@@ -180,8 +180,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
               return {
                 variantId: String(product.variantId),
+                productId: typeof product.productId === "string" ? product.productId : null,
                 productTitle: product.title || "Untitled Product",
                 variantTitle: product.variantTitle ?? null,
+                sku: typeof product.sku === "string" ? product.sku : null,
                 currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
                 scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
                 revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
@@ -266,8 +268,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
               return {
                 variantId: String(product.variantId),
+                productId: typeof product.productId === "string" ? product.productId : null,
                 productTitle: product.title || "Untitled Product",
                 variantTitle: product.variantTitle ?? null,
+                sku: typeof product.sku === "string" ? product.sku : null,
                 currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
                 scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
                 revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
@@ -386,7 +390,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : null;
 
     const variantGids = history.map((h) => toVariantGid(h.variantId));
-    const currentByVariant = new Map<string, { currentPrice: number | null; productTitle: string | null }>();
+    const currentByVariant = new Map<string, {
+      currentPrice: number | null;
+      productTitle: string | null;
+      productId: string | null;
+      variantTitle: string | null;
+      sku: string | null;
+    }>();
 
     for (const ids of chunk(variantGids, 100)) {
       const response = await admin.graphql(
@@ -395,7 +405,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             ... on ProductVariant {
               id
               price
+              title
+              sku
               product {
+                id
                 title
               }
             }
@@ -412,6 +425,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         currentByVariant.set(normalizedId, {
           currentPrice: node.price != null ? Number(node.price) : null,
           productTitle: node.product?.title ?? null,
+          productId: node.product?.id ?? null,
+          variantTitle: node.title ?? null,
+          sku: node.sku ?? null,
         });
       }
     }
@@ -438,7 +454,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
       return {
         variantId: h.variantId,
+        productId: current?.productId ?? null,
         productTitle: current?.productTitle ?? "Untitled Product",
+        variantTitle: current?.variantTitle ?? null,
+        sku: current?.sku ?? null,
         currentPrice: revertedFromPrice,
         revertTargetPrice: Number(h.oldPrice),
         status: operationalStatus,

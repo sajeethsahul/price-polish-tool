@@ -91,8 +91,10 @@ interface CampaignHistoryItem {
 
 interface CampaignRevertPreviewRow {
   variantId: string;
+  productId?: string | null;
   productTitle: string;
   variantTitle?: string | null;
+  sku?: string | null;
   currentPrice: number | null;
   scheduledPrice?: number | null;
   revertTargetPrice: number;
@@ -171,6 +173,45 @@ const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
 };
 
 type TimelineTone = "success" | "warning" | "critical" | "info" | "attention";
+
+function normalizeMeaningfulVariantTitle(value: string | null | undefined, productTitle?: string | null) {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === "default title") return null;
+  const normalizedProductTitle = (productTitle ?? "").trim().toLowerCase();
+  if (normalizedProductTitle && trimmed.toLowerCase() === normalizedProductTitle) return null;
+  return trimmed;
+}
+
+function normalizeSku(value: string | null | undefined) {
+  const trimmed = (value ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
+function buildVariantSubtitle(params: { productTitle?: string | null; variantTitle?: string | null; sku?: string | null }) {
+  const variantTitle = normalizeMeaningfulVariantTitle(params.variantTitle, params.productTitle);
+  const sku = normalizeSku(params.sku);
+  const parts: string[] = [];
+  if (variantTitle) parts.push(variantTitle);
+  if (sku) parts.push(`SKU: ${sku}`);
+  return parts.length > 0 ? parts.join(" • ") : null;
+}
+
+function computeProductVariantCounts(items: Array<{ productId?: string | null; variantId?: string | null }>) {
+  const productIds = new Set<string>();
+  const variantIds = new Set<string>();
+
+  for (const item of items) {
+    const productId = (item.productId ?? "").trim();
+    const variantId = (item.variantId ?? "").trim();
+    if (productId) productIds.add(productId);
+    if (variantId) variantIds.add(variantId);
+  }
+
+  const variantCount = variantIds.size || items.length;
+  const productCount = productIds.size || Math.min(items.length, variantCount);
+  return { productCount, variantCount };
+}
 
 interface CampaignTimelineMilestone {
   key: string;
@@ -1019,6 +1060,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   }, []);
 
   const campaignDetailRows = campaignDetail?.rows ?? [];
+  const campaignDetailCounts = useMemo(
+    () => computeProductVariantCounts(campaignDetailRows),
+    [campaignDetailRows]
+  );
   const campaignDetailTotalPages = Math.max(1, Math.ceil(campaignDetailRows.length / campaignDetailPageSize));
   const campaignDetailPaginatedRows = useMemo(() => {
     const start = (campaignDetailPage - 1) * campaignDetailPageSize;
@@ -1152,6 +1197,11 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     return revertPreviewFilteredRows.slice(start, start + revertPreviewPageSize);
   }, [revertPreviewFilteredRows, revertPreviewPage, revertPreviewPageSize]);
 
+  const revertPreviewCounts = useMemo(() => {
+    if (!revertPreview) return { productCount: 0, variantCount: 0 };
+    return computeProductVariantCounts(revertPreview.rows);
+  }, [revertPreview]);
+
   useEffect(() => {
     setRevertPreviewPage(1);
   }, [revertPreviewSearchQuery, revertPreviewMovementFilter, revertPreviewPageSize]);
@@ -1221,6 +1271,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
   const previewImpactSummary = useMemo(() => {
     const rows = filteredPreviews;
+    const productIds = new Set<string>();
+    const variantIds = new Set<string>();
     let affectedCount = 0;
     let sumDelta = 0;
     let sumFinal = 0;
@@ -1230,6 +1282,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     let hasDecrease = false;
 
     for (const item of rows) {
+      if (item.productId) productIds.add(String(item.productId));
+      if (item.variantId) variantIds.add(String(item.variantId));
+
       const oldP = parseFloat(item.oldPrice);
       const finalP = item.overriddenPrice !== undefined
         ? Number(item.overriddenPrice) || 0
@@ -1294,7 +1349,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
     }
 
     return {
-      totalCount: rows.length,
+      totalCount: productIds.size || rows.length,
+      variantCount: variantIds.size || rows.length,
       affectedCount,
       hasIncrease,
       hasDecrease,
@@ -3096,7 +3152,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                               <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
                                 <Text as="h3" variant="headingMd">Preview Summary</Text>
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  {`Based on ${previewImpactSummary.totalCount} products in your current view`}
+                                  {(() => {
+                                    const productCount = Number(previewImpactSummary.totalCount ?? 0);
+                                    const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
+                                    if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
+                                      return `Based on ${productCount} products • ${variantCount} variants in your current view`;
+                                    }
+                                    return `Based on ${productCount} products in your current view`;
+                                  })()}
                                 </Text>
                               </InlineStack>
                               <Divider />
@@ -3381,11 +3444,30 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                             {p.title}
                                           </Text>
                                           
-                                          {p.variantTitle && p.variantTitle !== "Default Title" && (
-                                            <Text as="span" variant="bodySm" tone="subdued">
-                                              {p.variantTitle}
-                                            </Text>
-                                          )}
+                                          {(() => {
+                                            const subtitle = buildVariantSubtitle({
+                                              productTitle: p.title,
+                                              variantTitle: p.variantTitle ?? null,
+                                              sku: p.sku ?? null,
+                                            });
+
+                                            if (!subtitle) return null;
+
+                                            return (
+                                              <div
+                                                style={{
+                                                  whiteSpace: "nowrap",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  maxWidth: "100%",
+                                                }}
+                                              >
+                                                <Text as="span" variant="bodySm" tone="subdued">
+                                                  {subtitle}
+                                                </Text>
+                                              </div>
+                                            );
+                                          })()}
 
                                           {rowSafeguardNotices.length > 0 && (
                                             <Text as="span" variant="bodySm" tone="subdued">
@@ -3644,9 +3726,18 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
                       <strong>{campaignDetail.preActivation || campaignDetail.prePublish ? "Scheduled products" : "Tracked items"}:</strong>{" "}
-                      {campaignDetail.preActivation || campaignDetail.prePublish
-                        ? campaignDetail.productCount
-                        : campaignDetail.totalTrackedCount ?? campaignDetail.rows.length}
+                      {(() => {
+                        const fallbackCount = campaignDetail.preActivation || campaignDetail.prePublish
+                          ? campaignDetail.productCount
+                          : campaignDetail.totalTrackedCount ?? campaignDetail.rows.length;
+                        const counts = campaignDetailCounts.productCount > 0
+                          ? campaignDetailCounts
+                          : { productCount: fallbackCount, variantCount: fallbackCount };
+                        if (counts.variantCount !== counts.productCount) {
+                          return `${counts.productCount} products • ${counts.variantCount} variants`;
+                        }
+                        return `${counts.productCount} products`;
+                      })()}
                     </Text>
                   </InlineStack>
 
@@ -3701,7 +3792,15 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                             </Text>
                           )}
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Intended pricing scope: {campaignDetail.productCount} scheduled products
+                            {(() => {
+                              const counts = campaignDetailCounts.productCount > 0
+                                ? campaignDetailCounts
+                                : { productCount: campaignDetail.productCount, variantCount: campaignDetail.productCount };
+                              if (counts.variantCount !== counts.productCount) {
+                                return `Intended pricing scope: ${counts.productCount} products • ${counts.variantCount} variants`;
+                              }
+                              return `Intended pricing scope: ${counts.productCount} products`;
+                            })()}
                           </Text>
                           {campaignDetail.schedule?.createdAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
@@ -3905,13 +4004,23 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                     {compactVariantIdentifier(row.variantId)}
                                   </Text>
                                 </div>
-                                {(campaignDetail.preActivation || campaignDetail.prePublish) && row.variantTitle && (
-                                  <div style={{ overflowWrap: "anywhere" }}>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      {row.variantTitle}
-                                    </Text>
-                                  </div>
-                                )}
+                                {(() => {
+                                  const subtitle = buildVariantSubtitle({
+                                    productTitle: row.productTitle,
+                                    variantTitle: row.variantTitle ?? null,
+                                    sku: row.sku ?? null,
+                                  });
+
+                                  if (!subtitle) return null;
+
+                                  return (
+                                    <div style={{ overflowWrap: "anywhere" }}>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        {subtitle}
+                                      </Text>
+                                    </div>
+                                  );
+                                })()}
                                 {row.revertFailureReason && (
                                   <div style={{ overflowWrap: "anywhere" }}>
                                     <Text as="p" variant="bodySm" tone="subdued">
@@ -4038,7 +4147,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       <strong>Campaign:</strong> {revertPreview.title}
                     </Text>
                     <Text as="p" variant="bodySm">
-                      <strong>Affected products:</strong> {revertPreview.productCount}
+                      <strong>Affected products:</strong>{" "}
+                      {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
+                        ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
+                        : revertPreviewCounts.productCount}
                     </Text>
                   </InlineStack>
                   <InlineStack gap="200" wrap>
@@ -4049,7 +4161,9 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                           : "info"
                       }
                     >
-                      {`Affected products: ${revertPreview.productCount}`}
+                      {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
+                        ? `Affected products: ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
+                        : `Affected products: ${revertPreviewCounts.productCount}`}
                     </Badge>
                     <Badge tone="success">
                       {`Revert rows in preview: ${revertPreview.rows.length}`}
@@ -4194,6 +4308,23 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                                   {compactVariantIdentifier(row.variantId)}
                                 </Text>
                               </div>
+                              {(() => {
+                                const subtitle = buildVariantSubtitle({
+                                  productTitle: row.productTitle,
+                                  variantTitle: row.variantTitle ?? null,
+                                  sku: row.sku ?? null,
+                                });
+
+                                if (!subtitle) return null;
+
+                                return (
+                                  <div style={{ overflowWrap: "anywhere" }}>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      {subtitle}
+                                    </Text>
+                                  </div>
+                                );
+                              })()}
                             </BlockStack>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>

@@ -34,8 +34,9 @@ export type RevertCampaignPricesResult = {
   message: string | null;
 };
 
-function classifyUnrecoverableReason(message: string): string | null {
-  const normalized = message.toLowerCase();
+function classifyUnrecoverableReason(message: unknown): string | null {
+  const normalized = typeof message === "string" ? message.toLowerCase() : "";
+  if (!normalized) return null;
   if (
     normalized.includes("variant") &&
     (normalized.includes("not found") || normalized.includes("does not exist"))

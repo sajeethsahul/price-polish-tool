@@ -50,6 +50,45 @@ const LARGE_SCHEDULE_THRESHOLD = 100;
 const VERY_LARGE_SCHEDULE_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
 const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
+
+function normalizeMeaningfulVariantTitle(value: string | null | undefined, productTitle?: string | null) {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return null;
+  if (trimmed.toLowerCase() === "default title") return null;
+  const normalizedProductTitle = (productTitle ?? "").trim().toLowerCase();
+  if (normalizedProductTitle && trimmed.toLowerCase() === normalizedProductTitle) return null;
+  return trimmed;
+}
+
+function normalizeSku(value: string | null | undefined) {
+  const trimmed = (value ?? "").trim();
+  return trimmed ? trimmed : null;
+}
+
+function buildVariantSubtitle(params: { productTitle?: string | null; variantTitle?: string | null; sku?: string | null }) {
+  const variantTitle = normalizeMeaningfulVariantTitle(params.variantTitle, params.productTitle);
+  const sku = normalizeSku(params.sku);
+  const parts: string[] = [];
+  if (variantTitle) parts.push(variantTitle);
+  if (sku) parts.push(`SKU: ${sku}`);
+  return parts.length > 0 ? parts.join(" • ") : null;
+}
+
+function computeProductVariantCounts(items: Array<{ productId?: string | null; variantId?: string | null; title?: string | null }>) {
+  const productKeys = new Set<string>();
+  const variantIds = new Set<string>();
+
+  for (const item of items) {
+    const productKey = (item.productId ?? item.title ?? "").trim();
+    const variantId = (item.variantId ?? "").trim();
+    if (productKey) productKeys.add(productKey);
+    if (variantId) variantIds.add(variantId);
+  }
+
+  const variantCount = variantIds.size || items.length;
+  const productCount = productKeys.size || Math.min(items.length, variantCount);
+  return { productCount, variantCount };
+}
 const MAJOR_MOVEMENT_THRESHOLD = 40;
 const OPERATIONAL_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
 const SELECT_OPTION_PREFIX = "\u2002";
@@ -597,6 +636,10 @@ export function ScheduledHistoryModal({
   }, [historyPage, totalHistoryPages]);
 
   const selectedJobProducts = selectedJob?.products ?? [];
+  const selectedJobCounts = useMemo(
+    () => computeProductVariantCounts(selectedJobProducts),
+    [selectedJobProducts]
+  );
   const selectedJobTotalPages = Math.max(1, Math.ceil(selectedJobProducts.length / selectedJobPageSize));
   const selectedJobPaginatedProducts = useMemo(() => {
     const start = (selectedJobPage - 1) * selectedJobPageSize;
@@ -1321,7 +1364,11 @@ export function ScheduledHistoryModal({
                       : (selectedJobPage - 1) * selectedJobPageSize + 1
                   }-${
                     (selectedJobPage - 1) * selectedJobPageSize + selectedJobPaginatedProducts.length
-                  } of ${selectedJobProducts.length} products`}
+                  } of ${
+                    selectedJobCounts.variantCount !== selectedJobCounts.productCount
+                      ? `${selectedJobCounts.productCount} products • ${selectedJobCounts.variantCount} variants`
+                      : `${selectedJobCounts.productCount} products`
+                  }`}
                 </Text>
                 <div style={{ minWidth: 140 }}>
                   <Select
@@ -1340,7 +1387,11 @@ export function ScheduledHistoryModal({
                 headings={["Product", "Variant", "Old Price", "Scheduled Price"]}
                 rows={selectedJobPaginatedProducts.map((product) => [
                   product.title || "Untitled Product",
-                  product.variantTitle || "Default Title",
+                  buildVariantSubtitle({
+                    productTitle: product.title ?? null,
+                    variantTitle: product.variantTitle ?? null,
+                    sku: product.sku ?? null,
+                  }) ?? "—",
                   formatMoney(Number(product.oldPrice), currencyCode),
                   formatMoney(Number(product.newPrice), currencyCode),
                 ])}
