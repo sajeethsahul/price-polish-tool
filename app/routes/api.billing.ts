@@ -15,12 +15,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return auth;
   }
 
-  const { billing } = auth;
+  const { admin, session, billing } = auth;
 
   // ===============================
   // 💰 BILLING FLOW (SHOPIFY HANDLED)
   // ===============================
-  return billing.require({
+  const result = await billing.require({
     plans: ["basic"],
     isTest: true,
 
@@ -34,4 +34,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       });
     },
   });
+
+  if (!(result instanceof Response)) {
+    const shop = session.shop;
+    const { persistBillingStateFromShopify } = await import("../utils/billing-persistence.server");
+    // await persistBillingStateFromShopify({
+    //   admin,
+    //   shop,
+    //   expectedPlanName: "basic",
+    //   isTest: true,
+    // });
+  }
+
+  return result;
 };

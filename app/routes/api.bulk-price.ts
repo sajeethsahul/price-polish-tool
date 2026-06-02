@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
+import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -46,6 +47,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const hasActivePlan =
       billingCheck?.hasActivePayment ||
       billingCheck?.appSubscriptions?.length > 0;
+
+    if (hasActivePlan) {
+      // await persistBillingStateFromShopify({
+      //   admin,
+      //   shop,
+      //   expectedPlanName: "basic",
+      //   isTest: true,
+      // });
+    }
 
     if (!hasActivePlan) {
       console.warn("[BULK] BLOCKED - NO ACTIVE PLAN");

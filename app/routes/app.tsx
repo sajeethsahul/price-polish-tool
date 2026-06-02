@@ -27,6 +27,7 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -66,6 +67,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (billingResponse instanceof Response) {
     return billingResponse;
   }
+
+  // await persistBillingStateFromShopify({
+  //   admin,
+  //   shop,
+  //   expectedPlanName: "basic",
+  //   isTest: true,
+  // });
 
   // ✅ If reached here → user has active plan
   const hasActivePlan = true;

@@ -193,3 +193,113 @@ All future variant phases must preserve:
 - preview performance
 
 Backward compatibility is mandatory.
+
+
+## Scheduler Lifecycle Validation (Completed)
+
+### Ownership Validation
+
+Scenario:
+
+Original Price = 112.09
+
+Time Window Price = 100.00
+
+Manual Apply During Active Window = 125.00
+
+Final Price After Window End = 125.00
+
+Result:
+
+PASS
+
+The latest merchant action remained authoritative after the Time Window expired.
+
+This confirms ownership preservation and prevents scheduled restores from overwriting newer merchant pricing decisions.
+
+---
+
+### Time Window Lifecycle Validation
+
+Product:
+
+The Collection Snowboard: Hydrogen
+
+Scenario:
+
+Original Price = 501.08
+
+Future Time Window Price = 555.00
+
+Result:
+
+Before Start Time:
+
+* Admin Price = 501.08
+* Storefront Price = 501.08
+
+At Start Time:
+
+* Admin Price = 555.00
+* Storefront Price = 555.00
+
+After Window End:
+
+* Prices restored correctly
+* Campaign status transitioned to Expired Window
+
+Result:
+
+PASS
+
+Validated full lifecycle:
+
+Create Schedule
+→ Wait
+→ Publish At Start Time
+→ Restore At End Time
+→ Expire Window
+
+---
+
+### Overlap Awareness
+
+Validated:
+
+* Product overlap detection
+* Variant overlap detection
+* Active Window overlap awareness
+* Conflict visibility
+* Warning-only merchant workflow
+
+Result:
+
+PASS
+
+---
+
+### Revert Compatibility
+
+Validated:
+
+* Mixed snapshot compatibility
+* Legacy campaign recovery
+* Ownership preservation
+
+Result:
+
+PASS
+
+---
+
+### Launch Assessment
+
+Scheduling lifecycle is considered operationally stable for MVP.
+
+Future enhancements may include:
+
+* One-Time Publish proximity awareness
+* Duplicate schedule prevention
+* Conflict severity levels
+
+These are not required for MVP launch.

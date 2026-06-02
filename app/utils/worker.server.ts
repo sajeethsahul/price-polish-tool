@@ -147,7 +147,7 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
             SELECT id
             FROM   "ScheduledJob"
             WHERE  status = 'pending'
-              AND  "runAt" <= ${now}
+              AND  "runAt" <= (${now} AT TIME ZONE 'UTC')
             ORDER  BY "runAt" ASC
             LIMIT  1
             FOR UPDATE SKIP LOCKED
@@ -170,7 +170,7 @@ async function claimExpiredWindow(): Promise<ClaimedJob | null> {
              AND   c.shop = sj_inner.shop
             WHERE  sj_inner.mode = 'time-window'
               AND  sj_inner.status = 'active-window'
-              AND  sj_inner."windowEndAt" <= ${now}
+              AND  sj_inner."windowEndAt" <= (${now} AT TIME ZONE 'UTC')
               AND  sj_inner."restoredAt" IS NULL
               AND  c.source = 'schedule-window'
               AND  c.status = 'active-window'
@@ -355,7 +355,7 @@ export function startWorker() {
                         });
                         await prisma.scheduledJob.update({
                             where: { id: jobId },
-                            data: { status: "restore-deferred" },
+                            data: { status: "active-window" },
                         });
                         continue;
                     }
@@ -445,13 +445,29 @@ export function startWorker() {
             let job: ClaimedJob | null;
 
             while ((job = await claimNextJob()) !== null) {
-                processedCount++;
                 const { id: jobId, shop } = job;
 
                 console.log(
                     `[Worker] 🔄 Claimed job ${jobId} for shop ${shop} ` +
                     `(scheduled: ${job.runAt.toISOString()})`
                 );
+
+                const claimedAt = new Date();
+                if (job.runAt > claimedAt) {
+                    console.warn("[Worker] ⏳ Job claimed before runAt — re-queued", {
+                        shop,
+                        jobId,
+                        runAt: job.runAt.toISOString(),
+                        now: claimedAt.toISOString(),
+                    });
+                    await prisma.scheduledJob.update({
+                        where: { id: jobId },
+                        data: { status: "pending" },
+                    });
+                    continue;
+                }
+
+                processedCount++;
                 if (job.campaignId && job.mode !== "time-window") {
                     console.log("[Worker] 📌 Publish claimed", {
                         shop,
