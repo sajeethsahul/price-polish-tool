@@ -27,6 +27,15 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
+model Shop {
+  shop          String   @id
+  isInstalled   Boolean  @default(true)
+  installedAt   DateTime
+  uninstalledAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model PricingRule {
   id                      String   @id @default(cuid())
   shop                    String   @unique

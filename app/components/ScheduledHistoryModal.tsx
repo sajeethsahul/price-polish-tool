@@ -733,6 +733,8 @@ export function ScheduledHistoryModal({
         return <Badge tone="warning">Pending</Badge>;
       case "processing":
         return <Badge tone="info">Processing</Badge>;
+      case "missed-during-uninstall":
+        return <Badge tone="attention">Missed During Uninstall</Badge>;
       case "active-window":
         return <Badge tone="attention">Active Window</Badge>;
       case "restoring":

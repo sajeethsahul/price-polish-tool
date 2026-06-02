@@ -146,8 +146,11 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
         WHERE id = (
             SELECT id
             FROM   "ScheduledJob"
+            LEFT JOIN "Shop" s
+              ON   s.shop = "ScheduledJob".shop
             WHERE  status = 'pending'
               AND  "runAt" <= (${now} AT TIME ZONE 'UTC')
+              AND  (s.shop IS NULL OR s."isInstalled" = true)
             ORDER  BY "runAt" ASC
             LIMIT  1
             FOR UPDATE SKIP LOCKED
@@ -165,6 +168,8 @@ async function claimExpiredWindow(): Promise<ClaimedJob | null> {
         FROM (
             SELECT sj_inner.id
             FROM   "ScheduledJob" sj_inner
+            LEFT JOIN "Shop" s
+              ON   s.shop = sj_inner.shop
             JOIN   "Campaign" c
               ON   c.id = sj_inner."campaignId"
              AND   c.shop = sj_inner.shop
@@ -172,6 +177,7 @@ async function claimExpiredWindow(): Promise<ClaimedJob | null> {
               AND  sj_inner.status = 'active-window'
               AND  sj_inner."windowEndAt" <= (${now} AT TIME ZONE 'UTC')
               AND  sj_inner."restoredAt" IS NULL
+              AND  (s.shop IS NULL OR s."isInstalled" = true)
               AND  c.source = 'schedule-window'
               AND  c.status = 'active-window'
               AND  c.status NOT IN ('window-stopped', 'auto-restored', 'cancelled-window', 'unrecoverable')

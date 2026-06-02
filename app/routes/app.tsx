@@ -23,6 +23,7 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { recordShopInstall } from "../utils/shop-lifecycle.server";
 import {
   PricePolishLoader,
   resolvePricePolishLoaderCopy,
@@ -45,6 +46,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const shop = session.shop;
+
+  await recordShopInstall({ shop });
 
   // 🧠 HOST
   let host = url.searchParams.get("host");
