@@ -15,6 +15,10 @@ import {
 } from "@shopify/polaris";
 import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
+import { CampaignConflictExplorerModal } from "./CampaignConflictExplorerModal";
+import { ExpandableList } from "./ExpandableList";
+import { ModalScrollableSection } from "./ModalScrollableSection";
+import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
 import type {
   OperationalSafeguardNotice,
   OperationalSafeguardSeverity,
@@ -24,6 +28,7 @@ import type {
 
 interface ScheduledJob {
   id: string;
+  campaignId?: string | null;
   title: string;
   runAt: string;
   mode?: "one-time" | "time-window" | string;
@@ -35,17 +40,9 @@ interface ScheduledJob {
   products: ScheduledProductSnapshot[] | null;
 }
 
-type ScheduleScope = "all" | "selected" | "filtered";
+type ScheduleScope = "none" | "all" | "selected" | "filtered";
 type ScheduleMode = "one-time" | "time-window";
 
-interface ScheduleConflictNotice {
-  id: string;
-  severity: OperationalSafeguardSeverity;
-  message: string;
-}
-
-const CONFLICT_NEARBY_WINDOW_MS = 30 * 60 * 1000;
-const LARGE_OVERLAP_COUNT_THRESHOLD = 25;
 const LARGE_SCHEDULE_THRESHOLD = 100;
 const VERY_LARGE_SCHEDULE_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
@@ -124,22 +121,26 @@ export function ScheduledHistoryModal({
   existingCampaignTitles = [],
   shopify,
 }: ScheduledHistoryModalProps) {
+  const scheduleDefaultedScopeRef = useRef(false);
   const [jobs, setJobs] = useState<ScheduledJob[]>([]);
   const [loading, setLoading] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [overlapWarningOpen, setOverlapWarningOpen] = useState(false);
   const overlapWarningBypassRef = useRef(false);
   const [overlapDetailTab, setOverlapDetailTab] = useState<"variants" | "windows">("windows");
+  const [conflictExplorerOpen, setConflictExplorerOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<ScheduledJob | null>(null);
   const [selectedTab, setSelectedTab] = useState<"create" | "history">("create");
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>("one-time");
-  const [scheduleApplyMode, setScheduleApplyMode] = useState<ScheduleScope>("all");
+  const [scheduleApplyMode, setScheduleApplyMode] = useState<ScheduleScope>("none");
   const [scheduleTitle, setScheduleTitle] = useState("");
   const [scheduleTime, setScheduleTime] = useState("");
   const [windowEndTime, setWindowEndTime] = useState("");
+  const [scheduleApplyModeError, setScheduleApplyModeError] = useState<string | undefined>();
   const [scheduleTitleError, setScheduleTitleError] = useState<string | undefined>();
   const [scheduleTimeError, setScheduleTimeError] = useState<string | undefined>();
   const [windowEndTimeError, setWindowEndTimeError] = useState<string | undefined>();
+  const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<
     "all" | "upcoming" | "active" | "completed" | "restored" | "failed" | "overdue"
   >("all");
@@ -173,20 +174,28 @@ export function ScheduledHistoryModal({
   }, [open]);
 
   useEffect(() => {
+    if (open && !scheduleDefaultedScopeRef.current) {
+      scheduleDefaultedScopeRef.current = true;
+      setScheduleApplyMode(selectedItems.size > 0 ? "selected" : "none");
+    }
     if (!open) {
+      scheduleDefaultedScopeRef.current = false;
       setJobs([]);
       setLoading(false);
       setIsScheduling(false);
       setOverlapWarningOpen(false);
       overlapWarningBypassRef.current = false;
       setOverlapDetailTab("windows");
+      setConflictExplorerOpen(false);
+      setScheduleConfirmOpen(false);
       setSelectedJob(null);
       setSelectedTab("create");
       setScheduleMode("one-time");
-      setScheduleApplyMode("all");
+      setScheduleApplyMode("none");
       setScheduleTitle("");
       setScheduleTime("");
       setWindowEndTime("");
+      setScheduleApplyModeError(undefined);
       setScheduleTitleError(undefined);
       setScheduleTimeError(undefined);
       setWindowEndTimeError(undefined);
@@ -261,6 +270,9 @@ export function ScheduledHistoryModal({
   }, [jobs]);
 
   const scopedItemsForSchedule = useMemo(() => {
+    if (scheduleApplyMode === "none") {
+      return [];
+    }
     if (scheduleApplyMode === "selected") {
       return previews.filter((item) => selectedItems.has(String(item.variantId)));
     }
@@ -269,6 +281,25 @@ export function ScheduledHistoryModal({
     }
     return previews;
   }, [scheduleApplyMode, previews, selectedItems, filteredPreviews]);
+
+  const selectedScopeCount = useMemo(() => {
+    if (selectedItems.size === 0) return 0;
+    return previews.filter((item) => selectedItems.has(String(item.variantId))).length;
+  }, [previews, selectedItems]);
+
+  const scheduleScopeLabel = useMemo(() => {
+    if (scheduleApplyMode === "selected") return "Selected Products";
+    if (scheduleApplyMode === "all") return "All Products";
+    if (scheduleApplyMode === "filtered") return "Filtered Products";
+    return "Select Scope";
+  }, [scheduleApplyMode]);
+
+  const scheduleScopeWarning = useMemo(() => {
+    if (scheduleApplyMode !== "all") return null;
+    const total = previews.length;
+    if (total > 0) return `⚠ Affects entire catalog (${total} products)`;
+    return "⚠ Affects entire catalog";
+  }, [previews.length, scheduleApplyMode]);
 
   const normalizedExistingScheduleTitles = useMemo(() => {
     const normalize = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -369,264 +400,6 @@ export function ScheduledHistoryModal({
 
     return notices;
   }, [previews.length, scheduleApplyMode, scheduleMode, scheduleTime, scopedItemsForSchedule, windowEndTime]);
-
-  const scheduleConflictNotices = useMemo<ScheduleConflictNotice[]>(() => {
-    if (!scheduleTime) return [];
-
-    const publishAtMs = new Date(scheduleTime).getTime();
-    if (Number.isNaN(publishAtMs)) return [];
-    const restoreAtMs =
-      scheduleMode === "time-window" && windowEndTime
-        ? new Date(windowEndTime).getTime()
-        : publishAtMs;
-    if (Number.isNaN(restoreAtMs)) return [];
-    const candidateEndMs = Math.max(publishAtMs, restoreAtMs);
-
-    const candidateVariantIds = new Set(
-      scopedItemsForSchedule
-        .map((item) => String(item.variantId))
-        .filter((variantId) => variantId.length > 0)
-    );
-
-    //if (candidateVariantIds.size === 0) return [];
-
-    const getJobProductIds = (job: ScheduledJob) => {
-  if (!Array.isArray(job.products)) return new Set<string>();
-
-  return new Set(
-    job.products
-      .map((product) => String(product.productId))
-      .filter((productId) => productId.length > 0)
-  );
-};
-
-    const candidateProductIds = new Set(
-  scopedItemsForSchedule
-    .map((item) => String(item.productId))
-    .filter((productId) => productId.length > 0)
-);
-
-  if (candidateProductIds.size === 0) return [];
-
-
-    const notices: ScheduleConflictNotice[] = [];
-    const candidateMinute = Math.floor(publishAtMs / 60000);
-    const catalogSize = previews.length;
-
-    const getJobVariantIds = (job: ScheduledJob) => {
-      if (!Array.isArray(job.products)) return new Set<string>();
-      return new Set(
-        job.products
-          .map((product) => String(product.variantId))
-          .filter((variantId) => variantId.length > 0)
-      );
-    };
-
-    const likelyAllProductsJobs = scheduleCenterData.upcoming.filter((job) => {
-      if (catalogSize <= 0) return false;
-      if ((job.productCount ?? 0) >= catalogSize) return true;
-      return getJobVariantIds(job).size >= catalogSize;
-    });
-
-    const getJobWindowEndMs = (job: ScheduledJob & { runAtMs: number; windowEndMs?: number | null }) => {
-      if (job.mode === "time-window" && typeof job.windowEndMs === "number") {
-        return job.windowEndMs;
-      }
-      return job.runAtMs;
-    };
-
-    const windowsOverlap = (job: ScheduledJob & { runAtMs: number; windowEndMs?: number | null }) => {
-
-     
-      const normalizeEnd = (startMs: number, endMs: number) => (endMs > startMs ? endMs : startMs + 1);
-
-      const candidateStart = publishAtMs;
-      const candidateEnd = normalizeEnd(candidateStart, candidateEndMs);
-
-      const existingStart = job.runAtMs;
-      const existingEnd = normalizeEnd(existingStart, getJobWindowEndMs(job));
-
-        console.log("[OVERLAP TEST]", {
-          candidateStart,
-          candidateEnd,
-          existingStart,
-          existingEnd,
-          overlap: candidateStart < existingEnd && candidateEnd > existingStart,
-          status: job.status,
-          campaign: job.title,
-        });
-      return candidateStart < existingEnd && candidateEnd > existingStart;
-       
-    };
-
-    const exactPublishTimeOverlap = scheduleCenterData.upcoming.filter((job) => {
-      if (!windowsOverlap(job)) return false;
-      return Math.floor(job.runAtMs / 60000) === candidateMinute;
-    });
-    const nearbyPublishTimeOverlap = scheduleCenterData.upcoming.filter((job) => {
-      if (!windowsOverlap(job)) return false;
-      const deltaMs = Math.abs(job.runAtMs - publishAtMs);
-      return deltaMs > 0 && deltaMs <= CONFLICT_NEARBY_WINDOW_MS;
-    });
-
-    const overlappingVariantIds = new Set<string>();
-    let productOverlapJobCount = 0;
-    let overlapScheduledLaterCount = 0;
-    let activeWindowOverlapCount = 0;
-    let restoreWindowOverlapCount = 0;
-
- for (const job of scheduleCenterData.upcoming) {
-  const jobVariantIds = getJobVariantIds(job);
-  const jobProductIds = getJobProductIds(job);
-
-  const hasVariantScope =
-  candidateVariantIds.size > 0 &&
-  jobVariantIds.size > 0 &&
-  candidateVariantIds.size === candidateProductIds.size &&
-  jobVariantIds.size === jobProductIds.size;
-
-  const overlapsScope = hasVariantScope
-    ? [...candidateVariantIds].some((id) => jobVariantIds.has(id))
-    : [...candidateProductIds].some((id) => jobProductIds.has(id));
-
-  if (!overlapsScope) continue;
-
-  const overlapsWindowTiming = windowsOverlap(job);
-
-  if (!overlapsWindowTiming) continue;
-
-  const overlappingScopeIds = hasVariantScope
-    ? [...candidateVariantIds].filter((id) => jobVariantIds.has(id))
-    : [...candidateProductIds].filter((id) => jobProductIds.has(id));
-
-  const hasOverlap = overlappingScopeIds.length > 0;
-
-  for (const id of overlappingScopeIds) {
-    overlappingVariantIds.add(id);
-  }
-
-  if (hasOverlap) {
-    productOverlapJobCount += 1;
-
-    if (job.runAtMs > publishAtMs) {
-      overlapScheduledLaterCount += 1;
-    }
-
-    if (job.status.toLowerCase() === "active-window") {
-      activeWindowOverlapCount += 1;
-    }
-
-    if (
-      scheduleMode === "time-window" &&
-      job.mode === "time-window" &&
-      typeof job.windowEndMs === "number"
-    ) {
-      restoreWindowOverlapCount += 1;
-    }
-  }
-}
-
-    if (exactPublishTimeOverlap.length > 0) {
-      notices.push({
-        id: "exact-time-overlap",
-        severity: "warning",
-        message: `${exactPublishTimeOverlap.length} existing run${
-          exactPublishTimeOverlap.length === 1 ? "" : "s"
-        } already target this publish time.`,
-      });
-    }
-
-    const overlappingAllProductsJobs = likelyAllProductsJobs.filter(windowsOverlap);
-    if (overlappingAllProductsJobs.length > 0) {
-      notices.push({
-        id: "all-products-overlap",
-        severity: "warning",
-        message: "An existing all-products schedule may overlap with this time window.",
-      });
-    }
-
-    const hasLargeOverlap =
-      overlappingVariantIds.size >= LARGE_OVERLAP_COUNT_THRESHOLD ||
-      (overlappingVariantIds.size >= 10 &&
-        overlappingVariantIds.size >= Math.ceil(candidateVariantIds.size * 0.6));
-
-    if (overlappingVariantIds.size > 0) {
-      notices.push({
-        id: "overlapping-scope",
-        severity: "warning",
-        message:
-          "Some selected products already belong to another scheduled pricing campaign during this time window.",
-      });
-    }
-
-    if (hasLargeOverlap) {
-      notices.push({
-        id: "large-product-overlap",
-        severity: "warning",
-        message: `${overlappingVariantIds.size} selected products overlap with scheduled pricing during this time window.`,
-      });
-    } else if (overlappingVariantIds.size > 0) {
-      notices.push({
-        id: "product-overlap",
-        severity: "informational",
-        message: `${overlappingVariantIds.size} selected product${
-          overlappingVariantIds.size === 1 ? "" : "s"
-        } overlap with scheduled pricing during this time window.`,
-      });
-    }
-
-    if (activeWindowOverlapCount > 0) {
-      notices.push({
-        id: "active-window-overlap",
-        severity: "warning",
-        message: `${activeWindowOverlapCount} active pricing window${
-          activeWindowOverlapCount === 1 ? "" : "s"
-        } may overlap this operation.`,
-      });
-    }
-
-    if (restoreWindowOverlapCount > 0) {
-      notices.push({
-        id: "restore-window-overlap",
-        severity: "informational",
-        message: `${restoreWindowOverlapCount} time window${
-          restoreWindowOverlapCount === 1 ? "" : "s"
-        } include restore timing inside this window.`,
-      });
-    }
-
-    if (nearbyPublishTimeOverlap.length > 0) {
-      notices.push({
-        id: "nearby-time-overlap",
-        severity: "informational",
-        message: `${nearbyPublishTimeOverlap.length} scheduled run${
-          nearbyPublishTimeOverlap.length === 1 ? "" : "s"
-        } are near this publish time.`,
-      });
-    }
-
-    if (overlapScheduledLaterCount > 0) {
-      notices.push({
-        id: "later-overlap",
-        severity: "informational",
-        message: `${overlapScheduledLaterCount} overlapping run${
-          overlapScheduledLaterCount === 1 ? "" : "s"
-        } are scheduled later than this publish time.`,
-      });
-    }
-
-    if (notices.length === 0 && scheduleCenterData.upcoming.length > 0) {
-      notices.push({
-        id: "future-queue-awareness",
-        severity: "informational",
-        message: `${scheduleCenterData.upcoming.length} future pricing run${
-          scheduleCenterData.upcoming.length === 1 ? "" : "s"
-        } already exist in the queue.`,
-      });
-    }
-
-    return notices;
-  }, [scheduleMode, scheduleTime, scopedItemsForSchedule, previews.length, scheduleCenterData.upcoming, windowEndTime]);
 
   const scheduleOverlapContext = useMemo(() => {
     if (!scheduleTime) {
@@ -733,20 +506,132 @@ export function ScheduledHistoryModal({
   const shouldShowOverlapWarningModal =
     scheduleOverlapContext.overlappingVariantCount > 0 && scheduleOverlapContext.overlappingWindowCount > 0;
 
+  const candidateConflictExplorerTitle = useMemo(() => {
+    const trimmed = scheduleTitle.trim();
+    return trimmed.length > 0 ? trimmed : "Scheduled Campaign";
+  }, [scheduleTitle]);
+
+  const conflictExplorerConflicts = useMemo(() => {
+    if (!scheduleTime) return [];
+    const start = new Date(scheduleTime);
+    if (Number.isNaN(start.getTime())) return [];
+    const end = scheduleMode === "time-window" ? new Date(windowEndTime) : null;
+    const endAt = scheduleMode === "time-window" && end && !Number.isNaN(end.getTime()) ? end.toISOString() : null;
+
+    return computeConflictsForCandidateSchedule({
+      title: candidateConflictExplorerTitle,
+      status: "pending",
+      mode: scheduleMode,
+      runAt: start.toISOString(),
+      windowEndAt: endAt,
+      products: scopedItemsForSchedule.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+      })),
+    }, scheduleCenterData.upcoming as any);
+  }, [candidateConflictExplorerTitle, scheduleCenterData.upcoming, scheduleMode, scheduleTime, scopedItemsForSchedule, windowEndTime]);
+
+  const conflictExplorerLabelMaps = useMemo(() => {
+    const productLabelById = new Map<string, string>();
+    const variantLabelById = new Map<string, string>();
+
+    const add = (item: { productId?: string | null; variantId?: string | null; title?: string | null; variantTitle?: string | null }) => {
+      const productId = String(item.productId ?? "").trim();
+      const variantId = String(item.variantId ?? "").trim();
+      const productTitle = String(item.title ?? "").trim();
+      const variantTitle = normalizeMeaningfulVariantTitle(item.variantTitle ?? null, productTitle);
+
+      if (productId && productTitle && !productLabelById.has(productId)) {
+        productLabelById.set(productId, productTitle);
+      }
+      if (variantId) {
+        const label = productTitle
+          ? (variantTitle ? `${productTitle} / ${variantTitle}` : productTitle)
+          : variantTitle
+            ? variantTitle
+            : "";
+        if (label && !variantLabelById.has(variantId)) {
+          variantLabelById.set(variantId, label);
+        }
+      }
+    };
+
+    for (const item of scopedItemsForSchedule) {
+      add(item as any);
+    }
+
+    for (const job of scheduleCenterData.upcoming) {
+      const products = Array.isArray((job as any)?.products) ? ((job as any).products as any[]) : [];
+      for (const product of products) {
+        add(product);
+      }
+    }
+
+    return { productLabelById, variantLabelById };
+  }, [scheduleCenterData.upcoming, scopedItemsForSchedule]);
+
+  const overlapWarningSecondaryActions = useMemo(() => {
+    const actions = [
+      {
+        content: "Review selection",
+        onAction: () => {
+          setOverlapWarningOpen(false);
+          setOverlapDetailTab("windows");
+        },
+      },
+      {
+        content: "Cancel",
+        onAction: () => {
+          setOverlapWarningOpen(false);
+          setOverlapDetailTab("windows");
+        },
+      },
+    ];
+
+    if (conflictExplorerConflicts.length > 0) {
+      actions.unshift({
+        content: "View conflict details",
+        onAction: () => {
+          setOverlapWarningOpen(false);
+          setOverlapDetailTab("windows");
+          setConflictExplorerOpen(true);
+        },
+      });
+    }
+
+    return actions;
+  }, [conflictExplorerConflicts.length]);
+
   const overlapVariantItems = useMemo(() => {
     if (scheduleOverlapContext.overlappingVariantIds.length === 0) return [];
     const set = new Set(scheduleOverlapContext.overlappingVariantIds);
     return scopedItemsForSchedule.filter((item) => set.has(String(item.variantId)));
   }, [scheduleOverlapContext.overlappingVariantIds, scopedItemsForSchedule]);
 
-  const warningNoticeCount = useMemo(
-    () => scheduleConflictNotices.filter((notice) => notice.severity === "warning").length,
-    [scheduleConflictNotices]
-  );
-  const informationalNoticeCount = useMemo(
-    () => scheduleConflictNotices.filter((notice) => notice.severity === "informational").length,
-    [scheduleConflictNotices]
-  );
+  const overlapProductLabels = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of overlapVariantItems) {
+      const title = String(item.title ?? "").trim();
+      if (title) set.add(title);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [overlapVariantItems]);
+
+  const overlapVariantLabels = useMemo(() => {
+    return overlapVariantItems
+      .map((item) => {
+        const subtitle = buildVariantSubtitle({
+          productTitle: item.title ?? null,
+          variantTitle: item.variantTitle ?? null,
+          sku: item.sku ?? null,
+        });
+        const productTitle = String(item.title ?? "").trim();
+        if (!productTitle) return "";
+        return subtitle ? `${productTitle} / ${subtitle}` : productTitle;
+      })
+      .filter((label) => label.length > 0);
+  }, [overlapVariantItems]);
+
   const safeguardWarningCount = useMemo(
     () => scheduleOperationalSafeguards.filter((notice) => notice.severity === "warning").length,
     [scheduleOperationalSafeguards]
@@ -950,6 +835,84 @@ export function ScheduledHistoryModal({
     return remainingHours > 0
       ? `${days} day${days === 1 ? "" : "s"} ${remainingHours} hr`
       : `${days} day${days === 1 ? "" : "s"}`;
+  };
+
+  const preflightSchedule = () => {
+    if (scheduleApplyMode === "none") {
+      setScheduleApplyModeError("Select a pricing scope before scheduling.");
+      return;
+    }
+
+    if (scheduleApplyMode === "selected" && selectedScopeCount === 0) {
+      setScheduleApplyModeError("Select products on the dashboard, or choose All Products.");
+      return;
+    }
+
+    setScheduleApplyModeError(undefined);
+
+    const normalizedTitle = scheduleTitle.trim();
+    if (!normalizedTitle) {
+      setScheduleTitleError("Campaign title is required for scheduled pricing.");
+      return;
+    }
+
+    const normalizedKey = normalizedTitle.replace(/\s+/g, " ").toLowerCase();
+    if (normalizedExistingScheduleTitles.has(normalizedKey)) {
+      setScheduleTitleError("A campaign with this title already exists. Choose a unique title.");
+      return;
+    }
+
+    setScheduleTitleError(undefined);
+
+    if (!scheduleTime) {
+      setScheduleTimeError(
+        scheduleMode === "time-window"
+          ? "Choose when pricing should publish."
+          : "Choose when this schedule should run."
+      );
+      return;
+    }
+
+    const scheduleStartMs = new Date(scheduleTime).getTime();
+    if (Number.isNaN(scheduleStartMs)) {
+      setScheduleTimeError("Choose a valid publish time.");
+      return;
+    }
+    if (scheduleStartMs <= Date.now()) {
+      setScheduleTimeError("Choose a future start time before scheduling.");
+      return;
+    }
+
+    setScheduleTimeError(undefined);
+
+    if (scheduleMode === "time-window") {
+      if (!windowEndTime) {
+        setWindowEndTimeError("Choose when original pricing should restore.");
+        return;
+      }
+      const scheduleEndMs = new Date(windowEndTime).getTime();
+      if (Number.isNaN(scheduleEndMs)) {
+        setWindowEndTimeError("Choose a valid restore time.");
+        return;
+      }
+      if (scheduleEndMs === scheduleStartMs) {
+        setWindowEndTimeError("Start and end times need to be different.");
+        return;
+      }
+      if (scheduleEndMs <= scheduleStartMs) {
+        setWindowEndTimeError("Window end must be after the start time.");
+        return;
+      }
+      setWindowEndTimeError(undefined);
+    }
+
+    if (shouldShowOverlapWarningModal) {
+      setOverlapDetailTab("windows");
+      setOverlapWarningOpen(true);
+      return;
+    }
+
+    setScheduleConfirmOpen(true);
   };
 
   const submitSchedule = async () => {
@@ -1202,35 +1165,63 @@ export function ScheduledHistoryModal({
                           </InlineStack>
 
                           <BlockStack gap="300">
-                            <Select
-                              label="Schedule type"
-                              options={[
-                                { label: `${SELECT_OPTION_PREFIX}One-time Publish`, value: "one-time" },
-                                { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
-                              ]}
-                              value={scheduleMode}
-                              onChange={(value) => {
-                                setScheduleMode(value as ScheduleMode);
-                                setScheduleTimeError(undefined);
-                                setWindowEndTimeError(undefined);
-                              }}
-                              disabled={isScheduling}
-                            />
+                            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+                              <Select
+                                label="Schedule type"
+                                options={[
+                                  { label: `${SELECT_OPTION_PREFIX}One-time Publish`, value: "one-time" },
+                                  { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
+                                ]}
+                                value={scheduleMode}
+                                onChange={(value) => {
+                                  setScheduleMode(value as ScheduleMode);
+                                  setScheduleTimeError(undefined);
+                                  setWindowEndTimeError(undefined);
+                                }}
+                                disabled={isScheduling}
+                              />
 
-                            <Select
-                              label="Schedule pricing scope"
-                              options={[
-                                { label: `${SELECT_OPTION_PREFIX}All products`, value: "all" },
-                                { label: `${SELECT_OPTION_PREFIX}Selected products`, value: "selected" },
-                                { label: `${SELECT_OPTION_PREFIX}Filtered products`, value: "filtered" },
-                              ]}
-                              value={scheduleApplyMode}
-                              onChange={(value) => setScheduleApplyMode(value as ScheduleScope)}
-                              disabled={isScheduling}
-                            />
+                              <div>
+                                <Select
+                                  label="Pricing scope"
+                                  options={[
+                                    { label: `${SELECT_OPTION_PREFIX}Select scope`, value: "none" },
+                                    { label: `${SELECT_OPTION_PREFIX}Selected products (${selectedScopeCount})`, value: "selected" },
+                                    { label: `${SELECT_OPTION_PREFIX}All products (${previews.length})`, value: "all" },
+                                  ]}
+                                  value={scheduleApplyMode}
+                                  onChange={(value) => {
+                                    setScheduleApplyMode(value as ScheduleScope);
+                                    setScheduleApplyModeError(undefined);
+                                  }}
+                                  error={scheduleApplyModeError}
+                                  disabled={isScheduling}
+                                />
+                                {scheduleApplyMode === "none" ? (
+                                  <Box paddingBlockStart="100">
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      Select a scope to enable scheduling.
+                                    </Text>
+                                  </Box>
+                                ) : scheduleApplyMode === "selected" && selectedScopeCount === 0 ? (
+                                  <Box paddingBlockStart="100">
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                      No products selected.
+                                    </Text>
+                                  </Box>
+                                ) : null}
+                                {scheduleScopeWarning ? (
+                                  <Box paddingBlockStart="100">
+                                    <Text as="p" variant="bodySm" tone="critical">
+                                      {scheduleScopeWarning}
+                                    </Text>
+                                  </Box>
+                                ) : null}
+                              </div>
+                            </div>
 
                             <TextField
-                              label="Campaign Title"
+                              label="Campaign title"
                               value={scheduleTitle}
                               onChange={(value) => {
                                 setScheduleTitle(value);
@@ -1244,66 +1235,45 @@ export function ScheduledHistoryModal({
                               disabled={isScheduling}
                             />
 
-                            <TextField
-                              label={scheduleMode === "time-window" ? "Window Start" : "Publish at"}
-                              type="datetime-local"
-                              value={scheduleTime}
-                              onChange={(value) => {
-                                setScheduleTime(value);
-                                if (scheduleTimeError && value) {
-                                  setScheduleTimeError(undefined);
-                                }
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: scheduleMode === "time-window" ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 1fr)",
+                                gap: 16,
                               }}
-                              autoComplete="off"
-                              error={scheduleTimeError}
-                              disabled={isScheduling}
-                            />
-                            {scheduleMode === "time-window" && (
+                            >
                               <TextField
-                                label="Window End"
+                                label={scheduleMode === "time-window" ? "Window Start" : "Publish at"}
                                 type="datetime-local"
-                                value={windowEndTime}
+                                value={scheduleTime}
                                 onChange={(value) => {
-                                  setWindowEndTime(value);
-                                  if (windowEndTimeError && value) {
-                                    setWindowEndTimeError(undefined);
+                                  setScheduleTime(value);
+                                  if (scheduleTimeError && value) {
+                                    setScheduleTimeError(undefined);
                                   }
                                 }}
                                 autoComplete="off"
-                                error={windowEndTimeError}
+                                error={scheduleTimeError}
                                 disabled={isScheduling}
                               />
-                            )}
-                          </BlockStack>
-                        </BlockStack>
-                      </Box>
-
-                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="100">
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            {`Scheduling pricing update for: ${scopedItemsForSchedule.length} product${
-                              scopedItemsForSchedule.length === 1 ? "" : "s"
-                            }.`}
-                          </Text>
-                          {scheduleMode === "time-window" && (
-                            <>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {scheduleTime
-                                  ? `Pricing will publish at ${formatDateTime(scheduleTime)}.`
-                                  : "Pricing will publish at the window start."}
-                              </Text>
-                              <Text as="p" variant="bodySm" tone="subdued">
-                                {windowEndTime
-                                  ? `Original storefront pricing will automatically restore at ${formatDateTime(windowEndTime)}.`
-                                  : "Original storefront pricing will automatically restore at the window end."}
-                              </Text>
-                              {formatWindowDuration() && (
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  {`Window duration: ${formatWindowDuration()}.`}
-                                </Text>
+                              {scheduleMode === "time-window" && (
+                                <TextField
+                                  label="Window End"
+                                  type="datetime-local"
+                                  value={windowEndTime}
+                                  onChange={(value) => {
+                                    setWindowEndTime(value);
+                                    if (windowEndTimeError && value) {
+                                      setWindowEndTimeError(undefined);
+                                    }
+                                  }}
+                                  autoComplete="off"
+                                  error={windowEndTimeError}
+                                  disabled={isScheduling}
+                                />
                               )}
-                            </>
-                          )}
+                            </div>
+                          </BlockStack>
                         </BlockStack>
                       </Box>
 
@@ -1345,47 +1315,6 @@ export function ScheduledHistoryModal({
                         </Box>
                       )}
 
-                      {scheduleConflictNotices.length > 0 && (
-                        <Box
-                          padding="300"
-                          background="bg-surface-secondary"
-                          borderRadius="200"
-                          borderColor="border"
-                          borderWidth="025"
-                        >
-                          <BlockStack gap="200">
-                            <InlineStack gap="200" align="space-between" blockAlign="center" wrap>
-                              <Text as="p" variant="bodySm" fontWeight="medium">
-                                Conflict awareness
-                              </Text>
-                              <InlineStack gap="100" wrap>
-                                <Badge tone="warning">
-                                  {`${warningNoticeCount} Warning${
-                                    warningNoticeCount === 1 ? "" : "s"
-                                  }`}
-                                </Badge>
-                                <Badge tone="info">
-                                  {`${informationalNoticeCount} Info`}
-                                </Badge>
-                              </InlineStack>
-                            </InlineStack>
-                            <BlockStack gap="150">
-                              {scheduleConflictNotices.map((notice) => (
-                                <InlineStack key={notice.id} gap="200" blockAlign="center">
-                                  <Badge
-                                    tone={notice.severity === "warning" ? "warning" : "info"}
-                                  >
-                                    {notice.severity === "warning" ? "Warning" : "Info"}
-                                  </Badge>
-                                  <Text as="p" variant="bodySm">
-                                    {notice.message}
-                                  </Text>
-                                </InlineStack>
-                              ))}
-                            </BlockStack>
-                          </BlockStack>
-                        </Box>
-                      )}
                     </BlockStack>
                 </div>
               ) : (
@@ -1519,7 +1448,7 @@ export function ScheduledHistoryModal({
                       variant="primary"
                       tone="success"
                       onClick={() => {
-                        void submitSchedule();
+                        preflightSchedule();
                       }}
                       loading={isScheduling}
                       disabled={
@@ -1541,6 +1470,96 @@ export function ScheduledHistoryModal({
       </Modal>
 
       <Modal
+        open={scheduleConfirmOpen}
+        onClose={() => setScheduleConfirmOpen(false)}
+        title="Confirm Schedule"
+        primaryAction={{
+          content: "Confirm Schedule",
+          onAction: () => {
+            setScheduleConfirmOpen(false);
+            void submitSchedule();
+          },
+        }}
+        secondaryActions={[
+          {
+            content: "Back",
+            onAction: () => setScheduleConfirmOpen(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <ModalScrollableSection>
+            <BlockStack gap="300">
+              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="200">
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Campaign
+                      </Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">
+                        {scheduleTitle.trim() ? scheduleTitle.trim() : "Scheduled Campaign"}
+                      </Text>
+                    </BlockStack>
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Scope
+                      </Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">
+                        {scheduleScopeLabel}
+                      </Text>
+                    </BlockStack>
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Products
+                      </Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">
+                        {scopedItemsForSchedule.length}
+                      </Text>
+                    </BlockStack>
+                    <BlockStack gap="050">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Publish
+                      </Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">
+                        {scheduleTime ? formatDateTime(scheduleTime) : "—"}
+                      </Text>
+                    </BlockStack>
+                    {scheduleMode === "time-window" ? (
+                      <>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Restore
+                          </Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">
+                            {windowEndTime ? formatDateTime(windowEndTime) : "—"}
+                          </Text>
+                        </BlockStack>
+                        <BlockStack gap="050">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Duration
+                          </Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">
+                            {formatWindowDuration() ?? "—"}
+                          </Text>
+                        </BlockStack>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {scheduleApplyMode === "all" ? (
+                    <Text as="p" variant="bodySm" tone="critical">
+                      ⚠ This operation will update pricing across your entire catalog.
+                    </Text>
+                  ) : null}
+                </BlockStack>
+              </Box>
+            </BlockStack>
+          </ModalScrollableSection>
+        </Modal.Section>
+      </Modal>
+
+      <Modal
         open={overlapWarningOpen}
         onClose={() => {
           setOverlapWarningOpen(false);
@@ -1556,128 +1575,89 @@ export function ScheduledHistoryModal({
             void submitSchedule();
           },
         }}
-        secondaryActions={[
-          {
-            content: "Review selection",
-            onAction: () => {
-              setOverlapWarningOpen(false);
-              setOverlapDetailTab("windows");
-            },
-          },
-          {
-            content: "Cancel",
-            onAction: () => {
-              setOverlapWarningOpen(false);
-              setOverlapDetailTab("windows");
-            },
-          },
-        ]}
+        secondaryActions={overlapWarningSecondaryActions}
       >
         <Modal.Section>
-          <BlockStack gap="200">
-            <Text as="p" variant="bodySm">
-              Some selected products already belong to another scheduled pricing campaign during this time window.
-            </Text>
-            <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-              <BlockStack gap="150">
-                <Box
-                  background="bg-surface"
-                  padding="100"
-                  borderRadius="200"
-                  borderColor="border"
-                  borderWidth="025"
-                >
-                  <InlineStack gap="100" wrap={false}>
-                    <Button
-                      size="slim"
-                      fullWidth
-                      pressed={overlapDetailTab === "windows"}
-                      variant={overlapDetailTab === "windows" ? "primary" : "tertiary"}
-                      onClick={() => setOverlapDetailTab("windows")}
-                    >
-                      {`Overlapping windows (${scheduleOverlapContext.overlappingWindowCount})`}
-                    </Button>
-                    <Button
-                      size="slim"
-                      fullWidth
-                      pressed={overlapDetailTab === "variants"}
-                      variant={overlapDetailTab === "variants" ? "primary" : "tertiary"}
-                      onClick={() => setOverlapDetailTab("variants")}
-                    >
-                      {`Overlapping variants (${scheduleOverlapContext.overlappingVariantCount})`}
-                    </Button>
-                  </InlineStack>
-                </Box>
-
-                {overlapDetailTab === "variants" && (
-                  <Box padding="200" background="bg-surface" borderRadius="200">
-                    <BlockStack gap="150">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        These selected items overlap with another scheduled window.
-                      </Text>
-                      <BlockStack gap="100">
-                        {overlapVariantItems.slice(0, 8).map((item) => {
-                          const subtitle = buildVariantSubtitle({
-                            productTitle: item.title ?? null,
-                            variantTitle: item.variantTitle ?? null,
-                            sku: item.sku ?? null,
-                          });
-                          const fallbackId = String(item.variantId ?? "").split("/").pop() ?? "";
-                          const line = subtitle ? `${item.title} • ${subtitle}` : item.title;
-                          return (
-                            <Text
-                              key={String(item.variantId)}
-                              as="p"
-                              variant="bodySm"
-                              tone="subdued"
-                            >
-                              {subtitle ? line : `${line}${fallbackId ? ` • Variant ${fallbackId}` : ""}`}
-                            </Text>
-                          );
-                        })}
-                        {overlapVariantItems.length > 8 && (
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            {`+${overlapVariantItems.length - 8} more overlapping variant${
-                              overlapVariantItems.length - 8 === 1 ? "" : "s"
-                            }`}
-                          </Text>
-                        )}
-                      </BlockStack>
-                    </BlockStack>
+          <ModalScrollableSection>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm">
+                Some selected products already belong to another scheduled pricing campaign during this time window.
+              </Text>
+              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="150">
+                  <Box
+                    background="bg-surface"
+                    padding="100"
+                    borderRadius="200"
+                    borderColor="border"
+                    borderWidth="025"
+                  >
+                    <InlineStack gap="100" wrap={false}>
+                      <Button
+                        size="slim"
+                        fullWidth
+                        pressed={overlapDetailTab === "windows"}
+                        variant={overlapDetailTab === "windows" ? "primary" : "tertiary"}
+                        onClick={() => setOverlapDetailTab("windows")}
+                      >
+                        {`Overlapping windows (${scheduleOverlapContext.overlappingWindowCount})`}
+                      </Button>
+                      <Button
+                        size="slim"
+                        fullWidth
+                        pressed={overlapDetailTab === "variants"}
+                        variant={overlapDetailTab === "variants" ? "primary" : "tertiary"}
+                        onClick={() => setOverlapDetailTab("variants")}
+                      >
+                        {`Overlapping variants (${scheduleOverlapContext.overlappingVariantCount})`}
+                      </Button>
+                    </InlineStack>
                   </Box>
-                )}
 
-                {overlapDetailTab === "windows" && (
-                  <Box padding="200" background="bg-surface" borderRadius="200">
-                    <BlockStack gap="150">
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        These scheduled windows overlap your selected time range.
-                      </Text>
-                      <BlockStack gap="100">
-                        {scheduleOverlapContext.overlappingWindowJobs.slice(0, 6).map((job) => (
-                          <Text key={job} as="p" variant="bodySm" tone="subdued">
-                            {job}
-                          </Text>
-                        ))}
-                        {scheduleOverlapContext.overlappingWindowJobs.length > 6 && (
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            {`+${scheduleOverlapContext.overlappingWindowJobs.length - 6} more overlapping window${
-                              scheduleOverlapContext.overlappingWindowJobs.length - 6 === 1 ? "" : "s"
-                            }`}
-                          </Text>
-                        )}
+                  {overlapDetailTab === "variants" && (
+                    <Box padding="200" background="bg-surface" borderRadius="200">
+                      <BlockStack gap="150">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          These selected items overlap with another scheduled window.
+                        </Text>
+                        <ExpandableList title="Overlapping products" items={overlapProductLabels} collapsedVisibleCount={5} />
+                        <ExpandableList title="Overlapping variants" items={overlapVariantLabels} collapsedVisibleCount={5} />
                       </BlockStack>
-                    </BlockStack>
-                  </Box>
-                )}
-              </BlockStack>
-            </Box>
-            <Text as="p" variant="bodySm" tone="subdued">
-              Continue to schedule anyway, or review your selection and timing to avoid operational overlap.
-            </Text>
-          </BlockStack>
+                    </Box>
+                  )}
+
+                  {overlapDetailTab === "windows" && (
+                    <Box padding="200" background="bg-surface" borderRadius="200">
+                      <BlockStack gap="150">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          These scheduled windows overlap your selected time range.
+                        </Text>
+                        <ExpandableList
+                          title="Overlapping windows"
+                          items={scheduleOverlapContext.overlappingWindowJobs}
+                          collapsedVisibleCount={5}
+                        />
+                      </BlockStack>
+                    </Box>
+                  )}
+                </BlockStack>
+              </Box>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Continue to schedule anyway, or review your selection and timing to avoid operational overlap.
+              </Text>
+            </BlockStack>
+          </ModalScrollableSection>
         </Modal.Section>
       </Modal>
+
+      <CampaignConflictExplorerModal
+        open={conflictExplorerOpen}
+        onClose={() => setConflictExplorerOpen(false)}
+        primaryTitle={candidateConflictExplorerTitle}
+        conflicts={conflictExplorerConflicts}
+        productLabelById={conflictExplorerLabelMaps.productLabelById}
+        variantLabelById={conflictExplorerLabelMaps.variantLabelById}
+      />
 
       <Modal
         open={!!selectedJob}

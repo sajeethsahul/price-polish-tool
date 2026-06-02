@@ -37,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (!(result instanceof Response)) {
     const shop = session.shop;
-    const { persistBillingStateFromShopify } = await import("../utils/billing-persistence.server");
+  //  const { persistBillingStateFromShopify } = await import("../utils/billing-persistence.server");
     // await persistBillingStateFromShopify({
     //   admin,
     //   shop,

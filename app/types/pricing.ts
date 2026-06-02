@@ -44,3 +44,35 @@ export interface OperationalSafeguardNotice {
   severity: OperationalSafeguardSeverity;
   message: string;
 }
+
+export type CampaignConflictSeverity = "info" | "warning" | "critical";
+
+export type CampaignConflictType =
+  | "window-overlap"
+  | "scope-overlap"
+  | "exact-time-overlap"
+  | "nearby-time-overlap"
+  | "active-window-overlap"
+  | "restore-window-overlap";
+
+export type CampaignConflictCampaign = {
+  campaignId?: string | null;
+  scheduledJobId?: string | null;
+  title: string;
+  status: string;
+  scheduleType: "one-time" | "time-window" | "unknown";
+  startAt: string | null;
+  endAt: string | null;
+};
+
+export type CampaignConflict = {
+  id: string;
+  severity: CampaignConflictSeverity;
+  conflictType: CampaignConflictType;
+  primary: CampaignConflictCampaign;
+  conflicting: CampaignConflictCampaign;
+  affectedProductIds: string[];
+  affectedVariantIds: string[];
+  affectedProductCount: number;
+  affectedVariantCount: number;
+};

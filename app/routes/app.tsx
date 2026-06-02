@@ -3,22 +3,18 @@ import {
   Link,
   useLoaderData,
   useNavigation,
+  useLocation,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
 import {
   AppProvider as PolarisProvider,
-  SkeletonPage,
-  Layout,
-  Card,
-  SkeletonBodyText,
-  SkeletonDisplayText,
-  Loading,
   BlockStack,
   Frame,
   Page,
   Text,
   Button,
+  Card,
 } from "@shopify/polaris";
 
 import {
@@ -27,7 +23,12 @@ import {
 
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
+import {
+  PricePolishLoader,
+  resolvePricePolishLoaderCopy,
+  useDelayedVisibility,
+} from "../components/PricePolishLoader";
+//import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -108,31 +109,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppLayout() {
   const data = useLoaderData() as any;
   const navigation = useNavigation();
+  const location = useLocation();
 
   const isLoading = navigation.state === "loading";
   const { apiKey, host, currencyCode, hasActivePlan } = data;
+  const loadingPathname = navigation.location?.pathname ?? location.pathname;
+  const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
+  const showBrandedLoader = useDelayedVisibility(isLoading, 300);
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
       <Frame>
-        {isLoading ? (
-          <SkeletonPage title="Price Polish">
-            <Loading />
-            <Layout>
-              <Layout.Section>
-                <Card>
-                  <BlockStack gap="400">
-                    <SkeletonDisplayText size="small" />
-                    <SkeletonBodyText lines={3} />
-                  </BlockStack>
-                </Card>
-              </Layout.Section>
-            </Layout>
-          </SkeletonPage>
+        {showBrandedLoader ? (
+          <PricePolishLoader title={loadingCopy.title} subtitle={loadingCopy.subtitle} />
         ) : (
           <>
             <NavMenu>
               <Link to="/app">Dashboard</Link>
+              <Link to="/app/campaign-history">Campaign History</Link>
               <Link to="/app/rules">Pricing Rules</Link>
               <Link to="/app/settings">Settings</Link>
               <Link to="/app/help">Help</Link>

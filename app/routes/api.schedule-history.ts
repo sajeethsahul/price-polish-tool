@@ -16,6 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
             orderBy: { createdAt: "desc" },
             select: {
                 id: true,
+                campaignId: true,
                 title: true,
                 runAt: true,
                 mode: true,

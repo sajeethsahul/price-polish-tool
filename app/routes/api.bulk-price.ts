@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
-import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
+//import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;

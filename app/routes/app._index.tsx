@@ -41,6 +41,7 @@ import {
   ImmediateApplyConfirmationModal,
   type ImmediateApplyImpactSummary,
 } from "../components/ImmediateApplyConfirmationModal";
+import { PricePolishLoader, PRICE_POLISH_LOADER_COPY, useDelayedVisibility } from "../components/PricePolishLoader";
 import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
 import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
@@ -375,153 +376,12 @@ function getTimeframeStart(filter: CampaignHistoryTimeframeFilter, now = new Dat
   return start;
 }
 
-// ─── Animated Loader ───────────────────────────────────────────────────────
-const LOADER_MESSAGES = [
-  "Counting your coins... 🪙",
-  "Polishing prices to perfection ✨",
-  "Bribing the pricing gods... 💸",
-  "Calculating your empire's worth... 👑",
-  "Making numbers look their best 💅",
-  "Sharpening pencils & raising margins ✏️",
-  "Teaching prices to stand tall 📈",
-  "Asking Jeff Bezos for advice... 🚀",
-  "Rounding up the usual suspects 🔍",
-  "One moment — we're printing money 🖨️",
-];
-
 function DashboardLoader() {
-  const [msgIndex, setMsgIndex] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setMsgIndex(i => (i + 1) % LOADER_MESSAGES.length);
-    }, 1800);
-    return () => clearInterval(id);
-  }, []);
-
   return (
-    <div style={{
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: "70vh",
-      gap: "28px",
-      fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    }}>
-      <style>{`
-        @keyframes pp-bounce {
-          0%, 100% { transform: translateY(0) rotate(-5deg); }
-          40%       { transform: translateY(-22px) rotate(8deg) scale(1.15); }
-          60%       { transform: translateY(-14px) rotate(-3deg) scale(1.08); }
-        }
-        @keyframes pp-shadow-pulse {
-          0%, 100% { transform: scaleX(1);   opacity: 0.35; }
-          40%       { transform: scaleX(0.5); opacity: 0.12; }
-        }
-        @keyframes pp-shimmer {
-          0%   { background-position: -400px 0; }
-          100% { background-position:  400px 0; }
-        }
-        @keyframes pp-fade-slide {
-          0%   { opacity: 0; transform: translateY(8px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pp-orbit {
-          from { transform: rotate(0deg)   translateX(38px) rotate(0deg); }
-          to   { transform: rotate(360deg) translateX(38px) rotate(-360deg); }
-        }
-        @keyframes pp-orbit2 {
-          from { transform: rotate(180deg) translateX(38px) rotate(-180deg); }
-          to   { transform: rotate(540deg) translateX(38px) rotate(-540deg); }
-        }
-      `}</style>
-
-      <div style={{ position: "relative", width: 100, height: 100 }}>
-        <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          transform: "translate(-50%, -50%)",
-          fontSize: 52,
-          animation: "pp-bounce 1.4s cubic-bezier(.36,.07,.19,.97) infinite",
-          filter: "drop-shadow(0 6px 8px rgba(0,0,0,0.18))",
-          zIndex: 2,
-          userSelect: "none",
-        }}>💰</div>
-
-        <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          fontSize: 18,
-          animation: "pp-orbit 2.2s linear infinite",
-          transformOrigin: "0 0",
-          userSelect: "none",
-        }}>🪙</div>
-
-        <div style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          fontSize: 14,
-          animation: "pp-orbit2 2.2s linear infinite",
-          transformOrigin: "0 0",
-          userSelect: "none",
-        }}>✨</div>
-
-        <div style={{
-          position: "absolute",
-          bottom: -4, left: "50%",
-          transform: "translateX(-50%)",
-          width: 38, height: 8,
-          borderRadius: "50%",
-          background: "rgba(0,0,0,0.18)",
-          animation: "pp-shadow-pulse 1.4s cubic-bezier(.36,.07,.19,.97) infinite",
-        }} />
-      </div>
-
-      <div style={{
-        fontSize: 22,
-        fontWeight: 700,
-        background: "linear-gradient(90deg, #4f46e5, #7c3aed, #2563eb)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        letterSpacing: "-0.3px",
-      }}>Price Polish</div>
-
-      <div
-        key={msgIndex}
-        style={{
-          fontSize: 15,
-          color: "#6b7280",
-          fontWeight: 500,
-          animation: "pp-fade-slide 0.4s ease both",
-          textAlign: "center",
-          maxWidth: 320,
-          lineHeight: 1.5,
-        }}
-      >
-        {LOADER_MESSAGES[msgIndex]}
-      </div>
-
-      <div style={{
-        width: 240,
-        height: 6,
-        borderRadius: 99,
-        background: "#e5e7eb",
-        overflow: "hidden",
-      }}>
-        <div style={{
-          height: "100%",
-          borderRadius: 99,
-          background: "linear-gradient(90deg, #e5e7eb 25%, #a5b4fc 50%, #818cf8 60%, #e5e7eb 80%)",
-          backgroundSize: "800px 100%",
-          animation: "pp-shimmer 1.6s linear infinite",
-        }} />
-      </div>
-
-      <div style={{ fontSize: 12, color: "#9ca3af", letterSpacing: "0.4px" }}>
-        Fetching your pricing data...
-      </div>
-    </div>
+    <PricePolishLoader
+      title={PRICE_POLISH_LOADER_COPY.dashboard.title}
+      subtitle={PRICE_POLISH_LOADER_COPY.dashboard.subtitle}
+    />
   );
 }
 // ───────────────────────────────────────────────────────────────────────────
@@ -2246,11 +2106,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   };
 
   const SHOW_DEBUG_TOOLS = false;
+  const isInitialDashboardLoad = loading && ruleExists === null;
+  const showDashboardLoader = useDelayedVisibility(isInitialDashboardLoad, 300);
 
   // UPDATED: Loading guard — prevents flicker of "No Pricing Rules Found" before data arrives
   // ruleExists === null means first fetch hasn't completed yet
-  if (loading && ruleExists === null) {
-    return <DashboardLoader />;
+  if (isInitialDashboardLoad) {
+    return showDashboardLoader ? (
+      <DashboardLoader />
+    ) : (
+      <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Spinner size="large" />
+      </div>
+    );
   }
 
   
@@ -2494,323 +2362,20 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             )}
 
             <Card>
-              <BlockStack gap="300">
+              <BlockStack gap="200">
                 <InlineStack align="space-between" blockAlign="center" wrap>
                   <Text as="h3" variant="headingMd">Campaign History</Text>
-                  <InlineStack gap="200" blockAlign="center" wrap={false}>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Operational history from campaign runs
-                    </Text>
-                    <Button
-                      size="slim"
-                      variant="tertiary"
-                      icon={RefreshIcon}
-                      loading={campaignHistoryLoading}
-                      disabled={campaignHistoryLoading}
-                      onClick={() => { void handleRefreshCampaignHistory(); }}
-                    >
-                      Refresh
-                    </Button>
-                    <Button
-                      size="slim"
-                      variant="tertiary"
-                      icon={campaignHistoryExpanded ? ChevronUpIcon : ChevronDownIcon}
-                      onClick={toggleCampaignHistoryExpanded}
-                      accessibilityLabel={campaignHistoryExpanded ? "Collapse campaign history panel" : "Expand campaign history panel"}
-                    >
-                      {campaignHistoryExpanded ? "Collapse" : "Expand"}
-                    </Button>
-                  </InlineStack>
+                  <Button
+                    size="slim"
+                    variant="tertiary"
+                    onClick={() => navigate("/app/campaign-history")}
+                  >
+                    View Full History
+                  </Button>
                 </InlineStack>
-                <div
-                  style={{
-                    overflow: "hidden",
-                    maxHeight: campaignHistoryExpanded ? 1200 : 0,
-                    opacity: campaignHistoryExpanded ? 1 : 0,
-                    transition: "max-height 220ms ease, opacity 160ms ease",
-                  }}
-                >
-                  <BlockStack gap="300">
-                    <InlineStack gap="300" wrap align="start">
-                      <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
-                        <Select
-                          label="Status"
-                          options={campaignHistoryStatusOptions}
-                          value={campaignHistoryStatusFilter}
-                          onChange={handleCampaignHistoryStatusFilterChange}
-                        />
-                      </div>
-                      <div style={{ flex: "1 1 180px", minWidth: "160px" }}>
-                        <Select
-                          label="Source"
-                          options={campaignHistorySourceOptions}
-                          value={campaignHistorySourceFilter}
-                          onChange={handleCampaignHistorySourceFilterChange}
-                        />
-                      </div>
-                      <div style={{ flex: "1 1 180px", minWidth: "170px" }}>
-                        <Select
-                          label="Timeframe"
-                          options={campaignHistoryTimeframeOptions}
-                          value={campaignHistoryTimeframeFilter}
-                          onChange={handleCampaignHistoryTimeframeFilterChange}
-                        />
-                      </div>
-                      <div style={{ flex: "2 1 260px", minWidth: "220px" }}>
-                        <TextField
-                          label="Search Campaigns"
-                          value={campaignHistorySearchQuery}
-                          onChange={handleCampaignHistorySearchChange}
-                          autoComplete="off"
-                          placeholder="Campaign title or campaign ID"
-                          maxLength={120}
-                        />
-                      </div>
-                    </InlineStack>
-                    <Checkbox
-                      label="Hide Closed Campaigns"
-                      checked={hideClosedCampaigns}
-                      onChange={(checked) => {
-                        setHideClosedCampaigns(checked);
-                        console.log(
-                          checked
-                            ? "[Campaign History UI] closed campaigns hidden"
-                            : "[Campaign History UI] closed campaigns shown"
-                        );
-                      }}
-                    />
-
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Showing {visibleCampaignHistory.length} of {filteredCampaignHistory.length} matching campaigns
-                    </Text>
-
-                    {visibleCampaignHistory.length === 0 ? (
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        {campaignHistoryEmptyStateMessage}
-                      </Text>
-                    ) : (
-                      <div style={{ maxHeight: 420, overflowY: "auto", paddingRight: 4 }}>
-                        <BlockStack gap="200">
-                          {visibleCampaignHistory.map((campaign) => (
-                            <Box
-                              key={campaign.campaignId}
-                              padding="300"
-                              background="bg-surface-secondary"
-                              borderRadius="200"
-                            >
-                              <InlineStack align="space-between" blockAlign="start" gap="300" wrap>
-                                <div style={{ flex: "2 1 420px", minWidth: 260 }}>
-                                  <BlockStack gap="200">
-                                    <InlineStack gap="200" blockAlign="center" wrap>
-                                      <Text as="p" variant="bodyMd" fontWeight="medium">
-                                        {campaign.title}
-                                      </Text>
-                                      <Badge tone={campaignStatusTone(resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow))}>
-                                        {campaignStatusLabel(resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow))}
-                                      </Badge>
-                                      {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
-                                        <Badge tone="success">Pricing Currently Active</Badge>
-                                      )}
-                                    </InlineStack>
-                                    {formatTimeWindowSummary(campaign) && (
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        {formatTimeWindowSummary(campaign)}
-                                      </Text>
-                                    )}
-                                    {formatScheduledPublishSummary(campaign, campaignRuntimeNow) && (
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        {formatScheduledPublishSummary(campaign, campaignRuntimeNow)}
-                                      </Text>
-                                    )}
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && campaign.runAt && (
-                                      <Box padding="200" background="bg-surface" borderRadius="200">
-                                        <BlockStack gap="100">
-                                          <InlineStack gap="200" blockAlign="center" wrap>
-                                            <Badge tone="warning">Scheduled</Badge>
-                                            <Text as="p" variant="headingSm">
-                                              {`Starts in ${formatDurationParts(new Date(campaign.runAt).getTime() - campaignRuntimeNow.getTime())}`}
-                                            </Text>
-                                          </InlineStack>
-                                          <Text as="p" variant="bodySm" tone="subdued">
-                                            {`Publishing at ${new Date(campaign.runAt).toLocaleTimeString([], {
-                                              hour: "numeric",
-                                              minute: "2-digit",
-                                            })}`}
-                                          </Text>
-                                        </BlockStack>
-                                      </Box>
-                                    )}
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing" && (
-                                      <Box padding="200" background="bg-surface" borderRadius="200">
-                                        <InlineStack gap="200" blockAlign="center" wrap>
-                                          <Spinner size="small" />
-                                          <BlockStack gap="050">
-                                            <Text as="p" variant="bodySm" fontWeight="medium">
-                                              Publishing...
-                                            </Text>
-                                            <Text as="p" variant="bodySm" tone="subdued">
-                                              Applying scheduled pricing
-                                            </Text>
-                                          </BlockStack>
-                                        </InlineStack>
-                                      </Box>
-                                    )}
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && campaign.windowEndAt && (
-                                      <Box padding="200" background="bg-surface" borderRadius="200">
-                                        <BlockStack gap="150">
-                                          <InlineStack gap="200" blockAlign="center" wrap>
-                                            <Badge tone="success">Live</Badge>
-                                            <Text as="p" variant="headingSm">
-                                              {`Restores in ${formatDurationParts(new Date(campaign.windowEndAt).getTime() - campaignRuntimeNow.getTime())}`}
-                                            </Text>
-                                          </InlineStack>
-                                          <Text as="p" variant="bodySm" tone="subdued">
-                                            {`Auto restore scheduled for ${new Date(campaign.windowEndAt).toLocaleTimeString([], {
-                                              hour: "numeric",
-                                              minute: "2-digit",
-                                              second: "2-digit",
-                                            })}`}
-                                          </Text>
-                                        </BlockStack>
-                                      </Box>
-                                    )}
-                                    <InlineStack gap="400" wrap>
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        Source: {formatCampaignSourceLabel(campaign.source)}
-                                      </Text>
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        Products: {campaign.productCount}
-                                      </Text>
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        Created: {new Date(campaign.createdAt).toLocaleString()}
-                                      </Text>
-                                      {campaign.source === "time-window" && campaign.runAt && campaign.windowEndAt && (
-                                        <Text as="p" variant="bodySm" tone="subdued">
-                                          Window: {new Date(campaign.runAt).toLocaleString()} to {new Date(campaign.windowEndAt).toLocaleString()}
-                                        </Text>
-                                      )}
-                                    </InlineStack>
-                                  </BlockStack>
-                                </div>
-
-                                <div style={{ flex: "1 1 360px", minWidth: 260 }}>
-                                  <Box padding="200" background="bg-surface" borderRadius="200">
-                                    <BlockStack gap="150">
-                                      <InlineStack gap="150" wrap>
-                                        <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
-                                        <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
-                                      </InlineStack>
-                                      <InlineStack gap="150" wrap>
-                                        <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
-                                        <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
-                                      </InlineStack>
-                                    </BlockStack>
-                                  </Box>
-                                  {campaign.unrecoverableReason && (
-                                    <Box paddingBlockStart="100">
-                                      <Text as="p" variant="bodySm" tone="subdued">
-                                        Reason: {campaign.unrecoverableReason}
-                                      </Text>
-                                    </Box>
-                                  )}
-                                </div>
-
-                                <div style={{ flex: "0 1 auto", marginInlineStart: "auto" }}>
-                                  <BlockStack gap="150" align="end">
-                                    <Button
-                                      size="slim"
-                                      variant="tertiary"
-                                      onClick={() => { void openCampaignDetailView(campaign); }}
-                                    >
-                                      View
-                                    </Button>
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-window" && (
-                                      <Button
-                                        size="slim"
-                                        variant="secondary"
-                                        disabled={isProcessing}
-                                        loading={isProcessing}
-                                        onClick={() => {
-                                          void handleWindowLifecycleAction(campaign, "cancel-schedule");
-                                        }}
-                                      >
-                                        Cancel Schedule
-                                      </Button>
-                                    )}
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && (
-                                      <Button
-                                        size="slim"
-                                        variant="secondary"
-                                        disabled={isProcessing}
-                                        loading={isProcessing}
-                                        onClick={() => {
-                                          void handlePublishLifecycleAction(campaign);
-                                        }}
-                                      >
-                                        Cancel Publish
-                                      </Button>
-                                    )}
-                                    {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
-                                      <Button
-                                        size="slim"
-                                        tone="critical"
-                                        disabled={isProcessing}
-                                        loading={isProcessing}
-                                        onClick={() => {
-                                          void handleWindowLifecycleAction(campaign, "stop-window");
-                                        }}
-                                      >
-                                        Stop Window
-                                      </Button>
-                                    )}
-                                    {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
-                                      <Button
-                                        size="slim"
-                                        variant="secondary"
-                                        disabled={isProcessing}
-                                        loading={isProcessing}
-                                        onClick={() => openCampaignRevertPreview(campaign, true)}
-                                      >
-                                        Retry Failed Reverts
-                                      </Button>
-                                    )}
-                                    {campaign.revertable && normalizeCampaignSource(campaign.source) !== "time-window" && (
-                                      <Button
-                                        size="slim"
-                                        tone="critical"
-                                        disabled={isProcessing}
-                                        loading={isProcessing}
-                                        onClick={() => openCampaignRevertPreview(campaign)}
-                                      >
-                                        Revert
-                                      </Button>
-                                    )}
-                                  </BlockStack>
-                                </div>
-                              </InlineStack>
-                            </Box>
-                          ))}
-                        </BlockStack>
-                      </div>
-                    )}
-                  </BlockStack>
-                </div>
-
-                {!campaignHistoryExpanded && (
-                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                    <InlineStack gap="300" wrap>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Active: {campaignHistorySummary.active}
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Partial: {campaignHistorySummary.partial}
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Closed: {campaignHistorySummary.closed}
-                      </Text>
-                    </InlineStack>
-                  </Box>
-                )}
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Operational history is now available on the dedicated Campaign History page.
+                </Text>
               </BlockStack>
             </Card>
 
