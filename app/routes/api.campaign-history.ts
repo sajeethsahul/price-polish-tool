@@ -23,6 +23,10 @@ type CampaignHistoryItem = {
   unrecoverableCount: number;
   totalTrackedCount: number;
   runtimeStatus: string;
+  scheduledJobStatus: string | null;
+  mode: string | null;
+  activatedAt: Date | null;
+  restoredAt: Date | null;
 };
 
 function normalizeSource(source: string | null): string | null {
@@ -31,6 +35,76 @@ function normalizeSource(source: string | null): string | null {
   if (source === "schedule") return "scheduled";
   if (source === "schedule-window") return "time-window";
   return source;
+}
+
+function normalizeLifecycleValue(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function resolveScheduledPublishRuntimeStatus(params: {
+  campaignStatus: string;
+  scheduledJobStatus: string | null;
+}) {
+  const jobStatus = normalizeLifecycleValue(params.scheduledJobStatus);
+  if (jobStatus === "pending") return "scheduled";
+  if (jobStatus === "processing") return "publishing";
+  if (jobStatus === "done") return "published";
+  if (jobStatus === "failed") return "failed";
+  if (jobStatus === "missed-during-uninstall") return "missed-during-uninstall";
+  if (jobStatus === "cancelled") return "cancelled-publish";
+
+  const campaignStatus = normalizeLifecycleValue(params.campaignStatus);
+  if (campaignStatus === "scheduled-publish") return "scheduled";
+  if (campaignStatus === "publishing") return "publishing";
+  if (campaignStatus === "published") return "published";
+  if (campaignStatus === "failed") return "failed";
+  if (campaignStatus === "cancelled-publish") return "cancelled-publish";
+  if (campaignStatus === "unrecoverable") return "unrecoverable";
+  return campaignStatus;
+}
+
+function resolveTimeWindowRuntimeStatus(params: {
+  campaignStatus: string;
+  scheduledJobStatus: string | null;
+  runAt: Date | null;
+  windowEndAt: Date | null;
+  restoredAt: Date | null;
+  totalTrackedCount: number;
+  revertedCount: number;
+  unrecoverableCount: number;
+  now: Date;
+}) {
+  const campaignStatus = normalizeLifecycleValue(params.campaignStatus);
+  if (campaignStatus === "cancelled-window") return "cancelled-window";
+  if (campaignStatus === "window-stopped") return "window-stopped";
+  if (campaignStatus === "unrecoverable") return "unrecoverable";
+
+  const jobStatus = normalizeLifecycleValue(params.scheduledJobStatus);
+  if (jobStatus === "pending") return "scheduled-window";
+  if (jobStatus === "processing") return "publishing-window";
+  if (jobStatus === "active-window") return "active-window";
+  if (jobStatus === "restoring") return "restoring";
+  if (jobStatus === "auto-restored") return "auto-restored";
+  if (jobStatus === "restore-failed") return "restore-failed";
+  if (jobStatus === "failed") return "failed";
+  if (jobStatus === "missed-during-uninstall") return "missed-during-uninstall";
+  if (jobStatus === "cancelled") return "cancelled-window";
+
+  const inferred = resolveWindowLifecycleState(
+    {
+      status: params.campaignStatus,
+      source: "schedule-window",
+      runAt: params.runAt,
+      windowEndAt: params.windowEndAt,
+      restoredAt: params.restoredAt,
+      totalTrackedCount: params.totalTrackedCount,
+      revertedCount: params.revertedCount,
+      unrecoverableCount: params.unrecoverableCount,
+    },
+    params.now
+  );
+
+  return inferred ?? campaignStatus;
 }
 
 function normalizeUnrecoverableReason(rawReason: string | null): string | null {
@@ -115,6 +189,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
           productCount: true,
           mode: true,
           windowEndAt: true,
+          activatedAt: true,
           restoredAt: true,
           status: true,
         },
@@ -198,6 +273,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const scheduledWindowEndByCampaign = new Map<string, Date | null>();
     const scheduledRestoredAtByCampaign = new Map<string, Date | null>();
     const scheduledStatusByCampaign = new Map<string, string | null>();
+    const scheduledModeByCampaign = new Map<string, string | null>();
+    const scheduledActivatedAtByCampaign = new Map<string, Date | null>();
     for (const row of scheduledRows) {
       if (!row.campaignId) continue;
       if (!scheduledCountByCampaign.has(row.campaignId)) {
@@ -211,6 +288,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       }
       if (!scheduledStatusByCampaign.has(row.campaignId)) {
         scheduledStatusByCampaign.set(row.campaignId, row.status ?? null);
+      }
+      if (!scheduledModeByCampaign.has(row.campaignId)) {
+        scheduledModeByCampaign.set(row.campaignId, row.mode ?? null);
+      }
+      if (!scheduledActivatedAtByCampaign.has(row.campaignId)) {
+        scheduledActivatedAtByCampaign.set(row.campaignId, row.activatedAt ?? null);
       }
     }
 
@@ -231,28 +314,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
         unrecoverableCount > 0 && retryableCount === 0
           ? "unrecoverable"
           : campaign.status;
-      if (campaign.source === "schedule-window") {
-        const windowState = resolveWindowLifecycleState(
-          {
-            status: campaign.status,
-            source: campaign.source,
-            runAt: campaign.runAt,
-            windowEndAt: campaign.windowEndAt ?? scheduledWindowEndByCampaign.get(campaign.id) ?? null,
-            restoredAt: scheduledRestoredAtByCampaign.get(campaign.id) ?? null,
-            totalTrackedCount,
-            revertedCount,
-            unrecoverableCount,
-          },
-          now
-        );
-        if (windowState) {
-          effectiveStatus = windowState;
-        }
-        if (windowState === "scheduled-window" || windowState === "active-window") {
+
+      const normalizedSource = normalizeLifecycleValue(campaign.source);
+      const scheduledJobStatus = scheduledStatusByCampaign.get(campaign.id) ?? null;
+      const scheduledMode = scheduledModeByCampaign.get(campaign.id) ?? null;
+      const scheduledActivatedAt = scheduledActivatedAtByCampaign.get(campaign.id) ?? null;
+      const scheduledRestoredAt = scheduledRestoredAtByCampaign.get(campaign.id) ?? null;
+
+      if (normalizedSource === "schedule-window") {
+        const runtimeStatus = resolveTimeWindowRuntimeStatus({
+          campaignStatus: effectiveStatus,
+          scheduledJobStatus,
+          runAt: campaign.runAt,
+          windowEndAt: campaign.windowEndAt ?? scheduledWindowEndByCampaign.get(campaign.id) ?? null,
+          restoredAt: scheduledRestoredAt,
+          totalTrackedCount,
+          revertedCount,
+          unrecoverableCount,
+          now,
+        });
+        effectiveStatus = runtimeStatus;
+        if (runtimeStatus === "scheduled-window" || runtimeStatus === "publishing-window" || runtimeStatus === "active-window") {
           revertedCount = 0;
           failedCount = 0;
           unrecoverableCount = 0;
         }
+      }
+
+      if (normalizedSource === "schedule") {
+        effectiveStatus = resolveScheduledPublishRuntimeStatus({
+          campaignStatus: effectiveStatus,
+          scheduledJobStatus,
+        });
       }
       const surfacedReason = unrecoverableReasonByCampaign.get(campaign.id)?.reason ?? null;
 
@@ -273,6 +366,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
         failedCount,
         unrecoverableCount,
         totalTrackedCount,
+        scheduledJobStatus,
+        mode: scheduledMode,
+        activatedAt: scheduledActivatedAt,
+        restoredAt: scheduledRestoredAt,
       };
     });
 

@@ -177,14 +177,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
             .map((product) => {
               const originalPrice = Number(product.originalVariantPrice ?? product.originalBasePrice ?? product.oldPrice);
-              const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
+              const currentPrice = Number(product.storefrontVariantPrice ?? product.oldPrice);
+              const scheduledPrice = Number(product.scheduledPrice);
               return {
                 variantId: String(product.variantId),
                 productId: typeof product.productId === "string" ? product.productId : null,
                 productTitle: product.title || "Untitled Product",
                 variantTitle: product.variantTitle ?? null,
                 sku: typeof product.sku === "string" ? product.sku : null,
-                currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
+                currentPrice: Number.isFinite(currentPrice) ? currentPrice : null,
                 scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
                 revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
                 status: "scheduled",
@@ -265,14 +266,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .filter((product) => typeof product?.variantId === "string" && product.variantId.length > 0)
             .map((product) => {
               const originalPrice = Number(product.originalVariantPrice ?? product.originalBasePrice ?? product.oldPrice);
-              const scheduledPrice = Number(product.scheduledPrice ?? product.newPrice);
+              const currentPrice = Number(product.storefrontVariantPrice ?? product.oldPrice);
+              const scheduledPrice = Number(product.scheduledPrice);
               return {
                 variantId: String(product.variantId),
                 productId: typeof product.productId === "string" ? product.productId : null,
                 productTitle: product.title || "Untitled Product",
                 variantTitle: product.variantTitle ?? null,
                 sku: typeof product.sku === "string" ? product.sku : null,
-                currentPrice: Number.isFinite(originalPrice) ? originalPrice : null,
+                currentPrice: Number.isFinite(currentPrice) ? currentPrice : null,
                 scheduledPrice: Number.isFinite(scheduledPrice) ? scheduledPrice : null,
                 revertTargetPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
                 status: "scheduled",

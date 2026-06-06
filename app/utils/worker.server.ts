@@ -144,16 +144,19 @@ async function claimNextJob(): Promise<ClaimedJob | null> {
         UPDATE "ScheduledJob"
         SET status = 'processing'
         WHERE id = (
-            SELECT id
-            FROM   "ScheduledJob"
-            LEFT JOIN "Shop" s
-              ON   s.shop = "ScheduledJob".shop
-            WHERE  status = 'pending'
-              AND  "runAt" <= (${now} AT TIME ZONE 'UTC')
-              AND  (s.shop IS NULL OR s."isInstalled" = true)
-            ORDER  BY "runAt" ASC
+            SELECT sj_inner.id
+            FROM   "ScheduledJob" sj_inner
+            WHERE  sj_inner.status = 'pending'
+              AND  sj_inner."runAt" <= (${now} AT TIME ZONE 'UTC')
+              AND  NOT EXISTS (
+                SELECT 1
+                FROM "Shop" s
+                WHERE s.shop = sj_inner.shop
+                  AND s."isInstalled" = false
+              )
+            ORDER  BY sj_inner."runAt" ASC
             LIMIT  1
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF sj_inner SKIP LOCKED
         )
         RETURNING id, shop, "campaignId", "runAt", mode, "windowEndAt", status, "createdAt", products
     `;
@@ -168,8 +171,6 @@ async function claimExpiredWindow(): Promise<ClaimedJob | null> {
         FROM (
             SELECT sj_inner.id
             FROM   "ScheduledJob" sj_inner
-            LEFT JOIN "Shop" s
-              ON   s.shop = sj_inner.shop
             JOIN   "Campaign" c
               ON   c.id = sj_inner."campaignId"
              AND   c.shop = sj_inner.shop
@@ -177,13 +178,18 @@ async function claimExpiredWindow(): Promise<ClaimedJob | null> {
               AND  sj_inner.status = 'active-window'
               AND  sj_inner."windowEndAt" <= (${now} AT TIME ZONE 'UTC')
               AND  sj_inner."restoredAt" IS NULL
-              AND  (s.shop IS NULL OR s."isInstalled" = true)
+              AND  NOT EXISTS (
+                SELECT 1
+                FROM "Shop" s
+                WHERE s.shop = sj_inner.shop
+                  AND s."isInstalled" = false
+              )
               AND  c.source = 'schedule-window'
               AND  c.status = 'active-window'
               AND  c.status NOT IN ('window-stopped', 'auto-restored', 'cancelled-window', 'unrecoverable')
             ORDER  BY sj_inner."windowEndAt" ASC
             LIMIT  1
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF sj_inner SKIP LOCKED
         ) candidate
         WHERE sj.id = candidate.id
         RETURNING sj.id, sj.shop, sj."campaignId", sj."runAt", sj.mode, sj."windowEndAt", sj.status, sj."createdAt", sj.products

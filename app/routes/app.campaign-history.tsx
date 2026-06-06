@@ -56,6 +56,10 @@ interface CampaignHistoryItem {
   unrecoverableCount: number;
   totalTrackedCount: number;
   runtimeStatus?: string;
+  scheduledJobStatus?: string | null;
+  mode?: string | null;
+  activatedAt?: string | null;
+  restoredAt?: string | null;
 }
 
 interface CampaignRevertPreviewRow {
@@ -180,26 +184,59 @@ function normalizeCampaignSource(source: string | null) {
 }
 
 function resolveCampaignRuntimeStatus(campaign: CampaignHistoryItem, now: Date = new Date()) {
-  if (normalizeCampaignSource(campaign.source) !== "time-window") {
-    const status = normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
-    if (normalizeCampaignSource(campaign.source) === "scheduled" && status === "scheduled-publish") {
-      const runAtMs = campaign.runAt ? new Date(campaign.runAt).getTime() : null;
-      if (runAtMs != null && !Number.isNaN(runAtMs) && now.getTime() >= runAtMs) {
-        return "publishing";
-      }
+  const source = normalizeCampaignSource(campaign.source);
+  const campaignStatus = normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+  const scheduledJobStatus = normalizeCampaignStatus(campaign.scheduledJobStatus ?? "");
+
+  if (source === "scheduled") {
+    if (campaignStatus === "cancelled-publish" || campaignStatus === "unrecoverable") return campaignStatus;
+
+    if (scheduledJobStatus) {
+      if (scheduledJobStatus === "pending") return "scheduled";
+      if (scheduledJobStatus === "processing") return "publishing";
+      if (scheduledJobStatus === "done") return "published";
+      if (scheduledJobStatus === "failed") return "failed";
+      if (scheduledJobStatus === "missed-during-uninstall") return "missed-during-uninstall";
+      if (scheduledJobStatus === "cancelled") return "cancelled-publish";
     }
-    return normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+
+    if (campaignStatus === "scheduled-publish") return "scheduled";
+    if (campaignStatus === "publishing") return "publishing";
+    if (campaignStatus === "published") return "published";
+    if (campaignStatus === "failed") return "failed";
+    return campaignStatus;
   }
 
-  return resolveWindowLifecycleState({
-    status: campaign.status,
-    source: "schedule-window",
-    runAt: campaign.runAt,
-    windowEndAt: campaign.windowEndAt,
-    totalTrackedCount: campaign.totalTrackedCount,
-    revertedCount: campaign.revertedCount,
-    unrecoverableCount: campaign.unrecoverableCount,
-  }, now) ?? normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+  if (source === "time-window") {
+    if (campaignStatus === "cancelled-window" || campaignStatus === "window-stopped" || campaignStatus === "unrecoverable") return campaignStatus;
+
+    if (scheduledJobStatus) {
+      if (scheduledJobStatus === "pending") return "scheduled-window";
+      if (scheduledJobStatus === "processing") return "publishing-window";
+      if (scheduledJobStatus === "active-window") return "active-window";
+      if (scheduledJobStatus === "restoring") return "restoring";
+      if (scheduledJobStatus === "auto-restored") return "auto-restored";
+      if (scheduledJobStatus === "restore-failed") return "restore-failed";
+      if (scheduledJobStatus === "failed") return "failed";
+      if (scheduledJobStatus === "missed-during-uninstall") return "missed-during-uninstall";
+      if (scheduledJobStatus === "cancelled") return "cancelled-window";
+    }
+
+    const inferred = resolveWindowLifecycleState({
+      status: campaignStatus,
+      source: "schedule-window",
+      runAt: campaign.runAt,
+      windowEndAt: campaign.windowEndAt,
+      restoredAt: campaign.restoredAt ?? null,
+      totalTrackedCount: campaign.totalTrackedCount,
+      revertedCount: campaign.revertedCount,
+      unrecoverableCount: campaign.unrecoverableCount,
+    }, now);
+
+    return inferred ?? campaignStatus;
+  }
+
+  return campaignStatus;
 }
 
 function formatCampaignSourceLabel(source: string | null) {
@@ -220,17 +257,32 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
   if (status === "scheduled-window" && start && end) {
     return `Pricing will publish at ${start} and automatically restore at ${end}.`;
   }
+  if (status === "publishing-window") {
+    return "Applying scheduled pricing...";
+  }
   if (status === "active-window" && end) {
-    return `Pricing is active now. Original pricing will automatically restore at ${end}.`;
+    return "Pricing currently active.";
+  }
+  if (status === "restoring" || status === "expired-window") {
+    return "Restoring original storefront pricing...";
   }
   if (status === "auto-restored") {
-    return "Original pricing was automatically restored when the window ended.";
+    return "Original storefront pricing restored.";
+  }
+  if (status === "restore-failed") {
+    return "Scheduled pricing applied but automatic restore failed.";
   }
   if (status === "window-stopped") {
     return "Original storefront pricing was restored before the scheduled end time.";
   }
   if (status === "cancelled-window") {
     return "This pricing window was cancelled before it started.";
+  }
+  if (status === "missed-during-uninstall") {
+    return "Schedule did not execute because the app was uninstalled during the execution window.";
+  }
+  if (status === "failed") {
+    return "Scheduled pricing failed.";
   }
   if (status === "partial") {
     return "Automatic restore needs attention for one or more tracked products.";
@@ -243,16 +295,17 @@ function formatScheduledPublishSummary(campaign: CampaignHistoryItem, now: Date 
   if (normalizeCampaignSource(campaign.source) !== "scheduled") return null;
   const status = resolveCampaignRuntimeStatus(campaign, now);
   const runAt = campaign.runAt ? new Date(campaign.runAt) : null;
-  if (status === "scheduled-publish" && runAt && !Number.isNaN(runAt.getTime())) {
+  if (status === "scheduled" && runAt && !Number.isNaN(runAt.getTime())) {
     return `Pricing will publish automatically at ${runAt.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
     })}`;
   }
-  if (status === "publishing") return "Applying scheduled pricing.";
+  if (status === "publishing") return "Applying scheduled pricing...";
   if (status === "published") return "Pricing was published successfully.";
   if (status === "cancelled-publish") return "This scheduled publish was cancelled before it started.";
-  if (status === "failed") return "Scheduled publish needs attention.";
+  if (status === "missed-during-uninstall") return "Schedule did not execute because the app was uninstalled during the execution window.";
+  if (status === "failed") return "Scheduled pricing failed.";
   return null;
 }
 
@@ -400,7 +453,14 @@ export default function CampaignHistoryPage() {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
-        } else if (status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending") {
+        } else if (
+          status === "scheduled" ||
+          status === "scheduled-window" ||
+          status === "scheduled-publish" ||
+          status === "publishing" ||
+          status === "publishing-window" ||
+          status === "restoring"
+        ) {
           acc.scheduled += 1;
         } else if (isClosedCampaignStatus(status)) {
           acc.closed += 1;
@@ -462,7 +522,14 @@ export default function CampaignHistoryPage() {
         if (campaignHistoryStatusFilter === "all") return true;
         if (campaignHistoryStatusFilter === "active") return status === "active" || status === "active-window" || status === "published";
         if (campaignHistoryStatusFilter === "partial") return status === "partial";
-        if (campaignHistoryStatusFilter === "scheduled") return status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending";
+        if (campaignHistoryStatusFilter === "scheduled") {
+          return status === "scheduled" ||
+            status === "scheduled-window" ||
+            status === "scheduled-publish" ||
+            status === "publishing" ||
+            status === "publishing-window" ||
+            status === "restoring";
+        }
         return isClosedCampaignStatus(status);
       })();
 
@@ -588,16 +655,20 @@ export default function CampaignHistoryPage() {
     if (normalized === "partial") return "warning" as const;
     if (normalized === "reverted" || normalized === "auto-restored" || normalized === "unrecoverable" || normalized === "window-stopped" || normalized === "cancelled-publish" || normalized === "cancelled-window") return "info" as const;
     if (normalized === "scheduled" || normalized === "scheduled-window" || normalized === "scheduled-publish" || normalized === "pending") return "warning" as const;
-    if (normalized === "publishing") return "attention" as const;
+    if (normalized === "publishing" || normalized === "publishing-window" || normalized === "restoring") return "attention" as const;
     if (normalized === "published") return "success" as const;
-    if (normalized === "failed") return "critical" as const;
+    if (normalized === "failed" || normalized === "restore-failed") return "critical" as const;
+    if (normalized === "missed-during-uninstall") return "warning" as const;
     return "attention" as const;
   }, []);
 
   const campaignStatusLabel = useCallback((status: string) => {
     const normalized = status.toLowerCase();
+    if (normalized === "scheduled") return "Scheduled";
     if (normalized === "scheduled-window") return "Scheduled Window";
+    if (normalized === "publishing-window") return "Publishing Window";
     if (normalized === "active-window") return "Active Window";
+    if (normalized === "restoring") return "Restoring";
     if (normalized === "expired-window") return "Expired Window";
     if (normalized === "auto-restored") return "Auto Restored";
     if (normalized === "window-stopped") return "Window Stopped";
@@ -607,6 +678,8 @@ export default function CampaignHistoryPage() {
     if (normalized === "publishing") return "Publishing";
     if (normalized === "published") return "Published";
     if (normalized === "failed") return "Failed";
+    if (normalized === "restore-failed") return "Restore Failed";
+    if (normalized === "missed-during-uninstall") return "Missed During Uninstall";
     if (normalized === "unrecoverable") return "Unrecoverable";
     return status;
   }, []);
@@ -1300,7 +1373,9 @@ export default function CampaignHistoryPage() {
                                   {formatScheduledPublishSummary(campaign, campaignRuntimeNow)}
                                 </Text>
                               )}
-                              {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && campaign.runAt && (
+                              {normalizeCampaignSource(campaign.source) === "scheduled" &&
+                                resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled" &&
+                                campaign.runAt && (
                                 <Box padding="200" background="bg-surface" borderRadius="200">
                                   <BlockStack gap="100">
                                     <InlineStack gap="200" blockAlign="center" wrap>
@@ -1318,16 +1393,34 @@ export default function CampaignHistoryPage() {
                                   </BlockStack>
                                 </Box>
                               )}
-                              {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing" && (
+                              {(resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing" ||
+                                resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing-window") && (
                                 <Box padding="200" background="bg-surface" borderRadius="200">
                                   <InlineStack gap="200" blockAlign="center" wrap>
                                     <Spinner size="small" />
                                     <BlockStack gap="050">
                                       <Text as="p" variant="bodySm" fontWeight="medium">
-                                        Publishing...
+                                        {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing-window"
+                                          ? "Publishing window..."
+                                          : "Publishing..."}
                                       </Text>
                                       <Text as="p" variant="bodySm" tone="subdued">
-                                        Applying scheduled pricing
+                                        Applying scheduled pricing...
+                                      </Text>
+                                    </BlockStack>
+                                  </InlineStack>
+                                </Box>
+                              )}
+                              {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "restoring" && (
+                                <Box padding="200" background="bg-surface" borderRadius="200">
+                                  <InlineStack gap="200" blockAlign="center" wrap>
+                                    <Spinner size="small" />
+                                    <BlockStack gap="050">
+                                      <Text as="p" variant="bodySm" fontWeight="medium">
+                                        Restoring...
+                                      </Text>
+                                      <Text as="p" variant="bodySm" tone="subdued">
+                                        Restoring original storefront pricing...
                                       </Text>
                                     </BlockStack>
                                   </InlineStack>
@@ -1433,7 +1526,8 @@ export default function CampaignHistoryPage() {
                                   Cancel Schedule
                                 </Button>
                               )}
-                              {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-publish" && (
+                              {normalizeCampaignSource(campaign.source) === "scheduled" &&
+                                resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled" && (
                                 <Button
                                   size="slim"
                                   variant="secondary"
