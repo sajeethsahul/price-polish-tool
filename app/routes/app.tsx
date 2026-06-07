@@ -131,6 +131,7 @@ export default function AppLayout() {
               <Link to="/app">Dashboard</Link>
               <Link to="/app/campaign-history">Campaign History</Link>
               <Link to="/app/rules">Pricing Rules</Link>
+              <Link to="/app/billing">Billing</Link>
               <Link to="/app/settings">Settings</Link>
               <Link to="/app/help">Help</Link>
             </NavMenu>
