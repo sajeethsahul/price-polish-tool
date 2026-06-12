@@ -35,15 +35,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
 
+  // ─── BILLING CALLBACK: approval flow completed ───────────────────────────────
+  // `result` is the Shopify billing context — NOT a redirect Response.
+  // It contains appSubscriptions[] which is all we need to persist the snapshot.
   if (!(result instanceof Response)) {
     const shop = session.shop;
-  //  const { persistBillingStateFromShopify } = await import("../utils/billing-persistence.server");
-    // await persistBillingStateFromShopify({
-    //   admin,
-    //   shop,
-    //   expectedPlanName: "basic",
-    //   isTest: true,
-    // });
+    console.log(`[BILLING CALLBACK] shop=${shop} billing approved`);
+
+    try {
+      const { persistBillingStateFromShopify } = await import(
+        "../utils/billing-persistence.server"
+      );
+      await persistBillingStateFromShopify({
+        shop,
+        billingResult: result as unknown as Record<string, unknown>,
+        expectedPlanName: "basic",
+        isTest: true,
+      });
+      console.log(`[BILLING CALLBACK SYNC] shop=${shop} subscription record persisted`);
+    } catch (err) {
+      console.error(
+        `[BILLING CALLBACK ERROR] shop=${shop} error=${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+      // Fail-safe: persistence errors never block the merchant flow.
+    }
   }
 
   return result;

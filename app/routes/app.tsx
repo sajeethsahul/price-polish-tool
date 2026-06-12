@@ -72,12 +72,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return billingResponse;
   }
 
-  // await persistBillingStateFromShopify({
-  //   admin,
-  //   shop,
-  //   expectedPlanName: "basic",
-  //   isTest: true,
-  // });
+  // ─── BILLING APP ENTRY: successful billing result available ────────────────────
+  // `billingResponse` is NOT a redirect — merchant was authenticated and approved.
+  // Persist a local snapshot so the Billing page and diagnostics are populated.
+  // This is non-fatal: persistence errors never block the app from loading.
+  console.log(`[BILLING APP ENTRY] shop=${shop}`);
+
+  try {
+    const { persistBillingStateFromShopify } = await import(
+      "../utils/billing-persistence.server"
+    );
+    await persistBillingStateFromShopify({
+      shop,
+      billingResult: billingResponse as unknown as Record<string, unknown>,
+      expectedPlanName: "basic",
+      isTest: true,
+    });
+    console.log(`[BILLING APP ENTRY SYNC] shop=${shop} subscription record persisted`);
+  } catch (err) {
+    console.error(
+      `[BILLING APP ENTRY ERROR] shop=${shop} error=${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
 
   // ✅ If reached here → user has active plan
   const hasActivePlan = true;
