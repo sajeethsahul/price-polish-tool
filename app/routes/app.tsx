@@ -6,6 +6,7 @@ import {
   useLocation,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import { useEffect, useState } from "react";
 
 import {
   AppProvider as PolarisProvider,
@@ -15,6 +16,7 @@ import {
   Text,
   Button,
   Card,
+  Toast,
 } from "@shopify/polaris";
 
 import {
@@ -35,6 +37,7 @@ import {
   type BillingStatusValue,
 } from "../components/BillingStatusBanner";
 import { normalizeBillingFromResult } from "../utils/billing-status.server";
+import { t } from "../utils/i18n";
 //import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 // ================= LOADER =================
@@ -149,10 +152,24 @@ export default function AppLayout() {
   const loadingPathname = navigation.location?.pathname ?? location.pathname;
   const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
   const showBrandedLoader = useDelayedVisibility(isLoading, 300);
+  const [toastContent, setToastContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const flag = sessionStorage.getItem("pp.billing.restore_initiated");
+    if (flag !== "1") return;
+    sessionStorage.removeItem("pp.billing.restore_initiated");
+    if (hasActivePlan) {
+      setToastContent(t("billing.accessRestored"));
+    }
+  }, [hasActivePlan]);
 
   const AppContent = (
     <PolarisProvider i18n={{}}>
       <Frame>
+        {toastContent ? (
+          <Toast content={toastContent} onDismiss={() => setToastContent(null)} />
+        ) : null}
         {showBrandedLoader ? (
           <PricePolishLoader title={loadingCopy.title} subtitle={loadingCopy.subtitle} />
         ) : (

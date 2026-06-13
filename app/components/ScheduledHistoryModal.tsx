@@ -20,6 +20,7 @@ import { ExpandableList } from "./ExpandableList";
 import { ModalScrollableSection } from "./ModalScrollableSection";
 import { BillingBlockModal, type BillingBlockModalCode } from "./BillingBlockModal";
 import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
+import { t } from "../utils/i18n";
 import type {
   OperationalSafeguardNotice,
   OperationalSafeguardSeverity,
@@ -991,21 +992,21 @@ export function ScheduledHistoryModal({
     }
 
     if (!hasRules) {
-      shopify.toast.show("Configure pricing rules before scheduling.", {
+      shopify.toast.show(t("toast.scheduleConfigureRules"), {
         isError: true,
       });
       return;
     }
 
     if (!hasActivePlan) {
-      shopify.toast.show("Activate a plan to schedule pricing operations.", {
+      shopify.toast.show(t("toast.scheduleActivatePlan"), {
         isError: true,
       });
       return;
     }
 
     if (scopedItemsForSchedule.length === 0) {
-      shopify.toast.show("No products available for the selected scheduling scope.", {
+      shopify.toast.show(t("toast.scheduleNoProductsForScope"), {
         isError: true,
       });
       return;
@@ -1051,7 +1052,7 @@ export function ScheduledHistoryModal({
           setBillingBlockModalCode(result.code);
           setBillingBlockModalOpen(true);
         } else {
-          shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+          shopify.toast.show(result.error || t("toast.schedulingFailed"), { isError: true });
         }
         return;
       }
@@ -1068,7 +1069,7 @@ export function ScheduledHistoryModal({
       setLoading(true);
       await loadScheduleHistory();
     } catch {
-      shopify.toast.show("Scheduling failed", { isError: true });
+      shopify.toast.show(t("toast.schedulingFailed"), { isError: true });
     } finally {
       setIsScheduling(false);
     }

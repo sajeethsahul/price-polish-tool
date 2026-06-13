@@ -31,6 +31,7 @@ import prisma from "../db.server";
 import { calculatePrice } from "../utils/pricing";
 import { requireActiveBilling } from "../utils/billing-protection.server";
 import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
+import { t } from "../utils/i18n";
 
 // ================= LOADER =================
 
@@ -206,6 +207,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }),
     ]);
 
+    const existingState = await prisma.appState.findUnique({
+        where: { shop: session.shop },
+        select: { onboardingFirstRuleAt: true, isLive: true },
+    });
+
+    if (!existingState?.onboardingFirstRuleAt) {
+        const now = new Date();
+        await prisma.appState.upsert({
+            where: { shop: session.shop },
+            update: { onboardingFirstRuleAt: now },
+            create: { shop: session.shop, isLive: existingState?.isLive ?? false, onboardingFirstRuleAt: now },
+        });
+    }
+
     return {
         adjustmentType: normalizedType,
         adjustmentDirection: normalizedDirection,
@@ -268,7 +283,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
     useEffect(() => {
         if (actionData?.saved) {
-            shopify.toast.show("Saved successfully");
+            shopify.toast.show(t("toast.savedSuccessfully"));
         }
         if (actionData?.code === "BILLING_INACTIVE") {
             setBillingBlockModalCode("BILLING_INACTIVE");
@@ -301,7 +316,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     });
 
     return (
-        <Page title="Pricing Rules" backAction={{ onAction: () => navigate("/app") }} fullWidth>
+        <Page title={t("rules.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
             <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
             <Layout>
 
@@ -310,7 +325,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                     <Card>
                         <BlockStack gap="200">
                             <Text as="p" tone="subdued">
-                                Configure how prices change and how the final price is normalized before you apply, schedule, or run live storefront pricing.
+                                {t("rules.intro")}
                             </Text>
                         </BlockStack>
                     </Card>
@@ -319,15 +334,15 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                     <Card>
                         <Form method="post">
                             <BlockStack gap="200">
-                                <Text as="h2" variant="headingMd">Pricing Adjustment</Text>
+                                <Text as="h2" variant="headingMd">{t("rules.pricingAdjustment")}</Text>
                                 <InlineStack gap="200" wrap>
                                     <div style={{ flex: "1 1 180px", minWidth: 160 }}>
                                         <Select
-                                            label="Type"
+                                            label={t("rules.type")}
                                             name="adjustmentType"
                                             options={[
-                                                { label: `${SELECT_OPTION_PREFIX}Percentage`, value: "percentage" },
-                                                { label: `${SELECT_OPTION_PREFIX}Fixed amount`, value: "fixed" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.percentage")}`, value: "percentage" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.fixedAmount")}`, value: "fixed" },
                                             ]}
                                             value={adjustmentType}
                                             disabled={isSubmitting}
@@ -337,11 +352,11 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                     </div>
                                     <div style={{ flex: "1 1 180px", minWidth: 160 }}>
                                         <Select
-                                            label="Direction"
+                                            label={t("rules.direction")}
                                             name="adjustmentDirection"
                                             options={[
-                                                { label: `${SELECT_OPTION_PREFIX}Increase`, value: "increase" },
-                                                { label: `${SELECT_OPTION_PREFIX}Decrease`, value: "decrease" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.increase")}`, value: "increase" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.decrease")}`, value: "decrease" },
                                             ]}
                                             value={adjustmentDirection}
                                             disabled={isSubmitting}
@@ -351,7 +366,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                     </div>
                                     <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                                         <TextField
-                                            label="Value"
+                                            label={t("rules.value")}
                                             name="adjustmentValue"
                                             autoComplete="off"
                                             value={adjustmentValue}
@@ -362,7 +377,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                                 }
                                             }}
                                             suffix={adjustmentType === "percentage" ? "%" : currencyCode}
-                                            helpText={adjustmentType === "percentage" ? "Example: 10 means 10%" : "Example: 5 means $5"}
+                                            helpText={adjustmentType === "percentage" ? t("rules.valueHelpPercentage") : t("rules.valueHelpFixed")}
                                             error={actionData?.fieldErrors?.adjustmentValue}
                                         />
                                     </div>
@@ -370,14 +385,14 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
                                 <Divider />
 
-                                <Text as="h2" variant="headingMd">Price Ending</Text>
+                                <Text as="h2" variant="headingMd">{t("rules.priceEnding")}</Text>
                                 <InlineStack gap="200" wrap>
                                     <div style={{ flex: "1 1 240px", minWidth: 220 }}>
                                         <Select
-                                            label="Ending"
+                                            label={t("rules.ending")}
                                             name="endingOption"
                                             options={[
-                                                { label: `${SELECT_OPTION_PREFIX}None`, value: "none" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.none")}`, value: "none" },
                                                 { label: `${SELECT_OPTION_PREFIX}.00`, value: "0.00" },
                                                 { label: `${SELECT_OPTION_PREFIX}.25`, value: "0.25" },
                                                 { label: `${SELECT_OPTION_PREFIX}.49`, value: "0.49" },
@@ -394,13 +409,13 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                     </div>
                                     <div style={{ flex: "1 1 260px", minWidth: 240 }}>
                                         <Select
-                                            label="Rounding"
+                                            label={t("rules.rounding")}
                                             name="roundingPrecision"
                                             options={[
-                                                { label: `${SELECT_OPTION_PREFIX}Standard currency rounding`, value: "standard" },
-                                                { label: `${SELECT_OPTION_PREFIX}Whole number only`, value: "whole" },
-                                                { label: `${SELECT_OPTION_PREFIX}Keep cents`, value: "keep-cents" },
-                                                { label: `${SELECT_OPTION_PREFIX}Nearest 0.05`, value: "nearest-0.05" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingStandard")}`, value: "standard" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingWhole")}`, value: "whole" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingKeepCents")}`, value: "keep-cents" },
+                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingNearest005")}`, value: "nearest-0.05" },
                                             ]}
                                             value={roundingPrecision}
                                             disabled={isSubmitting}
@@ -412,11 +427,11 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
                                 <Divider />
 
-                                <Text as="h2" variant="headingMd">Safeguards</Text>
+                                <Text as="h2" variant="headingMd">{t("rules.safeguards")}</Text>
                                 <InlineStack gap="200" wrap>
                                     <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                                         <TextField
-                                            label="Minimum price (optional)"
+                                            label={t("rules.minimumPriceOptional")}
                                             name="minPrice"
                                             autoComplete="off"
                                             value={minPrice}
@@ -432,7 +447,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                     </div>
                                     <div style={{ flex: "1 1 220px", minWidth: 200 }}>
                                         <TextField
-                                            label="Maximum price (optional)"
+                                            label={t("rules.maximumPriceOptional")}
                                             name="maxPrice"
                                             autoComplete="off"
                                             value={maxPrice}
@@ -449,7 +464,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                 </InlineStack>
 
                                 <Button submit loading={isSubmitting} variant="primary">
-                                    Save Rules
+                                    {t("rules.saveRule")}
                                 </Button>
 
                             </BlockStack>
@@ -464,28 +479,28 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                     <div style={{ background: "linear-gradient(135deg, #f9fafb, #f1f5f9)", border: "1px solid #e5e7eb", borderRadius: "12px" }}>
                     <Card>
                         <BlockStack gap="200">
-                            <Text as="span" variant="headingMd">Preview Example</Text>
+                            <Text as="span" variant="headingMd">{t("rules.previewExample")}</Text>
 
                             <Banner tone="info">
-                                Current price is your Shopify baseline. Textbox previews show what your rules would set next.
+                                {t("rules.previewBanner")}
                             </Banner>
 
                             <BlockStack gap="150">
                                 <InlineStack align="space-between">
-                                    <Text as="span" tone="subdued">Current</Text>
+                                    <Text as="span" tone="subdued">{t("rules.current")}</Text>
                                     <Text as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
                                 </InlineStack>
                                 <InlineStack align="space-between">
-                                    <Text as="span" tone="subdued">Adjustment</Text>
+                                    <Text as="span" tone="subdued">{t("rules.adjustment")}</Text>
                                     <Text as="span">
-                                        {adjustmentDirection === "decrease" ? "Decrease" : "Increase"}{" "}
+                                        {adjustmentDirection === "decrease" ? t("rules.decrease") : t("rules.increase")}{" "}
                                         {adjustmentType === "percentage"
                                             ? `${safeAdjustmentValue.toFixed(2)}%`
                                             : `${currencyCode} ${safeAdjustmentValue.toFixed(2)}`}
                                     </Text>
                                 </InlineStack>
                                 <InlineStack align="space-between">
-                                    <Text as="span" tone="subdued">After adjustment</Text>
+                                    <Text as="span" tone="subdued">{t("rules.afterAdjustment")}</Text>
                                     <Text as="span">{currencyCode} {Number(rawAdjusted.toFixed(2)).toFixed(2)}</Text>
                                 </InlineStack>
                                 <Divider />

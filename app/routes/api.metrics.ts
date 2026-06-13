@@ -86,6 +86,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         });
 
         const isLive = appState?.isLive === true;
+        const onboarding = {
+            onboardingFirstRuleAt: appState?.onboardingFirstRuleAt ?? null,
+            onboardingFirstPreviewAt: appState?.onboardingFirstPreviewAt ?? null,
+            onboardingFirstApplyStartAt: appState?.onboardingFirstApplyStartAt ?? null,
+            onboardingFirstApplyAt: appState?.onboardingFirstApplyAt ?? null,
+            onboardingFirstScheduleAt: appState?.onboardingFirstScheduleAt ?? null,
+            onboardingCelebratedAt: appState?.onboardingCelebratedAt ?? null,
+            reviewRequestShownAt: appState?.reviewRequestShownAt ?? null,
+            reviewRequestDismissedAt: appState?.reviewRequestDismissedAt ?? null,
+        };
         
         // Check for enabled live pricing rules
         const pricingRule = await prisma.pricingRule.findUnique({
@@ -129,6 +139,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             livePricingRulesCount,
             productsUnderAutomationCount: influencedVariantCount,
             isLive,
+            onboarding,
             storefrontControl: {
                 influencedVariantCount,
                 stagedPendingCount,
@@ -152,6 +163,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             livePricingRulesCount: 0,
             productsUnderAutomationCount: 0,
             isLive: false,
+            onboarding: {
+                onboardingFirstRuleAt: null,
+                onboardingFirstPreviewAt: null,
+                onboardingFirstApplyStartAt: null,
+                onboardingFirstApplyAt: null,
+                onboardingFirstScheduleAt: null,
+                onboardingCelebratedAt: null,
+                reviewRequestShownAt: null,
+                reviewRequestDismissedAt: null,
+            },
             storefrontControl: {
                 influencedVariantCount: 0,
                 stagedPendingCount: 0,

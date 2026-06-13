@@ -1,6 +1,5 @@
-import { Modal, BlockStack, Text, InlineStack, Box, Icon,Button } from "@shopify/polaris";
-
-import { DiscountIcon, RefreshIcon } from "@shopify/polaris-icons";
+import { Modal, BlockStack, Text, Button, InlineStack, Box } from "@shopify/polaris";
+import { t } from "../utils/i18n";
 
 export type BillingBlockModalCode = "BILLING_INACTIVE" | "BILLING_UNKNOWN";
 
@@ -12,39 +11,31 @@ export interface BillingBlockModalProps {
   onClose: () => void;
 }
 
+const BILLING_RESTORE_FLAG = "pp.billing.restore_initiated";
+
 function getTitle(code: BillingBlockModalCode): string {
   if (code === "BILLING_INACTIVE") {
-    return "Subscription Required";
+    return t("billing.subscriptionAccessRequired");
   }
-  return "Verification Required";
-}
-
-function getIcon(code: BillingBlockModalCode) {
-  if (code === "BILLING_INACTIVE") {
-    return DiscountIcon;
-  }
-  return RefreshIcon;
+  return t("billing.subscriptionVerificationRequired");
 }
 
 function getMessage(code: BillingBlockModalCode): string {
   if (code === "BILLING_INACTIVE") {
-    return "Your subscription is inactive. Activate billing to continue using Price Polish and unlock all features.";
+    return t("billing.inactiveMessage");
   }
-  return "We couldn't verify your billing status. Refresh the app to try again.";
+  return t("billing.verificationMessage");
 }
 
 function getPrimaryLabel(code: BillingBlockModalCode): string {
   if (code === "BILLING_INACTIVE") {
-    return "Activate Subscription";
+    return t("billing.restoreAccess");
   }
-  return "Refresh App";
+  return t("billing.refreshApp");
 }
 
-function getSecondaryLabel(code: BillingBlockModalCode): string {
-  if (code === "BILLING_INACTIVE") {
-    return "Continue Browsing";
-  }
-  return "Close";
+function getSecondaryLabel(_code: BillingBlockModalCode): string {
+  return t("billing.continueBrowsing");
 }
 
 function handlePrimaryAction(params: {
@@ -53,6 +44,7 @@ function handlePrimaryAction(params: {
   host: string;
 }): void {
   if (params.code === "BILLING_INACTIVE") {
+    sessionStorage.setItem(BILLING_RESTORE_FLAG, "1");
     const targetWindow = window.top ?? window;
     targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(params.shop)}&host=${encodeURIComponent(params.host)}`;
     return;
@@ -64,70 +56,50 @@ export function BillingBlockModal({ open, code, shop, host, onClose }: BillingBl
   if (!code) return null;
 
   const title = getTitle(code);
-  const IconComponent = getIcon(code);
   const message = getMessage(code);
   const primaryLabel = getPrimaryLabel(code);
   const secondaryLabel = getSecondaryLabel(code);
+  const messageParagraphs = message.split("\n\n");
+  const visual = code === "BILLING_INACTIVE" ? "🔒" : "🔄";
 
   return (
-<Modal
-  open={open}
-  onClose={onClose}
-  title=''
->
-  <Modal.Section>
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
-        padding: "24px 12px",
-      }}
-    >
-      <div
-        style={{
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          background: "#FFF7ED",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "40px",
-          marginBottom: "20px",
-        }}
-      >
-        {code === "BILLING_INACTIVE" ? "💳" : "🔄"}
-      </div>
+    <Modal open={open} onClose={onClose} title="">
+      <Modal.Section>
+        <BlockStack gap="500" align="center">
+          <InlineStack align="center">
+            <Box background="bg-surface-secondary" borderRadius="full" padding="500">
+              <Text as="span" variant="heading2xl">
+                {visual}
+              </Text>
+            </Box>
+          </InlineStack>
 
-      <Text as="h2" variant="headingLg">
-        {title}
-      </Text>
+          <Text as="h2" variant="headingLg" alignment="center">
+            {title}
+          </Text>
 
-      <div style={{ marginTop: 12, maxWidth: 420 }}>
-        <Text as="p" tone="subdued">
-          {message}
-        </Text>
-      </div>
+          <BlockStack gap="200">
+            {messageParagraphs.map((paragraph, index) => (
+              <Text key={index} as="p" tone="subdued" alignment="center">
+                {paragraph}
+              </Text>
+            ))}
+          </BlockStack>
 
-      <div style={{ marginTop: 28 }}>
-        <Button
-          variant="primary"
-          size="large"
-          onClick={() => handlePrimaryAction({ code, shop, host })}
-        >
-          {primaryLabel}
-        </Button>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <Button variant="plain" onClick={onClose}>
-          {secondaryLabel}
-        </Button>
-      </div>
-    </div>
-  </Modal.Section>
-</Modal>
+          <BlockStack gap="200" align="center">
+            <Button
+              variant="primary"
+              size="large"
+              onClick={() => handlePrimaryAction({ code, shop, host })}
+            >
+              {primaryLabel}
+            </Button>
+            <Button variant="plain" onClick={onClose}>
+              {secondaryLabel}
+            </Button>
+          </BlockStack>
+        </BlockStack>
+      </Modal.Section>
+    </Modal>
   );
 }

@@ -150,6 +150,20 @@ export async function action({ request }: ActionFunctionArgs) {
         },
     });
 
+    const nowForOnboarding = new Date();
+    const existingState = await prisma.appState.findUnique({
+        where: { shop },
+        select: { onboardingFirstScheduleAt: true, isLive: true },
+    });
+
+    if (!existingState?.onboardingFirstScheduleAt) {
+        await prisma.appState.upsert({
+            where: { shop },
+            update: { onboardingFirstScheduleAt: nowForOnboarding },
+            create: { shop, isLive: existingState?.isLive ?? false, onboardingFirstScheduleAt: nowForOnboarding },
+        });
+    }
+
     if (campaignId) {
         await (prisma.campaign as any).create({
             data: {

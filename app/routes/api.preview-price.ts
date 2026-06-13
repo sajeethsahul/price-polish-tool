@@ -187,6 +187,20 @@ console.log("[PREVIEW] History rows:", histories.length);
         console.log("RETURNING PRODUCTS:", previews.length, "| ruleExists:", ruleExists);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
+        const now = new Date();
+        const existingState = await prisma.appState.findUnique({
+          where: { shop },
+          select: { onboardingFirstPreviewAt: true, isLive: true },
+        });
+
+        if (!existingState?.onboardingFirstPreviewAt) {
+          await prisma.appState.upsert({
+            where: { shop },
+            update: { onboardingFirstPreviewAt: now },
+            create: { shop, isLive: existingState?.isLive ?? false, onboardingFirstPreviewAt: now },
+          });
+        }
+
         console.log("[PREVIEW] Returning success response");
 console.log("[PREVIEW] Preview count:", previews.length);
 console.log("[PREVIEW] ruleExists:", ruleExists);

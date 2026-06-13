@@ -46,6 +46,8 @@ import { BillingBlockModal, type BillingBlockModalCode } from "../components/Bil
 import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
 import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
+import { t } from "../utils/i18n";
+import { FirstPricingUpdateCelebrationModal, MerchantOnboardingCard, NextStepsCalloutCard, ReviewRequestCard } from "../components/MerchantOnboardingExperience";
 
 
 const BATCH_SIZE = 50;
@@ -149,6 +151,16 @@ interface DashboardMetrics {
   productsUnderAutomationCount: number;
   isLive: boolean;
   hasActivePlan: boolean;
+  onboarding?: {
+    onboardingFirstRuleAt: string | null;
+    onboardingFirstPreviewAt: string | null;
+    onboardingFirstApplyStartAt: string | null;
+    onboardingFirstApplyAt: string | null;
+    onboardingFirstScheduleAt: string | null;
+    onboardingCelebratedAt: string | null;
+    reviewRequestShownAt: string | null;
+    reviewRequestDismissedAt: string | null;
+  };
   storefrontControl: StorefrontControlMetrics;
 }
 
@@ -171,6 +183,16 @@ const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
   productsUnderAutomationCount: 0,
   isLive: false,
   hasActivePlan: true,
+  onboarding: {
+    onboardingFirstRuleAt: null,
+    onboardingFirstPreviewAt: null,
+    onboardingFirstApplyStartAt: null,
+    onboardingFirstApplyAt: null,
+    onboardingFirstScheduleAt: null,
+    onboardingCelebratedAt: null,
+    reviewRequestShownAt: null,
+    reviewRequestDismissedAt: null,
+  },
   storefrontControl: DEFAULT_STOREFRONT_CONTROL_METRICS,
 };
 
@@ -466,9 +488,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
   const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  const [reviewRequestHidden, setReviewRequestHidden] = useState(false);
+
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
-    if (shopify) shopify.toast.show("Billing implementation coming soon!");
+    if (shopify) shopify.toast.show(t("toast.billingComingSoon"));
     else console.log("BYPASS: Upgrade triggered");
   }, [shopify]);
 
@@ -483,10 +508,51 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
 
+  const onboardingState = metrics.onboarding ?? DEFAULT_DASHBOARD_METRICS.onboarding!;
+  const onboardingProgress = {
+    hasRule: Boolean(onboardingState.onboardingFirstRuleAt) || ruleExists === true,
+    hasPreviewed: Boolean(onboardingState.onboardingFirstPreviewAt),
+    hasApplied: Boolean(onboardingState.onboardingFirstApplyStartAt),
+    hasScheduled: Boolean(onboardingState.onboardingFirstScheduleAt),
+    hasCompletedFirstUpdate: Boolean(onboardingState.onboardingFirstApplyAt),
+  };
+
+  const postOnboardingEvent = useCallback(async (event: "celebration.dismiss" | "review.dismiss" | "review.shown") => {
+    const fetcher = await appFetch;
+    await fetcher("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    });
+  }, [appFetch]);
+
+  useEffect(() => {
+    if (onboardingProgress.hasCompletedFirstUpdate && !onboardingState.onboardingCelebratedAt) {
+      setCelebrationOpen(true);
+    }
+  }, [onboardingProgress.hasCompletedFirstUpdate, onboardingState.onboardingCelebratedAt]);
+
+  const eligibleForReviewRequest =
+    onboardingProgress.hasCompletedFirstUpdate ||
+    metrics.scheduledRunsCount >= 2 ||
+    metrics.activeCampaignsCount >= 2;
+
+  const shouldShowReviewRequest =
+    eligibleForReviewRequest &&
+    Boolean(onboardingState.onboardingCelebratedAt) &&
+    !onboardingState.reviewRequestDismissedAt &&
+    !reviewRequestHidden;
+
+  useEffect(() => {
+    if (!shouldShowReviewRequest) return;
+    if (onboardingState.reviewRequestShownAt) return;
+    void postOnboardingEvent("review.shown").catch(() => {});
+  }, [onboardingState.reviewRequestShownAt, postOnboardingEvent, shouldShowReviewRequest]);
+
   // ADDED: Guard helper — shows toast and blocks execution when no rules exist
   const guardNoRules = useCallback(() => {
     if (!hasRules) {
-      if (shopify) shopify.toast.show("Please configure pricing rules first", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.configureRulesFirst"), { isError: true });
       else console.warn("BYPASS: Please configure pricing rules first");
       return true; // blocked
     }
@@ -554,7 +620,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     } catch (err) {
       const error = err instanceof Error ? err : new Error("An unknown error occurred.");
       console.error("DEBUG: Preview Error detail:", error);
-      if (shopify) shopify.toast.show("Network error. Please try again.", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.networkErrorTryAgain"), { isError: true });
       else console.warn("BYPASS: Network error. Please try again.");
       setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
     } finally {
@@ -596,7 +662,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     campaignTitle: string,
   ): Promise<boolean> => {
     if (!hasRules) {
-      shopify.toast.show("Configure pricing rules first", { isError: true });
+      shopify.toast.show(t("toast.configureRulesFirstShort"), { isError: true });
       return false;
     }
 
@@ -608,13 +674,13 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       const scopedItems = itemsToUpdate;
 
       if (scopedItems.length === 0) {
-        shopify.toast.show("No products to apply", { isError: true });
+        shopify.toast.show(t("toast.noProductsToApply"), { isError: true });
         return false;
       }
 
       const normalizedCampaignTitle = campaignTitle.trim();
       if (!normalizedCampaignTitle) {
-        shopify.toast.show("Campaign title is required before applying pricing.", {
+        shopify.toast.show(t("toast.campaignTitleRequired"), {
           isError: true,
         });
         return false;
@@ -696,10 +762,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           throw new Error(pushBillingError);
         }
 
-        shopify.toast.show("Prices updated and live on storefront");
+        shopify.toast.show(t("toast.pricesLiveUpdated"));
         console.log("Prices updated and live on storefront-Sajeeth");
       } else {
-        shopify.toast.show("Pricing applied successfully");
+        shopify.toast.show(t("toast.pricingApplied"));
         console.log("Prices updated and live on storefront-Sajeeth");
       }
       // ─────────────────────────────────────────────────────────────────────
@@ -1328,7 +1394,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       });
     } catch (err) {
       console.error("DEBUG: Campaign detail view error:", err);
-      if (shopify) shopify.toast.show("Failed to load campaign details", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.failedLoadCampaignDetails"), { isError: true });
       else console.error("BYPASS: Failed to load campaign details");
       setCampaignDetailOpen(false);
       setSelectedCampaignForDetail(null);
@@ -1371,7 +1437,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       }
     } catch (err) {
       console.error("DEBUG: Campaign Revert Preview Error detail:", err);
-      if (shopify) shopify.toast.show("Failed to load revert preview", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.failedLoadRevertPreview"), { isError: true });
       else console.error("BYPASS: Failed to load revert preview");
       setRevertPreviewOpen(false);
       setSelectedCampaignForRevert(null);
@@ -1470,7 +1536,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       console.log("[Campaign History UI] operational metrics rendered", { count: campaigns.length });
     } catch (error) {
       console.error("DEBUG: Campaign History manual refresh failed:", error);
-      if (shopify) shopify.toast.show("Failed to refresh campaign history", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.failedRefreshCampaignHistory"), { isError: true });
       else console.error("BYPASS: Failed to refresh campaign history");
     } finally {
       if (showLoading) setCampaignHistoryLoading(false);
@@ -1582,11 +1648,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             : item
         )
       );
-      if (shopify) shopify.toast.show("Scheduled publish cancelled");
+      if (shopify) shopify.toast.show(t("toast.scheduledPublishCancelled"));
       await handlePreview();
     } catch (error) {
       console.error("[Publish Lifecycle] action failed", error);
-      if (shopify) shopify.toast.show("Unable to cancel scheduled publish", { isError: true });
+      if (shopify) shopify.toast.show(t("toast.unableCancelScheduledPublish"), { isError: true });
     } finally {
       setIsProcessing(false);
     }
@@ -2275,21 +2341,35 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
               </>
             )}
 
-            {/* First Visit Welcome */}
-            {firstVisit && (
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">Welcome to Price Polish</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Follow these steps to optimize store pricing:</Text>
-                  <Box paddingInlineStart="400">
-                    <BlockStack gap="150">
-                      <Text as="p" variant="bodySm"><strong>1. Configure:</strong> Set markup and rounding on the <Button variant="tertiary" onClick={() => navigate("/app/rules")}>Rules</Button> page.</Text>
-                      <Text as="p" variant="bodySm"><strong>2. Preview:</strong> Return here to review calculated prices.</Text>
-                      <Text as="p" variant="bodySm"><strong>3. Apply:</strong> Push changes when ready; you can undo recent bulk updates.</Text>
-                    </BlockStack>
-                  </Box>
-                </BlockStack>
-              </Card>
+            {!onboardingProgress.hasCompletedFirstUpdate && (
+              <MerchantOnboardingCard
+                progress={onboardingProgress}
+                onCreateFirstRule={() => navigate("/app/rules")}
+                onWatchSetupGuide={() => navigate("/app/help")}
+              />
+            )}
+
+            {onboardingProgress.hasCompletedFirstUpdate && (
+              <NextStepsCalloutCard
+                onExploreScheduling={() => setScheduleHistoryModalOpen(true)}
+                onReviewCampaignHistory={() => navigate("/app/campaign-history")}
+                onReviewPricingRules={() => navigate("/app/rules")}
+              />
+            )}
+
+            {shouldShowReviewRequest && (
+              <ReviewRequestCard
+                onPrimary={() => {
+                  const url = t("dashboard.review.url");
+                  window.open(url, "_blank", "noopener,noreferrer");
+                  setReviewRequestHidden(true);
+                  void postOnboardingEvent("review.dismiss").catch(() => {});
+                }}
+                onDismiss={() => {
+                  setReviewRequestHidden(true);
+                  void postOnboardingEvent("review.dismiss").catch(() => {});
+                }}
+              />
             )}
 
             {/* Billing Upsell */}
@@ -4064,6 +4144,19 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             </BlockStack>
           </Modal.Section>
         </Modal>
+
+        <FirstPricingUpdateCelebrationModal
+          open={celebrationOpen}
+          onExploreScheduling={() => {
+            setCelebrationOpen(false);
+            setScheduleHistoryModalOpen(true);
+            void postOnboardingEvent("celebration.dismiss").catch(() => {});
+          }}
+          onClose={() => {
+            setCelebrationOpen(false);
+            void postOnboardingEvent("celebration.dismiss").catch(() => {});
+          }}
+        />
 
         <BillingBlockModal
           open={billingBlockModalOpen}

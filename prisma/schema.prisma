@@ -150,8 +150,16 @@ model StagedPrice {
 }
 
 model AppState {
-  shop   String  @id
-  isLive Boolean @default(false)
+  shop                       String    @id
+  isLive                     Boolean   @default(false)
+  onboardingFirstRuleAt       DateTime?
+  onboardingFirstPreviewAt    DateTime?
+  onboardingFirstApplyStartAt DateTime?
+  onboardingFirstApplyAt      DateTime?
+  onboardingFirstScheduleAt   DateTime?
+  onboardingCelebratedAt      DateTime?
+  reviewRequestShownAt        DateTime?
+  reviewRequestDismissedAt    DateTime?
 }
 
 model PushJob {

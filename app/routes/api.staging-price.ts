@@ -35,6 +35,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const appState = await prisma.appState.findUnique({
     where: { shop: session.shop },
   });
+  const now = new Date();
+
+  await prisma.appState.upsert({
+    where: { shop: session.shop },
+    update: {
+      onboardingFirstApplyStartAt: appState?.onboardingFirstApplyStartAt ? undefined : now,
+    },
+    create: {
+      shop: session.shop,
+      isLive: appState?.isLive ?? false,
+      onboardingFirstApplyStartAt: now,
+    },
+  });
 
   if (campaignId) {
     await prisma.campaign.upsert({
@@ -52,6 +65,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (!appState?.isLive) {
+    if (!appState?.onboardingFirstApplyAt) {
+      await prisma.appState.upsert({
+        where: { shop: session.shop },
+        update: { onboardingFirstApplyAt: now },
+        create: { shop: session.shop, isLive: false, onboardingFirstApplyAt: now },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

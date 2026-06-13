@@ -328,6 +328,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       failCount,
     });
 
+    const state = await prisma.appState.findUnique({
+      where: { shop },
+      select: { onboardingFirstApplyAt: true },
+    });
+    if (!state?.onboardingFirstApplyAt && successCount > 0) {
+      await prisma.appState.upsert({
+        where: { shop },
+        update: { onboardingFirstApplyAt: new Date() },
+        create: { shop, isLive: true, onboardingFirstApplyAt: new Date() },
+      });
+    }
+
     return cors(
       new Response(JSON.stringify({
         success: true,

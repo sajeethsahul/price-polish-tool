@@ -62,6 +62,9 @@ type Pages = {
   "/api/bulk-price": {
     params: {};
   };
+  "/api/onboarding": {
+    params: {};
+  };
   "/api/undo-price": {
     params: {};
   };
@@ -117,7 +120,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/api.publish-lifecycle-action.ts": {
     id: "routes/api.publish-lifecycle-action";
@@ -182,6 +185,10 @@ type RouteFiles = {
   "routes/api.bulk-price.ts": {
     id: "routes/api.bulk-price";
     page: "/api/bulk-price";
+  };
+  "routes/api.onboarding.ts": {
+    id: "routes/api.onboarding";
+    page: "/api/onboarding";
   };
   "routes/api.undo-price.ts": {
     id: "routes/api.undo-price";
@@ -275,6 +282,7 @@ type RouteModules = {
   "routes/api.retry-failed": typeof import("./app/routes/api.retry-failed.ts");
   "routes/api.push-status": typeof import("./app/routes/api.push-status.ts");
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
+  "routes/api.onboarding": typeof import("./app/routes/api.onboarding.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
   "routes/api.products": typeof import("./app/routes/api.products.ts");
   "routes/api.billing": typeof import("./app/routes/api.billing.ts");

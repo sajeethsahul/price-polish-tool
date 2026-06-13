@@ -31,6 +31,7 @@ import { ModalPagination } from "../components/ModalPagination";
 import { ModalScrollableSection } from "../components/ModalScrollableSection";
 import { computeConflictsBetweenScheduledJobs, maxSeverity } from "../utils/campaign-conflicts";
 import type { CampaignConflict, CampaignConflictSeverity } from "../types/pricing";
+import { t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const auth = await authenticate.admin(request);
@@ -425,7 +426,7 @@ export default function CampaignHistoryPage() {
       const campaigns = Array.isArray((campaignHistoryData as any)?.campaigns) ? (campaignHistoryData as any).campaigns : [];
       setCampaignHistory(campaigns);
     } catch {
-      (shopify as any)?.toast?.show?.("Failed to refresh campaign history", { isError: true });
+      (shopify as any)?.toast?.show?.(t("toast.failedRefreshCampaignHistory"), { isError: true });
     } finally {
       if (showLoading) setCampaignHistoryLoading(false);
     }
@@ -935,7 +936,7 @@ export default function CampaignHistoryPage() {
       }
       setCampaignDetail(data);
     } catch {
-      (shopify as any)?.toast?.show?.("Failed to load campaign details", { isError: true });
+      (shopify as any)?.toast?.show?.(t("toast.failedLoadCampaignDetails"), { isError: true });
       setCampaignDetailOpen(false);
       setSelectedCampaignForDetail(null);
       setCampaignDetailPageSize(15);
@@ -969,7 +970,7 @@ export default function CampaignHistoryPage() {
       }
       setRevertPreview(data);
     } catch {
-      (shopify as any)?.toast?.show?.("Failed to load revert preview", { isError: true });
+      (shopify as any)?.toast?.show?.(t("toast.failedLoadRevertPreview"), { isError: true });
       setRevertPreviewOpen(false);
       setSelectedCampaignForRevert(null);
       resetRevertPreviewViewState();
@@ -981,7 +982,7 @@ export default function CampaignHistoryPage() {
   const openCampaignConflictDetails = useCallback((campaign: CampaignHistoryItem) => {
     const meta = campaignConflictMetaByCampaignId.get(campaign.campaignId);
     if (!meta || meta.conflicts.length === 0) {
-      (shopify as any)?.toast?.show?.("No conflicts detected for this campaign.");
+      (shopify as any)?.toast?.show?.(t("toast.noConflictsDetected"));
       return;
     }
     setConflictExplorerTitle(campaign.title);
@@ -1068,10 +1069,10 @@ export default function CampaignHistoryPage() {
             : item
         )
       );
-      (shopify as any)?.toast?.show?.("Scheduled publish cancelled");
+      (shopify as any)?.toast?.show?.(t("toast.scheduledPublishCancelled"));
       await handleRefreshCampaignHistory(false);
     } catch {
-      (shopify as any)?.toast?.show?.("Unable to cancel scheduled publish", { isError: true });
+      (shopify as any)?.toast?.show?.(t("toast.unableCancelScheduledPublish"), { isError: true });
     } finally {
       setIsProcessing(false);
     }
@@ -1231,7 +1232,7 @@ export default function CampaignHistoryPage() {
         setBillingBlockModalCode(code);
         setBillingBlockModalOpen(true);
       } else {
-        (shopify as any)?.toast?.show?.(message || "Failed to revert campaign", { isError: true });
+        (shopify as any)?.toast?.show?.(message || t("toast.failedRevertCampaign"), { isError: true });
       }
     } finally {
       setIsProcessing(false);
@@ -1240,7 +1241,7 @@ export default function CampaignHistoryPage() {
 
   return (
     <>
-      <Page title="Campaign History" backAction={{ onAction: () => navigate("/app") }} fullWidth>
+      <Page title={t("campaignHistory.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
         {isInitialCampaignHistoryLoad ? (
           showInitialCampaignHistoryLoader ? (
             <PricePolishLoader
@@ -1269,9 +1270,9 @@ export default function CampaignHistoryPage() {
                   <BlockStack gap="300">
                     <InlineStack align="space-between" blockAlign="start" wrap>
                       <BlockStack gap="050">
-                        <Text as="h3" variant="headingMd">Campaign History</Text>
+                        <Text as="h3" variant="headingMd">{t("campaignHistory.headerTitle")}</Text>
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Operational history from campaign runs
+                          {t("campaignHistory.headerSubtitle")}
                         </Text>
                       </BlockStack>
                       <Button
@@ -1285,7 +1286,7 @@ export default function CampaignHistoryPage() {
                           void handleRefreshScheduleJobs(false);
                         }}
                       >
-                        Refresh
+                        {t("campaignHistory.refresh")}
                       </Button>
                     </InlineStack>
 
@@ -1293,7 +1294,7 @@ export default function CampaignHistoryPage() {
                       <InlineStack gap="300" wrap align="start">
                         <div style={{ flex: "1 1 200px", minWidth: "180px" }}>
                           <Select
-                            label="Status"
+                            label={t("campaignHistory.status")}
                             options={campaignHistoryStatusOptions}
                             value={campaignHistoryStatusFilter}
                             onChange={(value) => setCampaignHistoryStatusFilter(value as CampaignHistoryStatusFilter)}
@@ -1301,7 +1302,7 @@ export default function CampaignHistoryPage() {
                         </div>
                         <div style={{ flex: "1 1 180px", minWidth: "160px" }}>
                           <Select
-                            label="Source"
+                            label={t("campaignHistory.source")}
                             options={campaignHistorySourceOptions}
                             value={campaignHistorySourceFilter}
                             onChange={(value) => setCampaignHistorySourceFilter(value as CampaignHistorySourceFilter)}
@@ -1309,7 +1310,7 @@ export default function CampaignHistoryPage() {
                         </div>
                         <div style={{ flex: "1 1 180px", minWidth: "170px" }}>
                           <Select
-                            label="Timeframe"
+                            label={t("campaignHistory.timeframe")}
                             options={campaignHistoryTimeframeOptions}
                             value={campaignHistoryTimeframeFilter}
                             onChange={(value) => setCampaignHistoryTimeframeFilter(value as CampaignHistoryTimeframeFilter)}
@@ -1317,20 +1318,20 @@ export default function CampaignHistoryPage() {
                         </div>
                         <div style={{ flex: "2 1 260px", minWidth: "220px" }}>
                           <TextField
-                            label="Search Campaigns"
+                            label={t("campaignHistory.searchCampaigns")}
                             value={campaignHistorySearchQuery}
                             onChange={(value) => {
                               if (value.length > 120) return;
                               setCampaignHistorySearchQuery(value);
                             }}
                             autoComplete="off"
-                            placeholder="Campaign title or campaign ID"
+                            placeholder={t("campaignHistory.searchPlaceholder")}
                             maxLength={120}
                           />
                         </div>
                       </InlineStack>
                       <Checkbox
-                        label="Hide Closed Campaigns"
+                        label={t("campaignHistory.hideClosedCampaigns")}
                         checked={hideClosedCampaigns}
                         onChange={(checked) => setHideClosedCampaigns(checked)}
                       />
@@ -1631,7 +1632,7 @@ export default function CampaignHistoryPage() {
         }}
         title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
         secondaryActions={[{
-          content: "Close",
+          content: t("common.close"),
           onAction: () => {
             setCampaignDetailOpen(false);
             setCampaignDetail(null);
@@ -1994,7 +1995,7 @@ export default function CampaignHistoryPage() {
             }
         }
         secondaryActions={[{
-          content: "Cancel",
+          content: t("common.cancel"),
           onAction: () => {
             setRevertPreviewOpen(false);
             setSelectedCampaignForRevert(null);

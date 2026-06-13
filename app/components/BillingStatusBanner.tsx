@@ -1,4 +1,5 @@
 import { Button, Banner } from "@shopify/polaris";
+import { t } from "../utils/i18n";
 
 export type BillingStatusValue =
   | "active"
@@ -41,17 +42,16 @@ export function BillingStatusBanner({
   }
 
   const handleActivate = () => {
+    sessionStorage.setItem("pp.billing.restore_initiated", "1");
     const targetWindow = window.top ?? window;
     targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
   };
 
   return (
-    <Banner tone="warning" title="Your subscription is inactive.">
-      <p>
-        Reactivate billing to continue using Price Polish without interruption.
-      </p>
+    <Banner tone="warning" title={t("billing.bannerTitleInactive")}>
+      <p>{t("billing.bannerBodyInactive")}</p>
       <Button variant="primary" onClick={handleActivate}>
-        Activate Subscription
+        {t("billing.bannerCtaActivateSubscription")}
       </Button>
     </Banner>
   );
