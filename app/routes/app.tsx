@@ -72,11 +72,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return billingResponse;
   }
 
-  // ─── BILLING APP ENTRY: successful billing result available ────────────────────
+  // ─── BILLING RECONCILIATION: sync cache with Shopify truth on every app entry ────
   // `billingResponse` is NOT a redirect — merchant was authenticated and approved.
   // Persist a local snapshot so the Billing page and diagnostics are populated.
   // This is non-fatal: persistence errors never block the app from loading.
-  console.log(`[BILLING APP ENTRY] shop=${shop}`);
+  console.log(`[BILLING RECONCILIATION] shop=${shop}`);
 
   try {
     const { persistBillingStateFromShopify } = await import(
@@ -88,10 +88,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       expectedPlanName: "basic",
       isTest: true,
     });
-    console.log(`[BILLING APP ENTRY SYNC] shop=${shop} subscription record persisted`);
+    console.log(`[BILLING RECONCILIATION SYNC] shop=${shop} subscription record reconciled`);
   } catch (err) {
     console.error(
-      `[BILLING APP ENTRY ERROR] shop=${shop} error=${
+      `[BILLING RECONCILIATION ERROR] shop=${shop} error=${
         err instanceof Error ? err.message : String(err)
       }`
     );
