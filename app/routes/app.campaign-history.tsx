@@ -25,6 +25,7 @@ import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 import { PricePolishLoader, PRICE_POLISH_LOADER_COPY, useDelayedVisibility } from "../components/PricePolishLoader";
+import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
 import { CampaignConflictExplorerModal } from "../components/CampaignConflictExplorerModal";
 import { ModalPagination } from "../components/ModalPagination";
 import { ModalScrollableSection } from "../components/ModalScrollableSection";
@@ -352,7 +353,7 @@ function getTimeframeStart(filter: CampaignHistoryTimeframeFilter, now = new Dat
 export default function CampaignHistoryPage() {
   const navigate = useNavigate();
   const shopify = useAppBridge();
-  const { currencyCode, hasActivePlan } = useOutletContext<{ currencyCode: string; hasActivePlan: boolean }>();
+  const { currencyCode, hasActivePlan, shop, host } = useOutletContext<{ currencyCode: string; hasActivePlan: boolean; shop: string; host: string }>();
   const appFetch = useAppFetch();
 
   const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([]);
@@ -393,6 +394,10 @@ export default function CampaignHistoryPage() {
   const [conflictExplorerOpen, setConflictExplorerOpen] = useState(false);
   const [conflictExplorerTitle, setConflictExplorerTitle] = useState("Campaign");
   const [conflictExplorerConflicts, setConflictExplorerConflicts] = useState<CampaignConflict[]>([]);
+
+  // Billing block modal state
+  const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
+  const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCampaignRuntimeNow(new Date()), 1000);
@@ -1182,7 +1187,13 @@ export default function CampaignHistoryPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error((data as any).error || "Failed to revert campaign.");
+        if (data.code === "BILLING_INACTIVE") {
+          throw new Error("Subscription inactive. Please reactivate billing to continue using Price Polish.");
+        } else if (data.code === "BILLING_UNKNOWN") {
+          throw new Error("Billing status could not be verified. Please refresh the app and try again.");
+        } else {
+          throw new Error((data as any).error || "Failed to revert campaign.");
+        }
       }
       const terminalReason = selectedCampaignForRevert?.unrecoverableReason;
       if ((data as any)?.terminal === true) {
@@ -1210,8 +1221,18 @@ export default function CampaignHistoryPage() {
       setRevertPreviewRetryFailedOnly(false);
       resetRevertPreviewViewState();
       await handleRefreshCampaignHistory(false);
-    } catch {
-      (shopify as any)?.toast?.show?.("Failed to revert campaign", { isError: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      if (isBillingError) {
+        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        // Close parent revert preview modal before showing billing modal
+        setRevertPreviewOpen(false);
+        setBillingBlockModalCode(code);
+        setBillingBlockModalOpen(true);
+      } else {
+        (shopify as any)?.toast?.show?.(message || "Failed to revert campaign", { isError: true });
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -2216,6 +2237,14 @@ export default function CampaignHistoryPage() {
           </BlockStack>
         </Modal.Section>
       </Modal>
+
+      <BillingBlockModal
+        open={billingBlockModalOpen}
+        code={billingBlockModalCode}
+        shop={shop}
+        host={host}
+        onClose={() => setBillingBlockModalOpen(false)}
+      />
     </>
   );
 }

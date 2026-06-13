@@ -42,6 +42,7 @@ import {
   type ImmediateApplyImpactSummary,
 } from "../components/ImmediateApplyConfirmationModal";
 import { PricePolishLoader, PRICE_POLISH_LOADER_COPY, useDelayedVisibility } from "../components/PricePolishLoader";
+import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
 import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
 import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
@@ -387,21 +388,21 @@ function DashboardLoader() {
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { currencyCode = "USD", isBypass } = useOutletContext<{ currencyCode?: string, isBypass?: boolean }>() || {};
+  const { currencyCode = "USD", shop = "", host = "", isBypass } = useOutletContext<{ currencyCode?: string; shop?: string; host?: string; isBypass?: boolean }>() || {};
 
   if (isBypass) {
-    return <DashboardContent isBypass={true} currencyCode={currencyCode} />;
+    return <DashboardContent isBypass={true} currencyCode={currencyCode} shop={shop} host={host} />;
   }
 
-  return <DashboardWithBridge currencyCode={currencyCode} />;
+  return <DashboardWithBridge currencyCode={currencyCode} shop={shop} host={host} />;
 }
 
-function DashboardWithBridge({ currencyCode }: { currencyCode: string }) {
+function DashboardWithBridge({ currencyCode, shop, host }: { currencyCode: string; shop: string; host: string }) {
   const shopify = useAppBridge();
-  return <DashboardContent shopify={shopify} currencyCode={currencyCode} />;
+  return <DashboardContent shopify={shopify} currencyCode={currencyCode} shop={shop} host={host} />;
 }
 
-function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, isBypass?: boolean, currencyCode: string }) {
+function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { shopify?: any; isBypass?: boolean; currencyCode: string; shop: string; host: string }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   // ruleExists = null → not yet fetched; true/false comes from backend DB check
   const [ruleExists, setRuleExists] = useState<boolean | null>(null);
@@ -460,6 +461,10 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
   const [immediateApplySingleItem, setImmediateApplySingleItem] = useState<PreviewItem | null>(null);
   const [immediateApplyModalItems, setImmediateApplyModalItems] = useState<PreviewItem[]>([]);
   const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] = useState(false);
+
+  // Billing block modal state
+  const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
+  const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
@@ -652,7 +657,12 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       console.log("[Apply] staging campaignId received:", stagingCampaignId);
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to apply pricing");
+        const billingError = result.code === "BILLING_INACTIVE"
+          ? "Subscription inactive. Please reactivate billing to continue using Price Polish."
+          : result.code === "BILLING_UNKNOWN"
+          ? "Billing status could not be verified. Please refresh the app and try again."
+          : result.error || "Failed to apply pricing";
+        throw new Error(billingError);
       }
 
       setActiveCampaignId(stagingCampaignId);
@@ -676,10 +686,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         const pushData = await pushRes.json();
 
         if (!pushRes.ok) {
+          const pushBillingError =
+            pushData.code === "BILLING_INACTIVE"
+              ? "Subscription inactive. Please reactivate billing to continue using Price Polish."
+              : pushData.code === "BILLING_UNKNOWN"
+              ? "Billing status could not be verified. Please refresh the app and try again."
+              : pushData.error || "Prices staged but failed to push live";
           console.log("Prices staged but failed to push live : - push data :", pushData);
-          throw new Error(
-            pushData.error || "Prices staged but failed to push live"
-          );
+          throw new Error(pushBillingError);
         }
 
         shopify.toast.show("Prices updated and live on storefront");
@@ -694,7 +708,17 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
 
       return true;
     } catch (error: any) {
-      shopify.toast.show(error.message || "Apply failed", { isError: true });
+      const message = error?.message || "Apply failed";
+      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      if (isBillingError) {
+        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        // Close parent confirmation modal before showing billing modal
+        setImmediateApplyModalOpen(false);
+        setBillingBlockModalCode(code);
+        setBillingBlockModalOpen(true);
+      } else {
+        shopify.toast.show(message, { isError: true });
+      }
       return false;
     } finally {
       setIsProcessing(false);
@@ -1245,12 +1269,27 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
         await handlePreview();
         setSelectedItems(new Set());
       } else {
-        throw new Error(data.error || "Failed to undo changes.");
+        if (data.code === "BILLING_INACTIVE") {
+          throw new Error("Subscription inactive. Please reactivate billing to continue using Price Polish.");
+        } else if (data.code === "BILLING_UNKNOWN") {
+          throw new Error("Billing status could not be verified. Please refresh the app and try again.");
+        } else {
+          throw new Error(data.error || "Failed to undo changes.");
+        }
       }
     } catch (err) {
       console.error("DEBUG: Undo Error detail:", err);
-      if (shopify) shopify.toast.show("Failed to undo changes", { isError: true });
-      else console.error("BYPASS: Failed to undo changes");
+      const message = err instanceof Error ? err.message : String(err);
+      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      if (isBillingError) {
+        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        setBillingBlockModalCode(code);
+        setBillingBlockModalOpen(true);
+      } else if (shopify) {
+        shopify.toast.show(message || "Failed to undo changes", { isError: true });
+      } else {
+        console.error("BYPASS: Failed to undo changes");
+      }
     } finally {
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
@@ -1362,7 +1401,13 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to revert campaign.");
+        if (data.code === "BILLING_INACTIVE") {
+          throw new Error("Subscription inactive. Please reactivate billing to continue using Price Polish.");
+        } else if (data.code === "BILLING_UNKNOWN") {
+          throw new Error("Billing status could not be verified. Please refresh the app and try again.");
+        } else {
+          throw new Error(data.error || "Failed to revert campaign.");
+        }
       }
       const terminalReason = selectedCampaignForRevert?.unrecoverableReason;
       if (data?.terminal === true) {
@@ -1395,8 +1440,19 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
       await handlePreview();
     } catch (err) {
       console.error("DEBUG: Campaign Revert Error detail:", err);
-      if (shopify) shopify.toast.show("Failed to revert campaign", { isError: true });
-      else console.error("BYPASS: Failed to revert campaign");
+      const message = err instanceof Error ? err.message : String(err);
+      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      if (isBillingError) {
+        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        // Close parent revert preview modal before showing billing modal
+        setRevertPreviewOpen(false);
+        setBillingBlockModalCode(code);
+        setBillingBlockModalOpen(true);
+      } else if (shopify) {
+        shopify.toast.show(message || "Failed to revert campaign", { isError: true });
+      } else {
+        console.error("BYPASS: Failed to revert campaign");
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -2195,7 +2251,7 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
                       <InlineStack gap="300" align="space-between">
                         <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
                         <Text as="span" variant="bodyMd">
-                          {typeof window !== "undefined" ? window.location.search.split("shop=")[1]?.split("&")[0] || "Unknown" : "Server"}
+                          {shop || "Unknown"}
                         </Text>
                       </InlineStack>
                     </BlockStack>
@@ -3245,6 +3301,8 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             open={scheduleHistoryModalOpen}
             onClose={() => setScheduleHistoryModalOpen(false)}
             currencyCode={currencyCode}
+            shop={shop}
+            host={host}
             previews={previews}
             filteredPreviews={filteredPreviews}
             selectedItems={selectedItems}
@@ -4006,6 +4064,14 @@ function DashboardContent({ shopify, isBypass, currencyCode }: { shopify?: any, 
             </BlockStack>
           </Modal.Section>
         </Modal>
+
+        <BillingBlockModal
+          open={billingBlockModalOpen}
+          code={billingBlockModalCode}
+          shop={shop}
+          host={host}
+          onClose={() => setBillingBlockModalOpen(false)}
+        />
 
       </Page>
     </div>

@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import prisma from "../../db.server";
 import { authenticate } from "../../shopify.server";
+import { requireActiveBilling } from "../../utils/billing-protection.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const auth = await authenticate.admin(request);
@@ -11,6 +11,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const { session, admin } = auth;
   const shop = session.shop;
 
+  const billingError = await requireActiveBilling(shop);
+  if (billingError) return Response.json(billingError, { status: 403 });
+
   const body = await request.json().catch(() => ({}));
   const { items, applyMode, collectionId } = body;
 
@@ -19,7 +22,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // 🔥 COLLECTION MODE
   if (applyMode === "collection") {
     if (!collectionId) {
-      return json(
+      return Response.json(
         { success: false, error: "Collection ID required" },
         { status: 400 }
       );
@@ -66,7 +69,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // 🔥 VALIDATION
   if (!finalItems || !Array.isArray(finalItems)) {
-    return json(
+    return Response.json(
       { success: false, error: "Invalid payload" },
       { status: 400 }
     );
@@ -82,5 +85,5 @@ export async function action({ request }: ActionFunctionArgs) {
     })),
   });
 
-  return json({ success: true });
+  return Response.json({ success: true });
 }

@@ -1,13 +1,7 @@
 import prisma from "../db.server";
+import { normalizeBillingStatus, type BillingStatusValue } from "./billing-status.server";
 
-export type BillingSyncStatus =
-  | "active"
-  | "trialing"
-  | "cancelled"
-  | "frozen"
-  | "expired"
-  | "none"
-  | "unknown";
+export type BillingSyncStatus = BillingStatusValue;
 
 export type PersistBillingParams = {
   shop: string;
@@ -43,29 +37,8 @@ function extractSubscriptionFields(result: Record<string, unknown>): {
   }
 
   const sub = appSubscriptions[0];
-  const rawStatus = (sub?.status ?? "unknown").toLowerCase();
   const plan = sub?.name ?? "basic";
-
-  let normalizedStatus: BillingSyncStatus = "unknown";
-  if (
-    rawStatus === "active" ||
-    rawStatus === "accepted" ||
-    rawStatus === "approved"
-  ) {
-    normalizedStatus = "active";
-  } else if (rawStatus === "trialing" || rawStatus === "trial") {
-    normalizedStatus = "trialing";
-  } else if (rawStatus === "cancelled" || rawStatus === "canceled") {
-    normalizedStatus = "cancelled";
-  } else if (rawStatus === "frozen") {
-    normalizedStatus = "frozen";
-  } else if (
-    rawStatus === "expired" ||
-    rawStatus === "declined" ||
-    rawStatus === "pending"
-  ) {
-    normalizedStatus = "expired";
-  }
+  const normalizedStatus = normalizeBillingStatus(sub?.status);
 
   const chargeId = sub?.id ? String(sub.id).split("/").pop() ?? null : null;
 

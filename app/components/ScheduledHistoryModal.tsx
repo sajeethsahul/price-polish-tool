@@ -18,6 +18,7 @@ import { formatMoney } from "../utils/format";
 import { CampaignConflictExplorerModal } from "./CampaignConflictExplorerModal";
 import { ExpandableList } from "./ExpandableList";
 import { ModalScrollableSection } from "./ModalScrollableSection";
+import { BillingBlockModal, type BillingBlockModalCode } from "./BillingBlockModal";
 import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
 import type {
   OperationalSafeguardNotice,
@@ -94,6 +95,8 @@ export interface ScheduledHistoryModalProps {
   open: boolean;
   onClose: () => void;
   currencyCode: string;
+  shop: string;
+  host: string;
   previews: PricingPreviewItem[];
   filteredPreviews: PricingPreviewItem[];
   selectedItems: Set<string>;
@@ -112,6 +115,8 @@ export function ScheduledHistoryModal({
   open,
   onClose,
   currencyCode,
+  shop,
+  host,
   previews,
   filteredPreviews,
   selectedItems,
@@ -141,6 +146,11 @@ export function ScheduledHistoryModal({
   const [scheduleTimeError, setScheduleTimeError] = useState<string | undefined>();
   const [windowEndTimeError, setWindowEndTimeError] = useState<string | undefined>();
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
+
+  // Billing block modal state
+  const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
+  const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
+
   const [historyFilter, setHistoryFilter] = useState<
     "all" | "upcoming" | "active" | "completed" | "restored" | "failed" | "overdue"
   >("all");
@@ -1037,7 +1047,12 @@ export function ScheduledHistoryModal({
       });
       const result = await response.json();
       if (!response.ok) {
-        shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+        if (result.code === "BILLING_INACTIVE" || result.code === "BILLING_UNKNOWN") {
+          setBillingBlockModalCode(result.code);
+          setBillingBlockModalOpen(true);
+        } else {
+          shopify.toast.show(result.error || "Scheduling failed", { isError: true });
+        }
         return;
       }
 
@@ -1733,6 +1748,14 @@ export function ScheduledHistoryModal({
           )}
         </Modal.Section>
       </Modal>
+
+      <BillingBlockModal
+        open={billingBlockModalOpen}
+        code={billingBlockModalCode}
+        shop={shop}
+        host={host}
+        onClose={() => setBillingBlockModalOpen(false)}
+      />
     </>
   );
 }

@@ -3,7 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
-//import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
+import { requireActiveBilling } from "../utils/billing-protection.server";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -32,58 +32,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await authenticate.admin(request);
   if (auth instanceof Response) return auth;
 
-  const { admin, session, billing } = auth;
+  const { admin, session } = auth;
   const shop = session.shop;
 
   console.log("[BULK] SESSION", { shop });
 
-  // ================= 💰 BILLING PROTECTION =================
-  try {
-    const billingCheck = await billing.check({
-      plans: ["basic"],
-      isTest: true,
-    });
-
-    const hasActivePlan =
-      billingCheck?.hasActivePayment ||
-      billingCheck?.appSubscriptions?.length > 0;
-
-    if (hasActivePlan) {
-      // await persistBillingStateFromShopify({
-      //   admin,
-      //   shop,
-      //   expectedPlanName: "basic",
-      //   isTest: true,
-      // });
-    }
-
-    if (!hasActivePlan) {
-      console.warn("[BULK] BLOCKED - NO ACTIVE PLAN");
-
-      return cors(
-        new Response(
-          JSON.stringify({
-            success: false,
-            error: "Upgrade required to apply pricing",
-          }),
-          {
-            status: 403,
-            headers: { "Content-Type": "application/json" },
-          }
-        )
-      );
-    }
-  } catch (err) {
-    console.error("[BULK] BILLING CHECK ERROR:", err);
-
+  const billingError = await requireActiveBilling(shop);
+  if (billingError) {
     return cors(
-      new Response(
-        JSON.stringify({
-          success: false,
-          error: "Billing validation failed",
-        }),
-        { status: 500 }
-      )
+      new Response(JSON.stringify(billingError), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      })
     );
   }
 

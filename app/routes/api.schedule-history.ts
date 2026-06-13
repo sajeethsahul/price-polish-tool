@@ -1,4 +1,3 @@
-import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
@@ -29,9 +28,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
             },
         });
 
-        return json({ jobs });
+        return Response.json({ jobs });
     } catch (error) {
         console.error("[Schedule History API] Error fetching jobs:", error);
-        return json({ error: "Failed to load schedule history" }, { status: 500 });
+        return Response.json({ error: "Failed to load schedule history" }, { status: 500 });
     }    
 }

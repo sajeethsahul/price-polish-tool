@@ -1,4 +1,3 @@
-import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
@@ -160,7 +159,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     if (campaigns.length === 0) {
       console.log("[Campaign History API] Count returned", { shop, count: 0 });
-      return json({ campaigns: [] });
+      return Response.json({ campaigns: [] });
     }
 
     const campaignIds = campaigns.map((c: any) => c.id)
@@ -393,9 +392,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
       campaignsWithTrackedHistory: result.filter((campaign) => campaign.totalTrackedCount > 0).length,
     });
 
-    return json({ campaigns: result });
+    return Response.json({ campaigns: result });
   } catch (error) {
     console.error("[Campaign History API] Error fetching campaign history:", error);
-    return json({ error: "Failed to load campaign history" }, { status: 500 });
+    return Response.json({ error: "Failed to load campaign history" }, { status: 500 });
   }
 }

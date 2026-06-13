@@ -1,8 +1,8 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { stagePrices } from "../utils/staging.server";
+import { requireActiveBilling } from "../utils/billing-protection.server";
 import type { ScheduledProductSnapshot } from "../types/pricing";
 
 function normalizeScheduledProductSnapshot(product: any): ScheduledProductSnapshot | null {
@@ -44,6 +44,9 @@ export async function action({ request }: ActionFunctionArgs) {
     const { session } = auth;
     const shop = session.shop;
 
+    const billingError = await requireActiveBilling(shop);
+    if (billingError) return Response.json(billingError, { status: 403 });
+
     const body = await request.json().catch(() => ({}));
     const { runAt, title } = body;
     const products = Array.isArray(body?.products)
@@ -55,7 +58,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const windowEndAt = typeof body?.windowEndAt === "string" ? body.windowEndAt : undefined;
 
     if (!runAt) {
-        return json({ error: "Choose when pricing should publish." }, { status: 400 });
+        return Response.json({ error: "Choose when pricing should publish." }, { status: 400 });
     }
 
     const runAtDate = new Date(runAt);
@@ -63,24 +66,24 @@ export async function action({ request }: ActionFunctionArgs) {
     const now = new Date();
 
     if (Number.isNaN(runAtDate.getTime())) {
-        return json({ error: "Choose a valid publish time." }, { status: 400 });
+        return Response.json({ error: "Choose a valid publish time." }, { status: 400 });
     }
 
     if (runAtDate.getTime() <= now.getTime()) {
-        return json({ error: "Choose a future start time before scheduling." }, { status: 400 });
+        return Response.json({ error: "Choose a future start time before scheduling." }, { status: 400 });
     }
 
     if (scheduleMode === "time-window") {
         if (!windowEndAtDate || Number.isNaN(windowEndAtDate.getTime())) {
-            return json({ error: "Choose when original pricing should restore." }, { status: 400 });
+            return Response.json({ error: "Choose when original pricing should restore." }, { status: 400 });
         }
 
         if (windowEndAtDate.getTime() <= runAtDate.getTime()) {
-            return json({ error: "Window end must be after the start time." }, { status: 400 });
+            return Response.json({ error: "Window end must be after the start time." }, { status: 400 });
         }
 
         if (!Array.isArray(products) || products.length === 0) {
-            return json(
+            return Response.json(
                 { error: "Choose products before scheduling a pricing window." },
                 { status: 400 }
             );
@@ -111,7 +114,7 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         if (!stageResult.success) {
-            return json(
+            return Response.json(
                 { error: stageResult.message || "Failed to stage prices for scheduling." },
                 { status: 400 }
             );
@@ -127,7 +130,7 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         if (!staged.length) {
-            return json(
+            return Response.json(
                 { error: "No products to schedule. Refresh previews and try again." },
                 { status: 400 }
             );
@@ -176,5 +179,5 @@ export async function action({ request }: ActionFunctionArgs) {
         }
     }
 
-    return json({ success: true, stagedCount, failedCount, ...(campaignId ? { campaignId } : {}) });
+    return Response.json({ success: true, stagedCount, failedCount, ...(campaignId ? { campaignId } : {}) });
 }

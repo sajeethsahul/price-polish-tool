@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { logActivity } from "../utils/activity.server";
+import { requireActiveBilling } from "../utils/billing-protection.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const preflight = handlePreflight(request);
@@ -16,6 +17,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { session, admin } = auth;
   const shop = session.shop;
+
+  const billingError = await requireActiveBilling(shop);
+  if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
 
   try {
     const body = await request.json();

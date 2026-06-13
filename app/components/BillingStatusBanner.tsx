@@ -20,12 +20,16 @@ export function isBillingActive(status: BillingStatusValue): boolean {
 
 interface BillingStatusBannerProps {
   status: BillingStatusValue;
+  shop: string;
+  host: string;
   /** Set to true when inside a route that is gated by billing (e.g. Dashboard). */
   showWhenInactiveOnly?: boolean;
 }
 
 export function BillingStatusBanner({
   status,
+  shop,
+  host,
   showWhenInactiveOnly = false,
 }: BillingStatusBannerProps) {
   if (showWhenInactiveOnly && isBillingActive(status)) {
@@ -37,14 +41,8 @@ export function BillingStatusBanner({
   }
 
   const handleActivate = () => {
-    const params = new URLSearchParams(window.location.search);
-    const shop = params.get("shop");
-    const host = params.get("host");
-    if (!shop || !host) return;
-    window.open(
-      `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`,
-      "_top"
-    );
+    const targetWindow = window.top ?? window;
+    targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
   };
 
   return (

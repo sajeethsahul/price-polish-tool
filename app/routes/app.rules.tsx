@@ -1,5 +1,3 @@
-// SAME IMPORTS (no change)
-
 import { useState, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import {
@@ -31,6 +29,8 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { calculatePrice } from "../utils/pricing";
+import { requireActiveBilling } from "../utils/billing-protection.server";
+import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
 
 // ================= LOADER =================
 
@@ -69,6 +69,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { session } = await authenticate.admin(request);
+    const shop = session.shop;
+
+    const billingError = await requireActiveBilling(shop);
+    if (billingError) return Response.json(billingError, { status: 403 });
+
     const formData = await request.formData();
 
     const adjustmentType = String(formData.get("adjustmentType") ?? "percentage");
@@ -221,20 +226,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function RulesPage() {
     const loaderData = useLoaderData<any>();
     const actionData = useActionData<any>();
-    const { currencyCode } = useOutletContext<any>();
+    const { currencyCode, shop, host } = useOutletContext<{ currencyCode: string; shop: string; host: string }>();
 
     return (
         <RulesContent
             loaderData={loaderData}
             actionData={actionData}
             currencyCode={currencyCode}
+            shop={shop}
+            host={host}
         />
     );
 }
 
 // ================= UI =================
 
-function RulesContent({ loaderData, actionData, currencyCode }: any) {
+function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any) {
     const navigate = useNavigate();
     const navigation = useNavigation();
     const shopify = useAppBridge();
@@ -256,10 +263,19 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
     const [roundingPrecision, setRoundingPrecision] = useState(String(loaderData.roundingPrecision ?? "standard").toLowerCase());
     const [minPrice, setMinPrice] = useState(loaderData.minPrice === null ? "" : String(loaderData.minPrice));
     const [maxPrice, setMaxPrice] = useState(loaderData.maxPrice === null ? "" : String(loaderData.maxPrice));
+    const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
+    const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
     useEffect(() => {
         if (actionData?.saved) {
             shopify.toast.show("Saved successfully");
+        }
+        if (actionData?.code === "BILLING_INACTIVE") {
+            setBillingBlockModalCode("BILLING_INACTIVE");
+            setBillingBlockModalOpen(true);
+        } else if (actionData?.code === "BILLING_UNKNOWN") {
+            setBillingBlockModalCode("BILLING_UNKNOWN");
+            setBillingBlockModalOpen(true);
         }
     }, [actionData]);
 
@@ -539,6 +555,14 @@ function RulesContent({ loaderData, actionData, currencyCode }: any) {
 
             </Layout>
             </div>
+
+            <BillingBlockModal
+                open={billingBlockModalOpen}
+                code={billingBlockModalCode}
+                shop={shop}
+                host={host}
+                onClose={() => setBillingBlockModalOpen(false)}
+            />
         </Page>
     );
 }

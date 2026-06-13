@@ -34,6 +34,7 @@ import {
   isBillingActive,
   type BillingStatusValue,
 } from "../components/BillingStatusBanner";
+import { normalizeBillingFromResult } from "../utils/billing-status.server";
 //import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 // ================= LOADER =================
@@ -85,26 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // Inline extraction — mirrors billing-persistence.server.ts logic without sharing server-only code.
   const rawBillingResult = billingResponse as unknown as Record<string, unknown>;
-  const appSubscriptions = (
-    rawBillingResult?.appSubscriptions as Array<{ id?: string | null; status?: string | null; name?: string | null }> | null | undefined
-  );
-  const firstSub = appSubscriptions && appSubscriptions.length > 0 ? appSubscriptions[0] : null;
-  const rawStatus = (firstSub?.status ?? "unknown").toLowerCase();
-  let normalizedStatus: BillingStatusValue = "unknown";
-  if (rawStatus === "active" || rawStatus === "accepted" || rawStatus === "approved") {
-    normalizedStatus = "active";
-  } else if (rawStatus === "trialing" || rawStatus === "trial") {
-    normalizedStatus = "trialing";
-  } else if (rawStatus === "cancelled" || rawStatus === "canceled") {
-    normalizedStatus = "cancelled";
-  } else if (rawStatus === "frozen") {
-    normalizedStatus = "frozen";
-  } else if (rawStatus === "expired" || rawStatus === "declined" || rawStatus === "pending") {
-    normalizedStatus = "expired";
-  } else if (!appSubscriptions || appSubscriptions.length === 0) {
-    normalizedStatus = "none";
-  }
-  const billingStatus: BillingStatusValue = normalizedStatus;
+  const billingStatus: BillingStatusValue = normalizeBillingFromResult(rawBillingResult);
 
   try {
     const { persistBillingStateFromShopify } = await import(
@@ -148,6 +130,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
+    shop,
     host,
     currencyCode,
     hasActivePlan,
@@ -162,7 +145,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   const isLoading = navigation.state === "loading";
-  const { apiKey, host, currencyCode, hasActivePlan, billingStatus } = data;
+  const { apiKey, shop, host, currencyCode, hasActivePlan, billingStatus } = data;
   const loadingPathname = navigation.location?.pathname ?? location.pathname;
   const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
   const showBrandedLoader = useDelayedVisibility(isLoading, 300);
@@ -185,6 +168,8 @@ export default function AppLayout() {
 
             <BillingStatusBanner
               status={billingStatus as BillingStatusValue}
+              shop={shop}
+              host={host}
             />
 
             {!hasActivePlan ? (
@@ -200,16 +185,8 @@ export default function AppLayout() {
                     <Button
                       variant="primary"
                       onClick={() => {
-                        const params = new URLSearchParams(window.location.search);
-                        const shop = params.get("shop");
-                        const host = params.get("host");
-
-                        if (!shop || !host) return;
-
-                        window.open(
-                          `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`,
-                          "_top"
-                        );
+                        const targetWindow = window.top ?? window;
+                        targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
                       }}
                     >
                       Start Free Trial
@@ -218,7 +195,7 @@ export default function AppLayout() {
                 </Card>
               </Page>
             ) : (
-              <Outlet context={{ currencyCode, hasActivePlan }} />
+              <Outlet context={{ currencyCode, hasActivePlan, shop, host }} />
             )}
           </>
         )}

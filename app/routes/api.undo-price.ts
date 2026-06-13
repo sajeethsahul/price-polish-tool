@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { revertCampaignPrices } from "../utils/revert.server";
+import { requireActiveBilling } from "../utils/billing-protection.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
@@ -27,6 +28,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const { admin, session } = auth;
     const shop = session.shop;
+
+    const billingError = await requireActiveBilling(shop);
+    if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
 
     console.log("[UNDO] SESSION", { shop });
 

@@ -2,9 +2,15 @@ import type { ActionFunctionArgs } from "react-router";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { stagePrices } from "../utils/staging.server";
+import { requireActiveBilling } from "../utils/billing-protection.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+
+  const billingError = await requireActiveBilling(shop);
+  if (billingError) return new Response(JSON.stringify(billingError), { status: 403 });
+
   const body = await request.json();
 
   const products = body?.products || [];
