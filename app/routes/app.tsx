@@ -29,6 +29,11 @@ import {
   resolvePricePolishLoaderCopy,
   useDelayedVisibility,
 } from "../components/PricePolishLoader";
+import {
+  BillingStatusBanner,
+  isBillingActive,
+  type BillingStatusValue,
+} from "../components/BillingStatusBanner";
 //import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
 // ================= LOADER =================
@@ -78,17 +83,40 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // This is non-fatal: persistence errors never block the app from loading.
   console.log(`[BILLING RECONCILIATION] shop=${shop}`);
 
+  // Inline extraction — mirrors billing-persistence.server.ts logic without sharing server-only code.
+  const rawBillingResult = billingResponse as unknown as Record<string, unknown>;
+  const appSubscriptions = (
+    rawBillingResult?.appSubscriptions as Array<{ id?: string | null; status?: string | null; name?: string | null }> | null | undefined
+  );
+  const firstSub = appSubscriptions && appSubscriptions.length > 0 ? appSubscriptions[0] : null;
+  const rawStatus = (firstSub?.status ?? "unknown").toLowerCase();
+  let normalizedStatus: BillingStatusValue = "unknown";
+  if (rawStatus === "active" || rawStatus === "accepted" || rawStatus === "approved") {
+    normalizedStatus = "active";
+  } else if (rawStatus === "trialing" || rawStatus === "trial") {
+    normalizedStatus = "trialing";
+  } else if (rawStatus === "cancelled" || rawStatus === "canceled") {
+    normalizedStatus = "cancelled";
+  } else if (rawStatus === "frozen") {
+    normalizedStatus = "frozen";
+  } else if (rawStatus === "expired" || rawStatus === "declined" || rawStatus === "pending") {
+    normalizedStatus = "expired";
+  } else if (!appSubscriptions || appSubscriptions.length === 0) {
+    normalizedStatus = "none";
+  }
+  const billingStatus: BillingStatusValue = normalizedStatus;
+
   try {
     const { persistBillingStateFromShopify } = await import(
       "../utils/billing-persistence.server"
     );
     await persistBillingStateFromShopify({
       shop,
-      billingResult: billingResponse as unknown as Record<string, unknown>,
+      billingResult: rawBillingResult,
       expectedPlanName: "basic",
       isTest: true,
     });
-    console.log(`[BILLING RECONCILIATION SYNC] shop=${shop} subscription record reconciled`);
+    console.log(`[BILLING RECONCILIATION SYNC] shop=${shop} billingStatus=${billingStatus}`);
   } catch (err) {
     console.error(
       `[BILLING RECONCILIATION ERROR] shop=${shop} error=${
@@ -97,8 +125,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  // ✅ If reached here → user has active plan
-  const hasActivePlan = true;
+  // ✅ hasActivePlan reflects enforcement gate (always true — no billing gating in this phase).
+  const hasActivePlan = isBillingActive(billingStatus);
 
   // 💱 CURRENCY
   let currencyCode = "USD";
@@ -123,6 +151,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host,
     currencyCode,
     hasActivePlan,
+    billingStatus,
   };
 };
 
@@ -133,7 +162,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   const isLoading = navigation.state === "loading";
-  const { apiKey, host, currencyCode, hasActivePlan } = data;
+  const { apiKey, host, currencyCode, hasActivePlan, billingStatus } = data;
   const loadingPathname = navigation.location?.pathname ?? location.pathname;
   const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
   const showBrandedLoader = useDelayedVisibility(isLoading, 300);
@@ -153,6 +182,10 @@ export default function AppLayout() {
               <Link to="/app/settings">Settings</Link>
               <Link to="/app/help">Help</Link>
             </NavMenu>
+
+            <BillingStatusBanner
+              status={billingStatus as BillingStatusValue}
+            />
 
             {!hasActivePlan ? (
               <Page title="Start Free Trial">
