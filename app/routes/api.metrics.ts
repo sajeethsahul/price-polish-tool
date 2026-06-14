@@ -8,6 +8,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (preflight) return preflight;
 
     const auth = await authenticate.admin(request);
+    if (auth instanceof Response) {
+        console.log("[AUTH/BILLING REDIRECT]");
+        console.log("REQUEST:", request.url);
+        console.log("STATUS:", auth.status);
+        console.log("LOCATION:", auth.headers.get("Location"));
+        return auth;
+    }
     
     if (!auth?.session) {
         console.error("NO SESSION FOUND IN REQUEST (METRICS)");

@@ -72,7 +72,20 @@ export default shopify;
 
 // ✅ REQUIRED EXPORTS
 export const apiVersion = ApiVersion.October24;
-export const authenticate = shopify.authenticate;
+const baseAuthenticate = shopify.authenticate;
+export const authenticate = {
+  ...baseAuthenticate,
+  admin: async (request: Request) => {
+    const result = await baseAuthenticate.admin(request);
+    if (result instanceof Response) {
+      console.log("[AUTH REDIRECT TRACE]");
+      console.log("REQUEST:", request.url);
+      console.log("STATUS:", result.status);
+      console.log("LOCATION:", result.headers.get("Location"));
+    }
+    return result;
+  },
+} as typeof shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;

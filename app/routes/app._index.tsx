@@ -47,7 +47,6 @@ import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pr
 import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 import { t } from "../utils/i18n";
-import { FirstPricingUpdateCelebrationModal, MerchantOnboardingCard, NextStepsCalloutCard, ReviewRequestCard } from "../components/MerchantOnboardingExperience";
 
 
 const BATCH_SIZE = 50;
@@ -488,9 +487,6 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
   const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
-  const [celebrationOpen, setCelebrationOpen] = useState(false);
-  const [reviewRequestHidden, setReviewRequestHidden] = useState(false);
-
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
     if (shopify) shopify.toast.show(t("toast.billingComingSoon"));
@@ -507,47 +503,6 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const navigate = useNavigate();
   const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
-
-  const onboardingState = metrics.onboarding ?? DEFAULT_DASHBOARD_METRICS.onboarding!;
-  const onboardingProgress = {
-    hasRule: Boolean(onboardingState.onboardingFirstRuleAt) || ruleExists === true,
-    hasPreviewed: Boolean(onboardingState.onboardingFirstPreviewAt),
-    hasApplied: Boolean(onboardingState.onboardingFirstApplyStartAt),
-    hasScheduled: Boolean(onboardingState.onboardingFirstScheduleAt),
-    hasCompletedFirstUpdate: Boolean(onboardingState.onboardingFirstApplyAt),
-  };
-
-  const postOnboardingEvent = useCallback(async (event: "celebration.dismiss" | "review.dismiss" | "review.shown") => {
-    const fetcher = await appFetch;
-    await fetcher("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event }),
-    });
-  }, [appFetch]);
-
-  useEffect(() => {
-    if (onboardingProgress.hasCompletedFirstUpdate && !onboardingState.onboardingCelebratedAt) {
-      setCelebrationOpen(true);
-    }
-  }, [onboardingProgress.hasCompletedFirstUpdate, onboardingState.onboardingCelebratedAt]);
-
-  const eligibleForReviewRequest =
-    onboardingProgress.hasCompletedFirstUpdate ||
-    metrics.scheduledRunsCount >= 2 ||
-    metrics.activeCampaignsCount >= 2;
-
-  const shouldShowReviewRequest =
-    eligibleForReviewRequest &&
-    Boolean(onboardingState.onboardingCelebratedAt) &&
-    !onboardingState.reviewRequestDismissedAt &&
-    !reviewRequestHidden;
-
-  useEffect(() => {
-    if (!shouldShowReviewRequest) return;
-    if (onboardingState.reviewRequestShownAt) return;
-    void postOnboardingEvent("review.shown").catch(() => {});
-  }, [onboardingState.reviewRequestShownAt, postOnboardingEvent, shouldShowReviewRequest]);
 
   // ADDED: Guard helper — shows toast and blocks execution when no rules exist
   const guardNoRules = useCallback(() => {
@@ -2341,37 +2296,6 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
               </>
             )}
 
-            {!onboardingProgress.hasCompletedFirstUpdate && (
-              <MerchantOnboardingCard
-                progress={onboardingProgress}
-                onCreateFirstRule={() => navigate("/app/rules")}
-                onWatchSetupGuide={() => navigate("/app/help")}
-              />
-            )}
-
-            {onboardingProgress.hasCompletedFirstUpdate && (
-              <NextStepsCalloutCard
-                onExploreScheduling={() => setScheduleHistoryModalOpen(true)}
-                onReviewCampaignHistory={() => navigate("/app/campaign-history")}
-                onReviewPricingRules={() => navigate("/app/rules")}
-              />
-            )}
-
-            {shouldShowReviewRequest && (
-              <ReviewRequestCard
-                onPrimary={() => {
-                  const url = t("dashboard.review.url");
-                  window.open(url, "_blank", "noopener,noreferrer");
-                  setReviewRequestHidden(true);
-                  void postOnboardingEvent("review.dismiss").catch(() => {});
-                }}
-                onDismiss={() => {
-                  setReviewRequestHidden(true);
-                  void postOnboardingEvent("review.dismiss").catch(() => {});
-                }}
-              />
-            )}
-
             {/* Billing Upsell */}
             {!hasActivePlan && (
               <Card>
@@ -4144,19 +4068,6 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             </BlockStack>
           </Modal.Section>
         </Modal>
-
-        <FirstPricingUpdateCelebrationModal
-          open={celebrationOpen}
-          onExploreScheduling={() => {
-            setCelebrationOpen(false);
-            setScheduleHistoryModalOpen(true);
-            void postOnboardingEvent("celebration.dismiss").catch(() => {});
-          }}
-          onClose={() => {
-            setCelebrationOpen(false);
-            void postOnboardingEvent("celebration.dismiss").catch(() => {});
-          }}
-        />
 
         <BillingBlockModal
           open={billingBlockModalOpen}

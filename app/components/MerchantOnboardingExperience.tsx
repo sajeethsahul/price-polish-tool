@@ -253,17 +253,7 @@ export function NextStepsCalloutCard({
   onReviewPricingRules: () => void;
 }) {
   return (
-    <CalloutCard
-      title={t("dashboard.nextSteps.title")}
-      primaryAction={{
-        content: t("dashboard.nextSteps.primary"),
-        onAction: onExploreScheduling,
-      }}
-      secondaryAction={{
-        content: t("dashboard.nextSteps.secondary"),
-        onAction: onReviewCampaignHistory,
-      }}
-    >
+    <Card>
       <BlockStack gap="200">
         <Text as="p" tone="subdued">
           {t("dashboard.nextSteps.subtitle")}
@@ -280,7 +270,7 @@ export function NextStepsCalloutCard({
           </Button>
         </InlineStack>
       </BlockStack>
-    </CalloutCard>
+    </Card>
   );
 }
 

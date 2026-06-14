@@ -18,10 +18,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // ================= AUTH =================
   const auth = await authenticate.admin(request);
-
-  // ================= REDIRECT HANDLING =================
-  if ((auth as any)?.redirect) {
-    return (auth as any).redirect;
+  if (auth instanceof Response) {
+    console.log("[AUTH/BILLING REDIRECT]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", auth.status);
+    console.log("LOCATION:", auth.headers.get("Location"));
+    return auth;
   }
 
   // ================= SUCCESS =================

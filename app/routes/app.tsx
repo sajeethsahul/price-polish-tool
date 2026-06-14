@@ -4,6 +4,7 @@ import {
   useLoaderData,
   useNavigation,
   useLocation,
+  redirect,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useEffect, useState } from "react";
@@ -44,9 +45,34 @@ import { t } from "../utils/i18n";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
 
+  const toTopLevelRedirect = (response: Response): Response => {
+    const location = response.headers.get("Location");
+    console.log("[REDIRECT TRACE]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", response.status);
+    console.log("LOCATION:", location);
+    if (!location) return response;
+    if (!location.startsWith("https://admin.shopify.com")) return response;
+
+    const html = `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head><body><script>window.top.location.href=${JSON.stringify(location)};</script></body></html>`;
+    return new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  };
+
   // 🔐 AUTH (MANDATORY)
   const auth = await authenticate.admin(request);
-  if (auth instanceof Response) return auth;
+  if (auth instanceof Response) {
+    console.log("[AUTH/BILLING REDIRECT]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", auth.status);
+    console.log("LOCATION:", auth.headers.get("Location"));
+    return toTopLevelRedirect(auth);
+  }
 
   const { admin, session, billing } = auth;
 
@@ -65,6 +91,34 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     host = Buffer.from(`admin.shopify.com/store/${store}`).toString("base64");
   }
 
+  // Check if merchant has completed onboarding
+  const { default: prisma } = await import("../db.server");
+  const appState = await prisma.appState.findUnique({
+    where: { shop },
+    select: { onboardingFirstApplyAt: true },
+  });
+  const isOnboarded = Boolean(appState?.onboardingFirstApplyAt);
+
+  // Onboarding guard: redirect to /app/welcome for un-onboarded merchants accessing non-welcome routes
+  const pathname = url.pathname;
+  const isWelcomeRoute = pathname === "/app/welcome";
+  if (!isOnboarded && !isWelcomeRoute) {
+    console.log("[REDIRECT TRACE]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", 302);
+    console.log("LOCATION:", `/app/welcome?shop=${shop}&host=${host}`);
+    return redirect(
+      `/app/welcome?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`
+    );
+  }
+  if (isOnboarded && isWelcomeRoute) {
+    console.log("[REDIRECT TRACE]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", 302);
+    console.log("LOCATION:", `/app?shop=${shop}&host=${host}`);
+    return redirect(`/app?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`);
+  }
+
   // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
   const billingResponse = await billing.require({
     plans: ["basic"],
@@ -78,7 +132,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // If Shopify wants to redirect → do it
   if (billingResponse instanceof Response) {
-    return billingResponse;
+    console.log("[AUTH/BILLING REDIRECT]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", billingResponse.status);
+    console.log("LOCATION:", billingResponse.headers.get("Location"));
+    return toTopLevelRedirect(billingResponse);
   }
 
   // ─── BILLING RECONCILIATION: sync cache with Shopify truth on every app entry ────
@@ -138,6 +196,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCode,
     hasActivePlan,
     billingStatus,
+    isOnboarded,
   };
 };
 
@@ -148,7 +207,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   const isLoading = navigation.state === "loading";
-  const { apiKey, shop, host, currencyCode, hasActivePlan, billingStatus } = data;
+  const { apiKey, shop, host, currencyCode, hasActivePlan, billingStatus, isOnboarded } = data;
   const loadingPathname = navigation.location?.pathname ?? location.pathname;
   const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
   const showBrandedLoader = useDelayedVisibility(isLoading, 300);
@@ -176,6 +235,7 @@ export default function AppLayout() {
           <>
             <NavMenu>
               <Link to="/app">Dashboard</Link>
+              <Link to="/app/welcome">Get Started</Link>
               <Link to="/app/campaign-history">Campaign History</Link>
               <Link to="/app/rules">Pricing Rules</Link>
               <Link to="/app/billing">Billing</Link>

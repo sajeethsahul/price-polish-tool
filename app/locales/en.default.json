@@ -87,6 +87,71 @@
     "hideClosedCampaigns": "Hide Closed Campaigns",
     "refresh": "Refresh"
   },
+  "welcome": {
+    "pageTitle": "Get Started",
+    "hero": {
+      "title": "Welcome to Price Polish",
+      "primary": "Get started",
+      "line1": "Manage pricing updates with confidence.",
+      "line2": "Reduce manual pricing work.",
+      "line3": "Stay in control of promotions and scheduled pricing.",
+      "why": "Price Polish helps you manage pricing changes more efficiently, reduce repetitive manual work, and maintain better control over promotions."
+    },
+    "trust": {
+      "title": "Why merchants trust Price Polish",
+      "bulk": "Bulk price updates in minutes",
+      "schedule": "Schedule promotions in advance",
+      "history": "Pricing history for every change",
+      "revert": "Revert changes when needed",
+      "billing": "Built-in billing protection",
+      "integrated": "Shopify-integrated workflow"
+    },
+    "safety": {
+      "title": "Your pricing stays protected",
+      "subtitle": "Designed to reduce risk and help you move forward with confidence.",
+      "item1": "Every pricing update is recorded",
+      "item2": "Campaign activity is tracked",
+      "item3": "Changes can be reverted",
+      "item4": "Scheduling can be cancelled",
+      "item5": "Original pricing history is preserved"
+    },
+    "social": {
+      "title": "Built for growing Shopify merchants",
+      "subtitle": "Designed to simplify pricing operations and reduce manual effort."
+    },
+    "step": {
+      "skip": "Skip for now",
+      "next": "Continue",
+      "createRule": {
+        "title": "Step 1: Create your first pricing rule",
+        "done": "Pricing rule created",
+        "doneBody": "Your pricing rule is set up. You can adjust it any time from the Rules page.",
+        "body": "A pricing rule tells Price Polish how to calculate your prices. Start with a percentage markup or markdown, then choose how prices should end.",
+        "cta": "Create Pricing Rule",
+        "tipTitle": "Tip: Start simple",
+        "tip": "Begin with a small percentage adjustment. You can preview results before applying anything to your store."
+      },
+      "preview": {
+        "title": "Step 2: Preview your pricing",
+        "done": "Prices previewed",
+        "doneBody": "You've seen how your pricing rule applies to your products. Ready to apply it?",
+        "body": "Preview shows you exactly what prices will change to before you apply anything. Review the list and confirm the changes look right.",
+        "cta": "View Product Previews"
+      },
+      "apply": {
+        "title": "Step 3: Apply your first pricing update",
+        "done": "Pricing update applied",
+        "doneBody": "Your pricing update was applied. The history is recorded and can be reverted at any time.",
+        "body": "Apply your pricing to your store catalog. Every change is tracked and can be reverted, so you can move forward confidently.",
+        "cta": "Go to Dashboard"
+      }
+    },
+    "success": {
+      "title": "Setup complete",
+      "body": "Your pricing update was applied successfully.\n\nYou're ready to run future pricing updates with confidence. Review your campaign history, schedule promotions, or adjust your pricing rules at any time.",
+      "cta": "Go to Dashboard"
+    }
+  },
   "dashboard": {
     "onboarding": {
       "heroTitle": "Welcome to Price Polish",

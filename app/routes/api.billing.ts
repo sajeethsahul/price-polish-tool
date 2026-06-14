@@ -11,7 +11,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // 🚨 VERY IMPORTANT — handle session-token redirects
   if (auth instanceof Response) {
-    console.log("⚠️ AUTH REDIRECT");
+    console.log("[AUTH/BILLING REDIRECT]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", auth.status);
+    console.log("LOCATION:", auth.headers.get("Location"));
     return auth;
   }
 
@@ -34,6 +37,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       });
     },
   });
+
+  if (result instanceof Response) {
+    console.log("[AUTH/BILLING REDIRECT]");
+    console.log("REQUEST:", request.url);
+    console.log("STATUS:", result.status);
+    console.log("LOCATION:", result.headers.get("Location"));
+  }
 
   // ─── BILLING CALLBACK: approval flow completed ───────────────────────────────
   // `result` is the Shopify billing context — NOT a redirect Response.
