@@ -306,38 +306,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     // ============================
-    // 🔥 MARK LIVE
+    // 🔥 MARK LIVE — only when at least one variant was actually updated
     // ============================
-    await prisma.appState.upsert({
-      where: { shop },
-      update: { isLive: true },
-      create: { shop, isLive: true },
-    });
-
-    // FIX 5: Clear staged prices now that they have been published to Shopify.
-    // Only runs when at least one variant succeeded — PriceHistory is the rollback
-    // mechanism from this point on. If every variant failed, staged data is preserved
-    // so the user can retry Go Live without re-applying.
     if (successCount > 0) {
-      await prisma.stagedPrice.deleteMany({ where: stagedWhere });
-      console.log(`✅ StagedPrice cleared for shop ${shop} after successful Go Live (${successCount} applied)`);
-    }
-
-    await logActivity(shop, "GO_LIVE", {
-      successCount,
-      failCount,
-    });
-
-    const state = await prisma.appState.findUnique({
-      where: { shop },
-      select: { onboardingFirstApplyAt: true },
-    });
-    if (!state?.onboardingFirstApplyAt && successCount > 0) {
       await prisma.appState.upsert({
         where: { shop },
-        update: { onboardingFirstApplyAt: new Date() },
-        create: { shop, isLive: true, onboardingFirstApplyAt: new Date() },
+        update: { isLive: true },
+        create: { shop, isLive: true },
       });
+
+      // FIX 5: Clear staged prices now that they have been published to Shopify.
+      // Only runs when at least one variant succeeded — PriceHistory is the rollback
+      // mechanism from this point on. If every variant failed, staged data is preserved
+      // so the user can retry Go Live without re-applying.
+      await prisma.stagedPrice.deleteMany({ where: stagedWhere });
+      console.log(`✅ StagedPrice cleared for shop ${shop} after successful Go Live (${successCount} applied)`);
+
+      await logActivity(shop, "GO_LIVE", {
+        successCount,
+        failCount,
+      });
+
+      const state = await prisma.appState.findUnique({
+        where: { shop },
+        select: { onboardingFirstApplyAt: true },
+      });
+      if (!state?.onboardingFirstApplyAt) {
+        await prisma.appState.upsert({
+          where: { shop },
+          update: { onboardingFirstApplyAt: new Date() },
+          create: { shop, isLive: true, onboardingFirstApplyAt: new Date() },
+        });
+      }
     }
 
     return cors(
