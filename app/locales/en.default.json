@@ -87,6 +87,25 @@
     "hideClosedCampaigns": "Hide Closed Campaigns",
     "refresh": "Refresh"
   },
+  "loading": {
+    "appName": "Price Polish",
+    "tagline": "Automated Pricing Management for Shopify",
+    "preparingWorkspace": "Preparing your pricing workspace",
+    "stillLoading": "Still loading...",
+    "almostReady": "Almost ready...",
+    "storeSafe": "Your store data is safe and secure.",
+    "connectionFinalizing": "We're finalizing your Shopify connection.",
+    "secureConnection": "Secure Shopify connection",
+    "subscriptionVerified": "Subscription verified",
+    "pricingEngineReady": "Pricing engine ready",
+    "usuallyTakesSeconds": "This usually takes only a few seconds.",
+    "trust": {
+      "priceUnchanged": "Your product prices remain unchanged until you approve updates.",
+      "reviewBeforePublish": "Every pricing update can be reviewed before publishing.",
+      "campaignHistory": "Campaign history keeps track of all changes.",
+      "revertAnytime": "You can revert pricing changes anytime."
+    }
+  },
   "welcome": {
     "pageTitle": "Get Started",
     "hero": {

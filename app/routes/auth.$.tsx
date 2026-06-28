@@ -1,6 +1,8 @@
 import type { LoaderFunctionArgs, HeadersFunction } from "react-router";
 import { authenticate, login } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import { AppProvider } from "@shopify/polaris";
+import { AppLaunchSplash } from "../components/AppLaunchSplash";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -52,3 +54,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export const headers: HeadersFunction = (headersArgs) => {
   return boundary.headers(headersArgs);
 };
+
+export default function AuthSplash() {
+  return (
+    <AppProvider i18n={{}}>
+      <AppLaunchSplash />
+    </AppProvider>
+  );
+}

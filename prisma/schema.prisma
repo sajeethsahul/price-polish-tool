@@ -157,6 +157,7 @@ model AppState {
   onboardingFirstApplyStartAt DateTime?
   onboardingFirstApplyAt      DateTime?
   onboardingFirstScheduleAt   DateTime?
+  onboardingCompletedAt       DateTime?
   onboardingCelebratedAt      DateTime?
   reviewRequestShownAt        DateTime?
   reviewRequestDismissedAt    DateTime?

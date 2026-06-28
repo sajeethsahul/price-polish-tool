@@ -726,6 +726,23 @@ export function startWorker() {
                             create: { shop, isLive: true },
                         });
 
+                        // Record the first successful scheduled publish as an onboarding
+                        // milestone. The immediate-apply paths (api.staging-price,
+                        // api.push-storefront) do this for interactive applies; the worker
+                        // must do the same for scheduled applies so merchants who schedule
+                        // before using the immediate apply buttons are not left permanently
+                        // un-onboarded.
+                        const onboardingState = await prisma.appState.findUnique({
+                            where: { shop },
+                            select: { onboardingFirstApplyAt: true },
+                        });
+                        if (!onboardingState?.onboardingFirstApplyAt) {
+                            await prisma.appState.update({
+                                where: { shop },
+                                data: { onboardingFirstApplyAt: new Date() },
+                            });
+                        }
+
                         if (job.campaignId) {
                             const nextCampaignStatus = isTimeWindow
                                 ? "active-window"

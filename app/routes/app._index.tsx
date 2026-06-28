@@ -156,6 +156,7 @@ interface DashboardMetrics {
     onboardingFirstApplyStartAt: string | null;
     onboardingFirstApplyAt: string | null;
     onboardingFirstScheduleAt: string | null;
+    onboardingCompletedAt: string | null;
     onboardingCelebratedAt: string | null;
     reviewRequestShownAt: string | null;
     reviewRequestDismissedAt: string | null;
@@ -188,6 +189,7 @@ const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
     onboardingFirstApplyStartAt: null,
     onboardingFirstApplyAt: null,
     onboardingFirstScheduleAt: null,
+    onboardingCompletedAt: null,
     onboardingCelebratedAt: null,
     reviewRequestShownAt: null,
     reviewRequestDismissedAt: null,

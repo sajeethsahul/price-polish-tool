@@ -2,8 +2,6 @@ import {
   Outlet,
   Link,
   useLoaderData,
-  useNavigation,
-  useLocation,
   redirect,
 } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
@@ -27,11 +25,6 @@ import {
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { recordShopInstall } from "../utils/shop-lifecycle.server";
-import {
-  PricePolishLoader,
-  resolvePricePolishLoaderCopy,
-  useDelayedVisibility,
-} from "../components/PricePolishLoader";
 import {
   BillingStatusBanner,
   isBillingActive,
@@ -95,28 +88,110 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { default: prisma } = await import("../db.server");
   const appState = await prisma.appState.findUnique({
     where: { shop },
-    select: { onboardingFirstApplyAt: true },
+    select: {
+      onboardingFirstRuleAt: true,
+      onboardingFirstPreviewAt: true,
+      onboardingFirstApplyStartAt: true,
+      onboardingFirstApplyAt: true,
+      onboardingFirstScheduleAt: true,
+      onboardingCompletedAt: true,
+      onboardingCelebratedAt: true,
+    },
   });
-  const isOnboarded = Boolean(appState?.onboardingFirstApplyAt);
+  const isOnboarded =
+    Boolean(appState?.onboardingCompletedAt) ||
+    Boolean(appState?.onboardingFirstApplyAt);
+
+  // True once the merchant has completed a meaningful wizard milestone.
+  // Distinguishes "brand-new install" (all null → force wizard) from
+  // "in-progress onboarding" (engaged → allow /app so the merchant can
+  // reach the Apply buttons on the dashboard).
+  // ApplyStartAt is a transient technical event, not a user milestone.
+  // onboardingFirstApplyAt already implies isOnboarded = true, so it
+  // never reaches this check.
+  const hasOnboardingProgress =
+    Boolean(appState?.onboardingFirstRuleAt) ||
+    Boolean(appState?.onboardingFirstPreviewAt);
+
+  console.log("[ONBOARDING CHECK]", {
+    shop,
+    onboardingCompletedAt: appState?.onboardingCompletedAt ?? null,
+    isOnboarded,
+    hasOnboardingProgress,
+  });
 
   // Onboarding guard: redirect to /app/welcome for un-onboarded merchants accessing non-welcome routes
   const pathname = url.pathname;
   const isWelcomeRoute = pathname === "/app/welcome";
-  if (!isOnboarded && !isWelcomeRoute) {
-    console.log("[REDIRECT TRACE]");
-    console.log("REQUEST:", request.url);
-    console.log("STATUS:", 302);
-    console.log("LOCATION:", `/app/welcome?shop=${shop}&host=${host}`);
-    return redirect(
-      `/app/welcome?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`
+  const allowedDuringOnboarding = new Set<string>([
+    "/app/welcome",
+    "/app/rules",
+    "/app/preview",
+  ]);
+  const isAllowedDuringOnboarding = allowedDuringOnboarding.has(pathname);
+
+  if (!isOnboarded && !isAllowedDuringOnboarding && !hasOnboardingProgress) {
+    console.log("[ONBOARDING STATE]", {
+      isOnboarded,
+      onboardingFirstRuleAt: appState?.onboardingFirstRuleAt ?? null,
+      onboardingFirstPreviewAt: appState?.onboardingFirstPreviewAt ?? null,
+      onboardingFirstApplyAt: appState?.onboardingFirstApplyAt ?? null,
+      onboardingFirstScheduleAt: appState?.onboardingFirstScheduleAt ?? null,
+      onboardingCompletedAt: appState?.onboardingCompletedAt ?? null,
+    });
+
+    const incomingSearchParams = new URLSearchParams(url.searchParams);
+    const outgoingSearchParams = new URLSearchParams(url.searchParams);
+
+    if (!outgoingSearchParams.get("host")) {
+      outgoingSearchParams.set("host", host);
+    }
+
+    const search = outgoingSearchParams.toString();
+    const to = `/app/welcome${search ? `?${search}` : ""}`;
+
+    const trackedParams = [
+      "embedded",
+      "host",
+      "id_token",
+      "session",
+      "timestamp",
+      "hmac",
+      "locale",
+    ];
+
+    const preserved = trackedParams.filter(
+      (key) => incomingSearchParams.has(key) && outgoingSearchParams.has(key)
     );
+    const lost = trackedParams.filter(
+      (key) => incomingSearchParams.has(key) && !outgoingSearchParams.has(key)
+    );
+    const gained = trackedParams.filter(
+      (key) => !incomingSearchParams.has(key) && outgoingSearchParams.has(key)
+    );
+
+    console.log("[ONBOARDING REDIRECT]");
+    console.log("FROM:", request.url);
+    console.log("TO:", to);
+    console.log("PRESERVED:", preserved);
+    console.log("LOST:", lost);
+    console.log("GAINED:", gained);
+
+    return redirect(to);
   }
   if (isOnboarded && isWelcomeRoute) {
-    console.log("[REDIRECT TRACE]");
-    console.log("REQUEST:", request.url);
-    console.log("STATUS:", 302);
-    console.log("LOCATION:", `/app?shop=${shop}&host=${host}`);
-    return redirect(`/app?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`);
+    const outgoingSearchParams = new URLSearchParams(url.searchParams);
+    if (!outgoingSearchParams.get("host")) {
+      outgoingSearchParams.set("host", host);
+    }
+    const search = outgoingSearchParams.toString();
+    const to = `/app${search ? `?${search}` : ""}`;
+
+    console.log("[ONBOARDING REDIRECT]");
+    console.log("FROM:", request.url);
+    console.log("TO:", to);
+
+    return redirect(to);
   }
 
   // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
@@ -203,14 +278,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 // ================= COMPONENT =================
 export default function AppLayout() {
   const data = useLoaderData() as any;
-  const navigation = useNavigation();
-  const location = useLocation();
 
-  const isLoading = navigation.state === "loading";
   const { apiKey, shop, host, currencyCode, hasActivePlan, billingStatus, isOnboarded } = data;
-  const loadingPathname = navigation.location?.pathname ?? location.pathname;
-  const loadingCopy = resolvePricePolishLoaderCopy(loadingPathname);
-  const showBrandedLoader = useDelayedVisibility(isLoading, 300);
   const [toastContent, setToastContent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -229,53 +298,49 @@ export default function AppLayout() {
         {toastContent ? (
           <Toast content={toastContent} onDismiss={() => setToastContent(null)} />
         ) : null}
-        {showBrandedLoader ? (
-          <PricePolishLoader title={loadingCopy.title} subtitle={loadingCopy.subtitle} />
-        ) : (
-          <>
-            <NavMenu>
-              <Link to="/app">Dashboard</Link>
-              <Link to="/app/welcome">Get Started</Link>
-              <Link to="/app/campaign-history">Campaign History</Link>
-              <Link to="/app/rules">Pricing Rules</Link>
-              <Link to="/app/billing">Billing</Link>
-              <Link to="/app/settings">Settings</Link>
-              <Link to="/app/help">Help</Link>
-            </NavMenu>
+        <>
+          <NavMenu>
+            <Link to="/app">Dashboard</Link>
+            <Link to="/app/welcome">Get Started</Link>
+            <Link to="/app/campaign-history">Campaign History</Link>
+            <Link to="/app/rules">Pricing Rules</Link>
+            <Link to="/app/billing">Billing</Link>
+            <Link to="/app/settings">Settings</Link>
+            <Link to="/app/help">Help</Link>
+          </NavMenu>
 
-            <BillingStatusBanner
-              status={billingStatus as BillingStatusValue}
-              shop={shop}
-              host={host}
-            />
+          <BillingStatusBanner
+            status={billingStatus as BillingStatusValue}
+            shop={shop}
+            host={host}
+          />
 
-            {!hasActivePlan ? (
-              <Page title="Start Free Trial">
-                <Card>
-                  <BlockStack gap="300">
-                    <Text  as="h2"  variant="headingMd">
-                      Unlock Price Polish
-                    </Text>
-                    <Text as="p">
-                      Start your 7-day free trial.
-                    </Text>
-                    <Button
-                      variant="primary"
-                      onClick={() => {
-                        const targetWindow = window.top ?? window;
-                        targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
-                      }}
-                    >
-                      Start Free Trial
-                    </Button>
-                  </BlockStack>
-                </Card>
-              </Page>
-            ) : (
-              <Outlet context={{ currencyCode, hasActivePlan, shop, host }} />
-            )}
-          </>
-        )}
+          {!hasActivePlan ? (
+            <Page title="Start Free Trial">
+              <Card>
+                <BlockStack gap="300">
+                  <Text  as="h2"  variant="headingMd">
+                    Unlock Price Polish
+                  </Text>
+                  <Text as="p">
+                    Start your 7-day free trial.
+                  </Text>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      const targetWindow = window.top ?? window;
+                      targetWindow.location.href = `/api/billing?shop=${encodeURIComponent(shop)}&host=${encodeURIComponent(host)}`;
+                    }}
+                  >
+                    Start Free Trial
+                  </Button>
+                </BlockStack>
+              </Card>
+            </Page>
+          ) : (
+            <Outlet context={{ currencyCode, hasActivePlan, shop, host }} />
+          )}
+        </>
       </Frame>
     </PolarisProvider>
   );

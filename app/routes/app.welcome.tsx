@@ -19,41 +19,32 @@ import {
 import { authenticate } from "../shopify.server";
 import { t } from "../utils/i18n";
 
-type WizardStep = "welcome" | "create-rule" | "preview-prices" | "apply-update" | "success";
+type WizardStep = "welcome" | "create-rule" | "preview-prices" | "apply-update";
 
 interface OnboardingState {
   hasRule: boolean;
   hasPreviewed: boolean;
   hasApplied: boolean;
-  hasScheduled: boolean;
-  hasCompletedFirstUpdate: boolean;
 }
-
-const DEBUG_WELCOME_TEST_RENDER = false;
 
 // ================= LOADER =================
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log("[WELCOME LOADER START]", request.url);
   try {
-    const auth = await authenticate.admin(request);
+    let auth: Awaited<ReturnType<typeof authenticate.admin>>;
+    try {
+      auth = await authenticate.admin(request);
+    } catch (error) {
+      if (error instanceof Response) {
+        console.log("[WELCOME AUTH REDIRECT]", error.headers.get("Location"));
+        return error;
+      }
+      throw error;
+    }
+
     if (auth instanceof Response) {
       const location = auth.headers.get("Location");
-      console.log("[AUTH/BILLING REDIRECT]");
-      console.log("REQUEST:", request.url);
-      console.log("STATUS:", auth.status);
-      console.log("LOCATION:", location);
-
-      if (location && location.startsWith("https://admin.shopify.com")) {
-        const html = `<!doctype html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head><body><script>window.top.location.href=${JSON.stringify(location)};</script></body></html>`;
-        return new Response(html, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/html; charset=utf-8",
-            "Cache-Control": "no-store",
-          },
-        });
-      }
-
+      console.log("[WELCOME AUTH REDIRECT]", location);
       return auth;
     }
 
@@ -66,9 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       select: {
         onboardingFirstRuleAt: true,
         onboardingFirstPreviewAt: true,
-        onboardingFirstApplyStartAt: true,
         onboardingFirstApplyAt: true,
-        onboardingFirstScheduleAt: true,
       },
     });
 
@@ -78,12 +67,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       onboarding: {
         hasRule: Boolean(appState?.onboardingFirstRuleAt),
         hasPreviewed: Boolean(appState?.onboardingFirstPreviewAt),
-        hasApplied: Boolean(appState?.onboardingFirstApplyStartAt),
-        hasScheduled: Boolean(appState?.onboardingFirstScheduleAt),
-        hasCompletedFirstUpdate: Boolean(appState?.onboardingFirstApplyAt),
+        hasApplied: Boolean(appState?.onboardingFirstApplyAt),
       },
     });
   } catch (error) {
+    if (error instanceof Response) {
+      console.log("[WELCOME AUTH REDIRECT]", error.headers.get("Location"));
+      return error;
+    }
+
     console.error("[WELCOME LOADER ERROR]", error);
     throw error;
   }
@@ -91,8 +83,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // ================= COMPONENT =================
 export default function WelcomePage() {
-  console.log("[WELCOME COMPONENT RENDER]");
-  if (DEBUG_WELCOME_TEST_RENDER) return <div>Welcome Test</div>;
   const navigate = useNavigate();
   const data = useLoaderData() as { onboarding: OnboardingState };
   const [step, setStep] = useState<WizardStep>("welcome");
@@ -102,48 +92,35 @@ export default function WelcomePage() {
     setOnboarding(data.onboarding);
   }, [data.onboarding]);
 
-  useEffect(() => {
-    if (onboarding.hasCompletedFirstUpdate) {
-      setStep("success");
-    }
-  }, [onboarding.hasCompletedFirstUpdate]);
-
   return (
     <Page title={t("welcome.pageTitle")}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 0" }}>
         <BlockStack gap="400">
           {step === "welcome" && (
-            <WelcomeStep onContinue={() => setStep("create-rule")} />
+            <WelcomeStep
+              onGetStarted={() => setStep("create-rule")}
+            />
           )}
           {step === "create-rule" && (
             <CreateRuleStep
               hasRule={onboarding.hasRule}
-              onDone={() => {
-                setStep("preview-prices");
-              }}
+              onDone={() => setStep("preview-prices")}
               onSkip={() => setStep("preview-prices")}
             />
           )}
           {step === "preview-prices" && (
             <PreviewPricesStep
               hasPreviewed={onboarding.hasPreviewed}
-              onDone={() => {
-                setStep("apply-update");
-              }}
+              onDone={() => setStep("apply-update")}
               onSkip={() => setStep("apply-update")}
             />
           )}
           {step === "apply-update" && (
             <ApplyUpdateStep
               hasApplied={onboarding.hasApplied}
-              onDone={() => {
-                setStep("success");
-              }}
-              onSkip={() => setStep("success")}
+              onDone={() => navigate("/app")}
+              onSkip={() => navigate("/app/preview")}
             />
-          )}
-          {step === "success" && (
-            <SuccessStep onGoToDashboard={() => navigate("/app")} />
           )}
         </BlockStack>
       </div>
@@ -153,7 +130,7 @@ export default function WelcomePage() {
 
 // ─── Step components ────────────────────────────────────────────────────────────
 
-function WelcomeStep({ onContinue }: { onContinue: () => void }) {
+function WelcomeStep({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <BlockStack gap="400">
       <Card>
@@ -170,6 +147,16 @@ function WelcomeStep({ onContinue }: { onContinue: () => void }) {
           <Text as="p" tone="subdued">
             {t("welcome.hero.why")}
           </Text>
+          <InlineStack gap="200">
+            <Button
+              variant="primary"
+              onClick={() => {
+                onGetStarted();
+              }}
+            >
+              {t("welcome.hero.primary")}
+            </Button>
+          </InlineStack>
         </BlockStack>
       </Card>
 
@@ -333,7 +320,7 @@ function PreviewPricesStep({
               <InlineStack gap="200">
                 <Button
                   variant="primary"
-                  onClick={() => navigate("/app")}
+                  onClick={() => navigate("/app/preview")}
                 >
                   {t("welcome.step.preview.cta")}
                 </Button>
@@ -411,51 +398,6 @@ function ApplyUpdateStep({
           {t("welcome.step.next")}
         </Button>
       </InlineStack>
-    </BlockStack>
-  );
-}
-
-function SuccessStep({
-  onGoToDashboard,
-}: {
-  onGoToDashboard: () => void;
-}) {
-  const paragraphs = t("welcome.success.body").split("\n\n");
-
-  return (
-    <BlockStack gap="400">
-      <Card>
-        <BlockStack gap="200" align="center">
-          <div
-            style={{
-              width: 72,
-              height: 72,
-              borderRadius: "50%",
-              background: "#ECFDF3",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Icon source={CheckIcon} tone="success" />
-          </div>
-          <Text as="h2" variant="headingLg" alignment="center">
-            {t("welcome.success.title")}
-          </Text>
-          <BlockStack gap="100" align="center">
-            {paragraphs.map((p, i) => (
-              <Text key={i} as="p" tone="subdued" alignment="center">
-                {p}
-              </Text>
-            ))}
-          </BlockStack>
-          <InlineStack gap="200">
-            <Button variant="primary" onClick={onGoToDashboard}>
-              {t("welcome.success.cta")}
-            </Button>
-          </InlineStack>
-        </BlockStack>
-      </Card>
     </BlockStack>
   );
 }

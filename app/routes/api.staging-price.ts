@@ -64,15 +64,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log("[Apply] campaign title persisted", { campaignId, campaignTitle });
   }
 
-  if (!appState?.isLive) {
-    if (!appState?.onboardingFirstApplyAt) {
-      await prisma.appState.upsert({
-        where: { shop: session.shop },
-        update: { onboardingFirstApplyAt: now },
-        create: { shop: session.shop, isLive: false, onboardingFirstApplyAt: now },
-      });
-    }
+  if (!appState?.onboardingFirstApplyAt) {
+    await prisma.appState.upsert({
+      where: { shop: session.shop },
+      update: { onboardingFirstApplyAt: now },
+      create: { shop: session.shop, isLive: appState?.isLive ?? false, onboardingFirstApplyAt: now },
+    });
+  }
 
+  if (!appState?.isLive) {
     return new Response(
       JSON.stringify({
         success: true,
