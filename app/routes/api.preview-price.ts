@@ -7,20 +7,20 @@ import { logActivity } from "../utils/activity.server";
 import type { PricingPreviewItem } from "../types/pricing";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    console.log("[PREVIEW] Route started");
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
     const auth = await authenticate.admin(request);
 
     if (!auth?.session) {
-        console.error("NO SESSION FOUND IN REQUEST");
         throw new Response("Unauthorized", { status: 401 });
     }
 
     const { admin, session } = auth;
     const shop = session.shop;
-    console.log("SESSION SHOP:", shop);
+    const previewStartMs = Date.now();
+
+    console.log("[PREVIEW] preview.started", { shop });
 
     try {
         const rule = await prisma.pricingRule.findUnique({
@@ -41,14 +41,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         const adjustmentValue = adjustmentType === "percentage"
           ? Math.abs(markupPercent)
           : (rule?.adjustmentValue ?? 0);
-
-        console.log("[PREVIEW] Fetching Shopify products");
-                    console.log("[PREVIEW] Rule loaded:", {
-                    hasRule: rule !== null,
-                    markupPercent,
-                    roundingStep,
-                    charmPricing,
-                    });
 
         const response = await admin.graphql(`
         {
@@ -79,27 +71,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         const data: any = await response.json();
 
-            console.log("[PREVIEW] Shopify response received");
-            console.log("[PREVIEW] GraphQL top-level keys:", Object.keys(data || {}));
-
-            if (!data?.data?.products) {
-            console.error("[PREVIEW] Missing products payload:", JSON.stringify(data, null, 2));
-            }
-
-
-        console.log(`DEBUG BACKEND: GraphQL response status: ${response.status} for shop: ${shop}`);
         if (data.errors) {
-            console.error("DEBUG BACKEND ERRORS: Shopify returned GraphQL errors:", JSON.stringify(data.errors, null, 2));
+            console.error("[PREVIEW] preview.graphql.error", { shop, errors: data.errors });
         }
 
         const totalCount = data?.data?.productsCount?.count ?? 0;
         const nodes = data?.data?.products?.nodes || [];
 
-        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Total Count in Store: ${totalCount}`);
-        console.log(`DEBUG BACKEND: [DIAGNOSTIC] Accessible Nodes: ${nodes.length}`);
-
         if (totalCount > 0 && nodes.length === 0) {
-            console.warn("DEBUG BACKEND: [CRITICAL] Count > 0 but Nodes = 0. Products exist but are NOT accessible to this app.");
+            console.warn("[PREVIEW] preview.access.warning", { shop, totalCount, accessibleCount: nodes.length, reason: "products exist but are not accessible to this app" });
         }
 
         // ✅ REPLACED: Promise.all with N+1 queries. 
@@ -108,16 +88,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             .map((p: any) => p.variants.nodes[0]?.id)
             .filter(Boolean);
 
-            console.log("[PREVIEW] Loading price history");
-console.log("[PREVIEW] Variant IDs count:", variantIds.length);
-
         const histories = await prisma.priceHistory.findMany({
             where: { variantId: { in: variantIds }, shop },
             orderBy: { createdAt: "desc" },
         });
-
-        console.log("[PREVIEW] Price history loaded");
-console.log("[PREVIEW] History rows:", histories.length);
 
         // Create a map for the LATEST history per variant
         const latestHistoryMap: Record<string, any> = {};
@@ -131,8 +105,6 @@ console.log("[PREVIEW] History rows:", histories.length);
             where: { shop },
             orderBy: { createdAt: "desc" },
         });
-
-        console.log("[PREVIEW] Last update loaded:", !!lastUpdate);
 
         const previews: PricingPreviewItem[] = nodes.map((product: any) => {
             const variant = product.variants.nodes[0];
@@ -184,7 +156,6 @@ console.log("[PREVIEW] History rows:", histories.length);
         // ruleExists: true only when a real PricingRule DB row exists for this shop
         // (previews are always returned using defaults if no rule exists)
         const ruleExists = rule !== null;
-        console.log("RETURNING PRODUCTS:", previews.length, "| ruleExists:", ruleExists);
         await logActivity(shop, "PREVIEW_CLICKED", { count: previews.length });
 
         const now = new Date();
@@ -201,9 +172,7 @@ console.log("[PREVIEW] History rows:", histories.length);
           });
         }
 
-        console.log("[PREVIEW] Returning success response");
-console.log("[PREVIEW] Preview count:", previews.length);
-console.log("[PREVIEW] ruleExists:", ruleExists);
+        console.log("[PREVIEW] preview.completed", { shop, productCount: previews.length, ruleExists, durationMs: Date.now() - previewStartMs });
 
         return cors(new Response(JSON.stringify({
             previews,
@@ -222,29 +191,18 @@ console.log("[PREVIEW] ruleExists:", ruleExists);
         }), {
             headers: { "Content-Type": "application/json" },
         }));
-    }   catch (error: any) {
+    } catch (error: any) {
+        console.error("[PREVIEW] preview.failed", { shop, error: error?.message ?? "unknown", durationMs: Date.now() - previewStartMs });
 
-        console.error("[PREVIEW] ROOT ERROR:", error);
-    
-        console.error(
-            "[PREVIEW] ROOT ERROR MESSAGE:",
-            error instanceof Error ? error.message : error
-        );
-    
-        console.error(
-            "[PREVIEW] ROOT ERROR STACK:",
-            error instanceof Error ? error.stack : "no-stack"
-        );
-    
         try {
             await logActivity(shop, "ERROR", {
                 action: "PREVIEW_LOAD",
                 message: error?.message || "unknown-error",
             });
         } catch (logError) {
-            console.error("[PREVIEW] logActivity failed:", logError);
+            console.error("[PREVIEW] preview.activity.failed", { shop });
         }
-    
+
         return cors(new Response(JSON.stringify({
             error: "Failed to load preview data",
             debug: error?.message || "unknown-error"

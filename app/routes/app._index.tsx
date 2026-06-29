@@ -51,6 +51,8 @@ import { t } from "../utils/i18n";
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
+/** Number of staged variants processed per publish API call for client-side progress tracking. */
+const PUBLISH_BATCH_SIZE = 50;
 const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
 const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px";
 const LARGE_OPERATION_THRESHOLD = 100;
@@ -134,6 +136,7 @@ interface CampaignRevertPreviewData {
 interface StorefrontControlMetrics {
   influencedVariantCount: number;
   stagedPendingCount: number;
+  pendingRetryCount: number;
   retryableRevertCount: number;
   unrecoverableCount: number;
   latestInfluenceAt: string;
@@ -167,6 +170,7 @@ interface DashboardMetrics {
 const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
   influencedVariantCount: 0,
   stagedPendingCount: 0,
+  pendingRetryCount: 0,
   retryableRevertCount: 0,
   unrecoverableCount: 0,
   latestInfluenceAt: "",
@@ -408,6 +412,104 @@ function DashboardLoader() {
     />
   );
 }
+
+// ─── Store Health Card ───────────────────────────────────────────────────────
+
+function formatRelativeTime(isoString: string): string {
+  if (!isoString) return "Never";
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  if (diffSecs < 60) return "Just now";
+  const diffMins = Math.floor(diffSecs / 60);
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
+function StoreHealthCard({
+  isLive,
+  stagedPendingCount,
+  pendingRetryCount,
+  scheduledRunsCount,
+  latestInfluenceAt,
+  isProcessing,
+  onRetry,
+}: {
+  isLive: boolean;
+  stagedPendingCount: number;
+  pendingRetryCount: number;
+  scheduledRunsCount: number;
+  latestInfluenceAt: string;
+  isProcessing: boolean;
+  onRetry: () => void;
+}) {
+  // Status priority: Attention > Healthy > Changes Ready > Not Configured
+  type StoreStatusKey = "attention" | "healthy" | "staged" | "not-configured";
+  const storeStatus: StoreStatusKey =
+    pendingRetryCount > 0
+      ? "attention"
+      : isLive
+      ? "healthy"
+      : stagedPendingCount > 0
+      ? "staged"
+      : "not-configured";
+
+  const statusBadge = {
+    attention: <Badge tone="critical">Attention Required</Badge>,
+    healthy: <Badge tone="success">Healthy</Badge>,
+    staged: <Badge tone="attention">Changes Ready</Badge>,
+    "not-configured": <Badge>Not Configured</Badge>,
+  }[storeStatus];
+
+  const lastPublish = formatRelativeTime(latestInfluenceAt);
+
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <Text as="h2" variant="headingSm">Store Health</Text>
+        {statusBadge}
+        {pendingRetryCount > 0 && (
+          <BlockStack gap="200">
+            <Text as="p" variant="bodySm" tone="critical">
+              {pendingRetryCount} product{pendingRetryCount === 1 ? "" : "s"} failed to publish and {pendingRetryCount === 1 ? "is" : "are"} ready to retry.
+            </Text>
+            <Button
+              variant="primary"
+              onClick={onRetry}
+              loading={isProcessing}
+              disabled={isProcessing}
+            >
+              Retry Failed Products
+            </Button>
+          </BlockStack>
+        )}
+        <BlockStack gap="150">
+          <InlineStack align="space-between">
+            <Text as="p" variant="bodySm" tone="subdued">Products Ready to Publish</Text>
+            <Text as="p" variant="bodySm" fontWeight="medium">{stagedPendingCount}</Text>
+          </InlineStack>
+          {pendingRetryCount > 0 && (
+            <InlineStack align="space-between">
+              <Text as="p" variant="bodySm" tone="subdued">Pending Retry</Text>
+              <Text as="p" variant="bodySm" fontWeight="medium" tone="critical">{pendingRetryCount}</Text>
+            </InlineStack>
+          )}
+          <InlineStack align="space-between">
+            <Text as="p" variant="bodySm" tone="subdued">Scheduled Jobs</Text>
+            <Text as="p" variant="bodySm" fontWeight="medium">{scheduledRunsCount}</Text>
+          </InlineStack>
+          <InlineStack align="space-between">
+            <Text as="p" variant="bodySm" tone="subdued">Last Publish</Text>
+            <Text as="p" variant="bodySm">{lastPublish}</Text>
+          </InlineStack>
+        </BlockStack>
+      </BlockStack>
+    </Card>
+  );
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -433,6 +535,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [publishTotal, setPublishTotal] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null);
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
   const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
@@ -1686,47 +1789,97 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   }, [guardNoRules]);
 
   const handlePushStorefront = useCallback(async (clear = false) => {
-    console.log(`DEBUG: Initializing handlePushStorefront (clear=${clear})...`);
     setIsProcessing(true);
     setShowGoLiveModal(false);
     setShowStopModal(false);
 
+    if (clear) {
+      // ── Stop Live (no progress tracking needed) ────────────────────────────
+      try {
+        const res = await fetch("/api/push-storefront", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clear: true }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          if (shopify) shopify.toast.show("Storefront prices restored successfully");
+          else console.log("BYPASS: Storefront prices restored successfully");
+          setMetrics(prev => ({ ...prev, isLive: false }));
+          await handlePreview();
+        } else {
+          throw new Error(data.error || "Failed to stop live pricing.");
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to update storefront pricing state.";
+        if (shopify) shopify.toast.show(errorMessage, { isError: true });
+        else console.error("BYPASS:", errorMessage);
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+    // ── Publish with per-batch progress tracking ───────────────────────────────
+    // Total is read from current storefrontControl before the first batch fires.
+    const total = storefrontControl.stagedPendingCount;
+    setPublishTotal(total);
+    setProgress(0);
+
+    // One UUID groups all batch PushJobs into a single logical publish operation.
+    // Sent with every batch request so the server can persist it on each PushJob
+    // and use it to deduplicate the GO_LIVE activity log entry.
+    const operationId = crypto.randomUUID();
+
+    let processed = 0;
+
     try {
-      const pushBody = {
-        clear,
-        ...(!clear && activeCampaignId ? { campaignId: activeCampaignId } : {}),
-      };
-      if (!clear) {
-        console.log("[Apply] push-storefront called with campaignId:", activeCampaignId);
-      }
-      const res = await fetch("/api/push-storefront", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(pushBody)
-      });
+      while (true) {
+        const pushBody = {
+          clear: false,
+          limit: PUBLISH_BATCH_SIZE,
+          operationId,
+          ...(activeCampaignId ? { campaignId: activeCampaignId } : {}),
+        };
 
-      console.log(`DEBUG: /api/push-storefront status: ${res.status}`);
-      const data = await res.json();
-      console.log("DEBUG: /api/push-storefront data received:", !!data);
+        const res = await fetch("/api/push-storefront", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pushBody),
+        });
 
-      if (res.ok) {
-        if (shopify) shopify.toast.show(clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront");
-        else console.log(`BYPASS: ${clear ? "Storefront prices restored successfully" : "Prices are now live on your storefront"}`);
-        setMetrics(prev => ({ ...prev, isLive: !clear }));
-        await handlePreview();
-      } else {
-        throw new Error(data.error || "Failed to push rules.");
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to publish prices.");
+        }
+
+        // Count this batch: successful + failed = processed in this pass
+        const batchProcessed = (data.applied ?? 0) + (data.failed ?? 0);
+        processed += batchProcessed;
+
+        const pct = total > 0 ? Math.min(Math.round((processed / total) * 100), 99) : 50;
+        setProgress(pct);
+
+        if (!data.remaining || data.remaining === 0) break;
       }
+
+      setProgress(100);
+      if (shopify) shopify.toast.show("Prices are now live on your storefront");
+      else console.log("BYPASS: Prices are now live on your storefront");
+      setMetrics(prev => ({ ...prev, isLive: true }));
+      await handlePreview();
+
     } catch (err) {
-      console.error("DEBUG: PushStorefront Error detail:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to update storefront pricing state.";
       if (shopify) shopify.toast.show(errorMessage, { isError: true });
       else console.error("BYPASS:", errorMessage);
     } finally {
-      console.log("DEBUG: Finalizing handlePushStorefront processing state.");
       setIsProcessing(false);
+      setProgress(0);
+      setPublishTotal(0);
     }
-  }, [shopify, activeCampaignId, handlePreview]);
+  }, [shopify, activeCampaignId, handlePreview, storefrontControl.stagedPendingCount]);
 
   const campaignStatusTone = useCallback((status: string) => {
     const normalized = status.toLowerCase();
@@ -2316,6 +2469,17 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
               </Card>
             )}
 
+            {/* Store Health Card */}
+            <StoreHealthCard
+              isLive={metrics.isLive}
+              stagedPendingCount={storefrontControl.stagedPendingCount}
+              pendingRetryCount={storefrontControl.pendingRetryCount}
+              scheduledRunsCount={metrics.scheduledRunsCount}
+              latestInfluenceAt={storefrontControl.latestInfluenceAt}
+              isProcessing={isProcessing}
+              onRetry={handlePushStorefront}
+            />
+
             {/* Operational Info Banner */}
             <Banner tone="info">
               <Text as="p" variant="bodyMd">
@@ -2694,12 +2858,25 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           {isProcessing && (
                             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
                               <BlockStack gap="200" align="center">
-                                <InlineStack gap="300" blockAlign="center" align="center">
-                                  <Spinner size="small" />
-                                  <Text as="p" variant="bodyMd" fontWeight="medium">Processing price updates…</Text>
-                                </InlineStack>
-                                <Text as="p" tone="subdued" variant="bodySm">Keep this page open until processing finishes.</Text>
-                                <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+                                {publishTotal > 0 ? (
+                                  <>
+                                    <Text as="p" variant="bodyMd" fontWeight="medium">Publishing Prices...</Text>
+                                    <Text as="p" tone="subdued" variant="bodySm">
+                                      {Math.min(Math.round((progress / 100) * publishTotal), publishTotal)} / {publishTotal} products
+                                    </Text>
+                                    <ProgressBar progress={progress} tone="primary" />
+                                    <Text as="p" tone="subdued" variant="bodySm">{Math.round(progress)}%</Text>
+                                  </>
+                                ) : (
+                                  <>
+                                    <InlineStack gap="300" blockAlign="center" align="center">
+                                      <Spinner size="small" />
+                                      <Text as="p" variant="bodyMd" fontWeight="medium">Processing price updates…</Text>
+                                    </InlineStack>
+                                    <Text as="p" tone="subdued" variant="bodySm">Keep this page open until processing finishes.</Text>
+                                    <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
+                                  </>
+                                )}
                               </BlockStack>
                             </Box>
                           )}

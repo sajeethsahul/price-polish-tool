@@ -164,14 +164,15 @@ model AppState {
 }
 
 model PushJob {
-  id        String   @id @default(uuid())
-  shop      String
-  total     Int
-  processed Int      @default(0)
-  success   Int      @default(0)
-  failed    Int      @default(0)
-  status    String   @default("running")
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  shop        String
+  operationId String?
+  total       Int
+  processed   Int      @default(0)
+  success     Int      @default(0)
+  failed      Int      @default(0)
+  status      String   @default("running")
+  createdAt   DateTime @default(now())
 }
 
 model ScheduledJob {

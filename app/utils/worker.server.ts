@@ -3,6 +3,7 @@ import { unauthenticated } from "../shopify.server";
 import { revertCampaignPrices } from "./revert.server";
 import { isWindowExpired } from "./window-lifecycle";
 import type { ScheduledProductSnapshot } from "../types/pricing";
+import { withShopifyRetry } from "./shopify-graphql.server";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -646,25 +647,28 @@ export function startWorker() {
                                 ? item.variantId
                                 : `gid://shopify/ProductVariant/${item.variantId}`;
 
-                            const response = await admin.graphql(
-                                `mutation productVariantsBulkUpdate(
-                                    $productId: ID!,
-                                    $variants: [ProductVariantsBulkInput!]!
-                                ) {
-                                    productVariantsBulkUpdate(
-                                        productId: $productId,
-                                        variants: $variants
+                            const response = await withShopifyRetry(
+                                () => admin.graphql(
+                                    `mutation productVariantsBulkUpdate(
+                                        $productId: ID!,
+                                        $variants: [ProductVariantsBulkInput!]!
                                     ) {
-                                        productVariants { id price }
-                                        userErrors { field message }
+                                        productVariantsBulkUpdate(
+                                            productId: $productId,
+                                            variants: $variants
+                                        ) {
+                                            productVariants { id price }
+                                            userErrors { field message }
+                                        }
+                                    }`,
+                                    {
+                                        variables: {
+                                            productId,
+                                            variants: [{ id: variantId, price: String(price) }],
+                                        },
                                     }
-                                }`,
-                                {
-                                    variables: {
-                                        productId,
-                                        variants: [{ id: variantId, price: String(price) }],
-                                    },
-                                }
+                                ),
+                                "worker"
                             );
 
                             const result = await response.json();
@@ -695,7 +699,6 @@ export function startWorker() {
                             });
 
                             successCount++;
-                            console.log(`[Worker] ✅ Variant ${item.variantId} updated → $${price}`);
 
                         } catch (variantErr) {
                             console.error(

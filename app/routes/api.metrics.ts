@@ -33,6 +33,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             latestVariantRows,
             openCampaignCount,
             closedCampaignCount,
+            latestDonePushJob,
         ] = await Promise.all([
             prisma.activityLog.findMany({
                 where: { shop },
@@ -69,6 +70,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                     shop,
                     status: { in: ["reverted", "unrecoverable", "auto-restored"] },
                 },
+            }),
+            prisma.pushJob.findFirst({
+                where: { shop, status: "done" },
+                orderBy: { createdAt: "desc" },
+                select: { failed: true },
             }),
         ]);
 
@@ -140,6 +146,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
 
         const canGoLive = stagedPendingCount > 0;
+        // pendingRetryCount: failures from the last completed publish that still
+        // have staged records. Capped at stagedPendingCount so stale job data
+        // from a previous session does not overstate the current retry queue.
+        const pendingRetryCount = Math.min(latestDonePushJob?.failed ?? 0, stagedPendingCount);
 
         return cors(new Response(JSON.stringify({
             activeCampaignsCount,
@@ -151,6 +161,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             storefrontControl: {
                 influencedVariantCount,
                 stagedPendingCount,
+                pendingRetryCount,
                 retryableRevertCount,
                 unrecoverableCount,
                 latestInfluenceAt,
@@ -185,6 +196,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             storefrontControl: {
                 influencedVariantCount: 0,
                 stagedPendingCount: 0,
+                pendingRetryCount: 0,
                 retryableRevertCount: 0,
                 unrecoverableCount: 0,
                 latestInfluenceAt: "",

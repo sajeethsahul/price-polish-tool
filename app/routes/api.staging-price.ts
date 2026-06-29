@@ -11,6 +11,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const billingError = await requireActiveBilling(shop);
   if (billingError) return new Response(JSON.stringify(billingError), { status: 403 });
 
+  const stagingStartMs = Date.now();
   const body = await request.json();
 
   const products = body?.products || [];
@@ -23,9 +24,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       ? body.campaignTitle.trim()
       : "Manual Apply Campaign";
 
+  console.log("[STAGING] stage.started", { shop, productCount: products.length, campaignId });
+
   const result = await stagePrices(session.shop, products, campaignId);
 
   if (!result.success) {
+    console.warn("[STAGING] stage.rejected", { shop, campaignId, reason: result.message, durationMs: Date.now() - stagingStartMs });
     return new Response(
       JSON.stringify({ error: result.message }),
       { status: 400 }
@@ -61,7 +65,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         source: "apply",
       },
     });
-    console.log("[Apply] campaign title persisted", { campaignId, campaignTitle });
   }
 
   if (!appState?.onboardingFirstApplyAt) {
@@ -71,6 +74,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       create: { shop: session.shop, isLive: appState?.isLive ?? false, onboardingFirstApplyAt: now },
     });
   }
+
+  console.log("[STAGING] stage.completed", { shop, successCount: result.successCount, failCount: result.failedCount, campaignId, durationMs: Date.now() - stagingStartMs });
 
   if (!appState?.isLive) {
     return new Response(

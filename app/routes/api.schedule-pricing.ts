@@ -101,23 +101,16 @@ export async function action({ request }: ActionFunctionArgs) {
         campaignId = crypto.randomUUID();
         const stageResult = await stagePrices(shop, products, campaignId);
 
-        console.log(
-            `[Schedule] Auto-staged ${stageResult.successCount} price(s) for shop ${shop}` +
-            (stageResult.failedCount > 0 ? `, ${stageResult.failedCount} failed` : "")
-        );
-
-        if (stageResult.failedItems.length > 0) {
-            console.warn(
-                `[Schedule] Failed items for shop ${shop}:`,
-                stageResult.failedItems.map(f => `${f.variantId}: ${f.reason}`)
-            );
-        }
-
         if (!stageResult.success) {
+            console.warn("[SCHEDULER] schedule.stage.rejected", { shop, campaignId, successCount: stageResult.successCount, failCount: stageResult.failedCount, reason: stageResult.message });
             return Response.json(
                 { error: stageResult.message || "Failed to stage prices for scheduling." },
                 { status: 400 }
             );
+        }
+
+        if (stageResult.failedCount > 0) {
+            console.warn("[SCHEDULER] schedule.stage.partial", { shop, campaignId, successCount: stageResult.successCount, failCount: stageResult.failedCount });
         }
 
         stagedCount = stageResult.successCount;
@@ -192,6 +185,8 @@ export async function action({ request }: ActionFunctionArgs) {
             });
         }
     }
+
+    console.log("[SCHEDULER] schedule.created", { shop, mode: scheduleMode, runAt: runAtDate.toISOString(), productCount: products?.length ?? 0, campaignId });
 
     return Response.json({ success: true, stagedCount, failedCount, ...(campaignId ? { campaignId } : {}) });
 }
