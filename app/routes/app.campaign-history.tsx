@@ -92,6 +92,7 @@ interface CampaignRevertPreviewData {
   terminal?: boolean;
   preActivation?: boolean;
   prePublish?: boolean;
+  staged?: boolean;
   schedule?: {
     type: "one-time" | "time-window" | string;
     status: string;
@@ -391,7 +392,6 @@ export default function CampaignHistoryPage() {
   const showInitialCampaignHistoryLoader = useDelayedVisibility(isInitialCampaignHistoryLoad, 300);
   const showCampaignDetailLoader = useDelayedVisibility(campaignDetailLoading, 300);
   const showRevertPreviewLoader = useDelayedVisibility(revertPreviewLoading, 300);
-
   const [conflictExplorerOpen, setConflictExplorerOpen] = useState(false);
   const [conflictExplorerTitle, setConflictExplorerTitle] = useState("Campaign");
   const [conflictExplorerConflicts, setConflictExplorerConflicts] = useState<CampaignConflict[]>([]);
@@ -1664,9 +1664,9 @@ export default function CampaignHistoryPage() {
                     <strong>Campaign:</strong> {campaignDetail.title}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    <strong>{campaignDetail.preActivation || campaignDetail.prePublish ? "Scheduled products" : "Tracked items"}:</strong>{" "}
+                    <strong>{campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Scheduled products" : "Tracked items"}:</strong>{" "}
                     {(() => {
-                      const fallbackCount = campaignDetail.preActivation || campaignDetail.prePublish
+                      const fallbackCount = campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged
                         ? campaignDetail.productCount
                         : campaignDetail.totalTrackedCount ?? campaignDetail.rows.length;
                       const counts = campaignDetailCounts.productCount > 0
@@ -1680,45 +1680,62 @@ export default function CampaignHistoryPage() {
                   </Text>
                 </InlineStack>
 
-                {campaignDetail.preActivation || campaignDetail.prePublish ? (
+                {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? (
                   <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                     <BlockStack gap="200">
                       <InlineStack gap="200" wrap>
                         <Badge tone={
-                          campaignDetail.schedule?.status === "cancelled-window" ||
-                            campaignDetail.schedule?.status === "cancelled-publish"
-                            ? "info"
-                            : "warning"
+                          campaignDetail.staged
+                            ? "attention"
+                            : campaignDetail.schedule?.status === "cancelled-window" ||
+                              campaignDetail.schedule?.status === "cancelled-publish"
+                              ? "info"
+                              : "warning"
                         }>
-                          {campaignDetail.schedule?.status === "cancelled-window"
-                            ? "Cancelled Window"
-                            : campaignDetail.schedule?.status === "cancelled-publish"
-                              ? "Cancelled"
-                              : campaignDetail.prePublish
-                                ? "Publish Scheduled"
-                                : "Window Scheduled"}
+                          {campaignDetail.staged
+                            ? "Ready to Publish"
+                            : campaignDetail.schedule?.status === "cancelled-window"
+                              ? "Cancelled Window"
+                              : campaignDetail.schedule?.status === "cancelled-publish"
+                                ? "Cancelled"
+                                : campaignDetail.prePublish
+                                  ? "Publish Scheduled"
+                                  : "Window Scheduled"}
                         </Badge>
-                        <Badge tone="attention">
-                          {formatDetailScheduleType(campaignDetail.schedule?.type)}
-                        </Badge>
+                        {!campaignDetail.staged && (
+                          <Badge tone="attention">
+                            {formatDetailScheduleType(campaignDetail.schedule?.type)}
+                          </Badge>
+                        )}
                       </InlineStack>
                       <Text as="p" variant="bodySm">
-                        {campaignDetail.schedule?.status === "cancelled-window"
-                          ? "This pricing window was cancelled before it started."
-                          : campaignDetail.schedule?.status === "cancelled-publish"
-                            ? "This scheduled publish was cancelled before it started."
-                            : campaignDetail.prePublish
-                              ? "This pricing publish is scheduled and has not started yet."
-                              : "This pricing window is scheduled and has not started yet."}
+                        {campaignDetail.staged
+                          ? "This campaign has been staged but has not yet been published."
+                          : campaignDetail.schedule?.status === "cancelled-window"
+                            ? "This pricing window was cancelled before it started."
+                            : campaignDetail.schedule?.status === "cancelled-publish"
+                              ? "This scheduled publish was cancelled before it started."
+                              : campaignDetail.prePublish
+                                ? "This pricing publish is scheduled and has not started yet."
+                                : "This pricing window is scheduled and has not started yet."}
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
-                        {campaignDetail.schedule?.status === "cancelled-window" ||
-                          campaignDetail.schedule?.status === "cancelled-publish"
-                          ? "No storefront pricing was changed for this cancelled schedule."
-                          : campaignDetail.prePublish
-                            ? "Applied storefront details will appear after publishing completes."
-                            : "Tracked storefront pricing details will appear once the publish window activates."}
+                        {campaignDetail.staged
+                          ? "Go to the Dashboard to publish these changes."
+                          : campaignDetail.schedule?.status === "cancelled-window" ||
+                            campaignDetail.schedule?.status === "cancelled-publish"
+                            ? "No storefront pricing was changed for this cancelled schedule."
+                            : campaignDetail.prePublish
+                              ? "Applied storefront details will appear after publishing completes."
+                              : "Tracked storefront pricing details will appear once the publish window activates."}
                       </Text>
+                      {campaignDetail.staged && (
+                        <InlineStack gap="200" wrap>
+                          <Button variant="secondary" onClick={() => navigate("/app")}>
+                            Go to Dashboard
+                          </Button>
+                        </InlineStack>
+                      )}
                       <InlineStack gap="400" wrap>
                         {campaignDetail.schedule?.runAt && (
                           <Text as="p" variant="bodySm" tone="subdued">
@@ -1865,7 +1882,7 @@ export default function CampaignHistoryPage() {
                       pageSize={campaignDetailPageSize}
                       onPageChange={(nextPage) => setCampaignDetailPage(nextPage)}
                       onPageSizeChange={(nextSize) => setCampaignDetailPageSize(nextSize)}
-                      itemLabel={campaignDetail.preActivation || campaignDetail.prePublish ? "scheduled products" : "tracked items"}
+                      itemLabel={campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "scheduled products" : "tracked items"}
                       pageSizeOptions={OPERATIONAL_PAGE_SIZE_OPTIONS}
                     />
 
@@ -1888,7 +1905,7 @@ export default function CampaignHistoryPage() {
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                             <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
-                              {campaignDetail.preActivation || campaignDetail.prePublish ? "Scheduled" : "Revert Target"}
+                              {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Scheduled" : "Revert Target"}
                             </Text>
                           </div>
                           <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
@@ -1934,9 +1951,9 @@ export default function CampaignHistoryPage() {
                                     variant="bodySm"
                                     fontWeight="medium"
                                     alignment="end"
-                                    tone={campaignDetail.preActivation || campaignDetail.prePublish ? undefined : "success"}
+                                    tone={campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? undefined : "success"}
                                   >
-                                    {campaignDetail.preActivation || campaignDetail.prePublish
+                                    {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged
                                       ? row.scheduledPrice == null
                                         ? "-"
                                         : formatMoney(row.scheduledPrice, currencyCode)

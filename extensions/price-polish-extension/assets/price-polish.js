@@ -1,11 +1,23 @@
 (() => {
-  console.log("Price Polish Loaded");
+  const DEBUG = true;
+
+  function log(...args) {
+    if (!DEBUG) return;
+    console.log(
+      `[PricePolish ${performance.now().toFixed(0)}ms]`,
+      ...args
+    );
+  }
+
+  log("Extension Loaded");
 
   let CONFIG = null;
   let debounceTimer = null;
   let lastMutationTime = Date.now();
   let observerActive = true;
-  const STABILITY_THRESHOLD = 5000; // 5 seconds of no changes to stop observer
+  let initPromise = null;
+  let didRunFinalLoadPass = false;
+  const STABILITY_THRESHOLD = 30000; // 5 seconds of no changes to stop observer
   const CONFIG_CACHE_KEY = "price-polish-runtime-config";
   const CONFIG_CACHE_TTL_MS = 500;
 
@@ -36,7 +48,7 @@
 
       // Add timestamp to bypass proxy caching issues
       const timestamp = new Date().getTime();
-      const response = await fetch(`/apps/price-polish/settings?t=${timestamp}`, { cache: "no-store" });
+      const response = await fetch(`/apps/price-polish?t=${timestamp}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch config");
       const settings = await response.json();
       CONFIG = settings;
@@ -47,7 +59,7 @@
         settings,
         expiresAt: Date.now() + CONFIG_CACHE_TTL_MS,
       }));
-      console.log("Price Polish: Config loaded", CONFIG);
+      log("Config Loaded", CONFIG);
       return true;
     } catch (error) {
       console.error("Price Polish: Error fetching config:", error);
@@ -134,17 +146,32 @@
   }
 
   function updatePrices() {
-    if (!CONFIG) return false;
+    log(
+        "updatePrices()",
+        "observerActive =", observerActive,
+        "readyState =", document.readyState
+    );
+
+    if (!CONFIG) {
+        log("No CONFIG");
+        return false;
+    }
 
     const elements = document.querySelectorAll(SELECTORS.join(", "));
-    if (elements.length === 0) return false;
 
+    log("Price elements found:", elements.length);
+
+    if (elements.length === 0)
+        return false;
+
+
+    if (elements.length === 0) return false;
+log("Disconnecting observer before DOM updates");
     observer.disconnect();
 
     let updatedCount = 0;
     elements.forEach(el => {
       if (el.dataset.polished === "true") return;
-
       // Extract the price early to use as a fallback identifier
       const textNode = Array.from(el.childNodes).find(node => 
         node.nodeType === Node.TEXT_NODE && /\d/.test(node.textContent)
@@ -201,11 +228,65 @@
 
       // --- THE BYPASS ---
       // If a price is explicitly set/applied, ABORT all further calculations 
-      if (priceSource === 'Applied') {
-        el.dataset.polished = "true";
-        return; // Prevents "flicker" and skips calculations completely
-      }
+      // if (priceSource === 'Applied') {
+      //   el.dataset.polished = "true";
+      //   return; // Prevents "flicker" and skips calculations completely
+      // }
 
+
+// if (priceSource === "Applied") {
+//   const formattedPrice = Number(priceValue).toFixed(2);
+
+//   console.log("=== BEFORE UPDATE ===");
+//   console.log({
+//     originalText,
+//     formattedPrice,
+//     outerHTML: el.outerHTML,
+//   });
+
+//   textNode.textContent = originalText.replace(
+//     /[\d,.]+/,
+//     formattedPrice
+//   );
+
+//   console.log("=== IMMEDIATELY AFTER UPDATE ===");
+//   console.log({
+//     text: textNode.textContent,
+//     outerHTML: el.outerHTML,
+//   });
+
+//   setTimeout(() => {
+//     console.log("=== 1 SECOND LATER ===");
+//     console.log({
+//       text: textNode.textContent,
+//       outerHTML: el.outerHTML,
+//     });
+//   }, 1000);
+
+//   el.dataset.polished = "true";
+//   return;
+// }
+if (priceSource === "Applied") {
+  const formattedPrice = Number(priceValue).toFixed(2);
+
+  
+
+  textNode.textContent = originalText.replace(
+    /[\d,.]+/,
+    formattedPrice
+  );
+
+log("Applied Price", {
+    old: originalText,
+    new: formattedPrice,
+    variant: rawId,
+});
+
+
+
+  el.dataset.polished = "true";
+  return;
+}
       // --- APPLY LOGIC FOR "DEFAULT" SOURCE ---
 
       const newPrice = calculatePrice(priceValue);
@@ -213,12 +294,32 @@
 
       if (originalText !== newText) {
         textNode.textContent = newText;
+        const observer = new MutationObserver((mutations) => {
+
+    log("Mutation observed:", mutations.length);
+
+    if (!CONFIG || !observerActive)
+        return;
+
+    lastMutationTime = Date.now();
+
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(() => {
+
+        log("Mutation debounce expired → updatePrices()");
+
+        updatePrices();
+
+    },300);
+});
         el.dataset.polished = "true";
         updatedCount++;
       }
     });
     
     if (observerActive) {
+      log("Observer CONNECTED");
       observer.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
     return updatedCount > 0;
@@ -238,22 +339,56 @@
   // Performance Guard: Stop observer after page is stable
   const stabilityCheck = setInterval(() => {
     if (Date.now() - lastMutationTime > STABILITY_THRESHOLD) {
-      console.log("Price Polish: Page stable, disconnecting observer.");
+      log("Observer DISCONNECTED after page stable");
       observer.disconnect();
       observerActive = false;
       clearInterval(stabilityCheck);
     }
   }, 1000);
 
-  async function init() {
-    if (!CONFIG) await fetchConfig();
+async function init() {
+    log("INIT START");
+
+    if (!CONFIG)
+        await fetchConfig();
+
+    log("Calling updatePrices() from init");
+
     updatePrices();
+
     lastMutationTime = Date.now();
-  }
+
+    log("INIT END");
+}
+
+function runInit() {
+    if (!initPromise) {
+        initPromise = init();
+    }
+
+    return initPromise;
+}
+
+window.addEventListener("load", () => {
+    log("WINDOW LOAD");
+
+    const pendingInit = initPromise || Promise.resolve();
+    pendingInit.finally(() => {
+        if (didRunFinalLoadPass) return;
+
+        didRunFinalLoadPass = true;
+        log("Calling updatePrices() from final load pass");
+        updatePrices();
+    });
+});
+
+document.addEventListener("readystatechange", () => {
+    log("READY STATE =", document.readyState);
+});
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", runInit, { once: true });
   } else {
-    init();
+    runInit();
   }
 })();

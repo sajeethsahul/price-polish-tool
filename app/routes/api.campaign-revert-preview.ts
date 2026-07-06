@@ -311,6 +311,120 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           }));
         }
 
+        const draftCampaign = campaignId
+          ? await (prisma.campaign as any).findFirst({
+              where: {
+                id: campaignId,
+                shop,
+                source: "apply",
+              },
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                createdAt: true,
+              },
+            })
+          : null;
+
+        if (draftCampaign) {
+          const stagedPrices = await prisma.stagedPrice.findMany({
+            where: {
+              shop,
+              campaignId,
+            },
+            select: {
+              variantId: true,
+              productId: true,
+              originalPrice: true,
+              stagedPrice: true,
+            },
+          });
+
+          const variantGids = stagedPrices.map((s) =>
+            s.variantId.startsWith("gid://")
+              ? s.variantId
+              : `gid://shopify/ProductVariant/${s.variantId}`
+          );
+          const currentByVariant = new Map<string, {
+            currentPrice: number | null;
+            productTitle: string | null;
+            productId: string | null;
+            variantTitle: string | null;
+            sku: string | null;
+          }>();
+
+          for (const ids of chunk(variantGids, 100)) {
+            const response = await admin.graphql(
+              `query RevertPreviewNodes($ids: [ID!]!) {
+                nodes(ids: $ids) {
+                  ... on ProductVariant {
+                    id
+                    price
+                    title
+                    sku
+                    product {
+                      id
+                      title
+                    }
+                  }
+                }
+              }`,
+              { variables: { ids } }
+            );
+
+            const data: any = await response.json();
+            const nodes = data?.data?.nodes ?? [];
+            for (const node of nodes) {
+              if (!node?.id) continue;
+              const normalizedId = String(node.id).split("/").pop() ?? "";
+              currentByVariant.set(normalizedId, {
+                currentPrice: node.price != null ? Number(node.price) : null,
+                productTitle: node.product?.title ?? null,
+                productId: node.product?.id ?? null,
+                variantTitle: node.title ?? null,
+                sku: node.sku ?? null,
+              });
+            }
+          }
+
+          const rows = stagedPrices.map((item) => {
+            const normalizedId = String(item.variantId).split("/").pop() ?? "";
+            const current = currentByVariant.get(normalizedId);
+            return {
+              variantId: item.variantId,
+              productId: item.productId ?? current?.productId ?? null,
+              productTitle: current?.productTitle ?? "Untitled Product",
+              variantTitle: current?.variantTitle ?? null,
+              sku: current?.sku ?? null,
+              currentPrice: Number(item.originalPrice),
+              scheduledPrice: Number(item.stagedPrice),
+              revertTargetPrice: null,
+              status: "staged",
+              revertFailureReason: null,
+            };
+          });
+
+          return cors(new Response(JSON.stringify({
+            campaignId,
+            title: draftCampaign.title,
+            productCount: stagedPrices.length,
+            latestBatchId: null,
+            rows,
+            revertedCount: 0,
+            failedCount: 0,
+            unrecoverableCount: 0,
+            totalTrackedCount: 0,
+            revertCompletedAt: null,
+            missingHistoricalRevertedFromCount: 0,
+            terminal: false,
+            staged: true,
+            message: "These prices have been staged but not yet published to Shopify.",
+          }), {
+            headers: { "Content-Type": "application/json" },
+          }));
+        }
+
         return cors(new Response(JSON.stringify({
           error: campaignId ? "No campaign details found" : "No campaign batch details found",
         }), {

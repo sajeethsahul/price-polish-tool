@@ -194,6 +194,38 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
+    let effectiveCampaignId = campaignId;
+    if (!campaignId) {
+      const stagedCampaignIds = [...new Set(
+        staged
+          .map((item) => item.campaignId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      )];
+
+      if (stagedCampaignIds.length === 1) {
+        effectiveCampaignId = stagedCampaignIds[0];
+        console.log("[PUBLISH] campaign.recovered", {
+          shop,
+          campaignId: effectiveCampaignId,
+          source: "staged-price",
+        });
+      } else if (stagedCampaignIds.length > 1) {
+        console.warn("[PUBLISH] campaign.recovery.failed", {
+          shop,
+          campaignCount: stagedCampaignIds.length,
+        });
+        return cors(
+          new Response(JSON.stringify({
+            success: false,
+            error: "Multiple staged campaigns detected. Publish one campaign at a time.",
+          }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+    }
+
     const batchId = `batch_${Date.now()}`;
 
     // ============================
@@ -253,7 +285,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           failedItems.push(item.variantId);
           continue;
         }
-
+        const formattedPrice = price.toFixed(2);
         const response = await withShopifyRetry(
           () => admin.graphql(`
           mutation productVariantsBulkUpdate(
@@ -285,7 +317,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   id: item.variantId.startsWith("gid://")
                     ? item.variantId
                     : `gid://shopify/ProductVariant/${item.variantId}`,
-                  price: String(price),
+                  price: String(formattedPrice),
                 },
               ],
             },
@@ -294,6 +326,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
 
         const result = await response.json();
+
+        //console.log( 'SAJEETH_TEST_PRICE_POLICE', JSON.stringify(result.data.productVariantsBulkUpdate.productVariants, null, 2));
+
 
         const userErrors = result?.data?.productVariantsBulkUpdate?.userErrors;
 
@@ -307,7 +342,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await prisma.priceHistory.create({
           data: {
             shop,
-            campaignId,
+            campaignId: effectiveCampaignId,
             productId: item.productId,
             variantId: item.variantId,
             oldPrice: item.originalPrice,
