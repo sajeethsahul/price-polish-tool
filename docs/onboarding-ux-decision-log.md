@@ -587,9 +587,114 @@ code-only.
 
 ---
 
-## Phase 4 — Visual Polish (planned)
+## Phase 4 — Visual Polish (Final onboarding pass)
 
-Scope: typography, alignment, spacing, mobile responsiveness, a11y.
+Status: Implemented — awaiting review.
+Files touched: 1 (`app/routes/app.welcome.tsx`).
+Patch: `docs/onboarding-ux-phase-4.patch` (rollback: `git apply -R`).
+Companion audit: `docs/onboarding-ux-global-audit.md` (no code, findings only).
+
+### 4.1 Wizard card `<BlockStack gap>` standardisation
+
+- Change: Hero card previously used `gap="150"`; social-proof card
+  previously used `gap="150"`. Both normalised to `gap="200"` /
+  `gap="300"` to match the sibling trust and safety cards.
+- Rationale: Sibling cards should share the same spacing rhythm.
+  `gap="200"` is Polaris's default rhythm for content within cards.
+- Risk: Very Low — spacing only.
+
+### 4.2 Hero card content grouping
+
+- Change: The four subdued paragraphs in the hero step are now wrapped
+  in an inner `<BlockStack gap="200">` so they read as a single block
+  of copy. The primary CTA sits below in its own `<InlineStack>` with
+  clearer visual separation.
+- Rationale: Prior layout inter-leaved copy with the CTA using a
+  single-gap container, which weakened the CTA. This is the exact
+  weakness called out in problem-statement item #2.
+- Risk: Very Low — layout grouping only, no logic change.
+
+### 4.3 Wizard "Next" buttons aligned to end
+
+- Change: Each of the three step-completion "Next" buttons (bottom of
+  Steps 1, 2, 3) now sit in `<InlineStack align="end">`, so they
+  anchor to the right edge of the wizard column.
+- Rationale: Matches the Preview page's `Continue →` position
+  (right-aligned primary) so merchants build a consistent expectation
+  of "primary continuation on the right" across the wizard flow.
+- Risk: Very Low — alignment only.
+
+### Files changed (Phase 4)
+
+- `app/routes/app.welcome.tsx` — +19 / -17 lines
+
+### Risk assessment (Phase 4)
+
+- Backend logic: untouched.
+- Pricing, publish, billing, GraphQL, App Proxy, Prisma, APIs,
+  Dashboard: untouched.
+- Wizard workflow, step transitions, URL sync, return-to-wizard,
+  onboarding state machine, navigation: untouched.
+- Only visual spacing and alignment inside three wizard step
+  components changed.
+
+### Manual QA checklist (Phase 4)
+
+- [ ] Wizard hero step: the four intro paragraphs read as one block
+      of copy, separated from the primary CTA by clear whitespace.
+- [ ] All wizard cards feel visually consistent — same inner rhythm,
+      no card feels tighter or looser than another.
+- [ ] The "Next" button on Steps 1, 2, and 3 anchors to the right edge
+      of the wizard column. On narrow screens it wraps naturally.
+- [ ] Preview page `Continue →` and wizard `Next` buttons are visually
+      aligned in position across the flow.
+- [ ] StepIndicator (Phase 1) still renders correctly and remains in
+      sync with URL / state.
+- [ ] All Phase 2 and Phase 3 flows still work (spot-check: fresh
+      install → wizard → save rule → preview → continue → apply).
+- [ ] Responsive: verify at 375 / 768 / 1024 / 1440 px. No overflow,
+      no clipped text, no scroll traps.
+- [ ] A11y regression: keyboard tab order still walks
+      Banner → StepIndicator → Card content → Primary → Skip → Next.
+- [ ] TypeScript on `app.welcome.tsx`: zero new errors.
+
+### Rollback instructions (Phase 4)
+
+Preferred (Phase 4 only):
+
+```
+git apply -R docs/onboarding-ux-phase-4.patch
+```
+
+Full revert (all phases, reverse order):
+
+```
+git apply -R docs/onboarding-ux-phase-4.patch
+git apply -R docs/onboarding-ux-phase-3.patch
+git apply -R docs/onboarding-ux-phase-2.patch
+git apply -R docs/onboarding-ux-phase-1.patch
+```
+
+Alternative — restore file from HEAD:
+
+```
+git checkout HEAD -- app/routes/app.welcome.tsx
+```
+
+No DB migrations, no yarn/npm changes, no env changes. Code-only.
+
+### Global consistency audit — separate deliverable
+
+See `docs/onboarding-ux-global-audit.md`. It documents 12 categories of
+findings across all pages (page titles, card spacing, colors, buttons,
+badges, empty states, loading states, toast tones, icons, tables,
+responsive behaviour, accessibility). Each finding lists file:line
+evidence, severity (P0 / P1 / P2), and recommended fix. No code was
+changed outside the Phase 4A onboarding scope; the audit is intended
+to seed follow-up phases (proposed Phase 6 "Global Design
+Reconciliation" and beyond).
+
+---
 
 ## Phase 5 — Production Cleanup (planned)
 

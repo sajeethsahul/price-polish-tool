@@ -1,0 +1,75 @@
+diff --git a/app/routes/app.welcome.tsx b/app/routes/app.welcome.tsx
+index a502da3..a9a1efc 100644
+--- a/app/routes/app.welcome.tsx
++++ b/app/routes/app.welcome.tsx
+@@ -203,19 +203,21 @@ function WelcomeStep({ onGetStarted }: { onGetStarted: () => void }) {
+   return (
+     <BlockStack gap="400">
+       <Card>
+-        <BlockStack gap="150">
+-          <Text as="p" tone="subdued">
+-            {t("welcome.hero.line1")}
+-          </Text>
+-          <Text as="p" tone="subdued">
+-            {t("welcome.hero.line2")}
+-          </Text>
+-          <Text as="p" tone="subdued">
+-            {t("welcome.hero.line3")}
+-          </Text>
+-          <Text as="p" tone="subdued">
+-            {t("welcome.hero.why")}
+-          </Text>
++        <BlockStack gap="300">
++          <BlockStack gap="200">
++            <Text as="p" tone="subdued">
++              {t("welcome.hero.line1")}
++            </Text>
++            <Text as="p" tone="subdued">
++              {t("welcome.hero.line2")}
++            </Text>
++            <Text as="p" tone="subdued">
++              {t("welcome.hero.line3")}
++            </Text>
++            <Text as="p" tone="subdued">
++              {t("welcome.hero.why")}
++            </Text>
++          </BlockStack>
+           <InlineStack gap="200">
+             <Button
+               variant="primary"
+@@ -270,7 +272,7 @@ function WelcomeStep({ onGetStarted }: { onGetStarted: () => void }) {
+       </Card>
+ 
+       <Card>
+-        <BlockStack gap="150">
++        <BlockStack gap="200">
+           <Text as="h3" variant="headingMd">
+             {t("welcome.social.title")}
+           </Text>
+@@ -342,7 +344,7 @@ function CreateRuleStep({
+         </BlockStack>
+       </Card>
+ 
+-      <InlineStack gap="200">
++      <InlineStack gap="200" align="end">
+         <Button variant="primary" onClick={onDone} disabled={!hasRule}>
+           {t("welcome.step.next")}
+         </Button>
+@@ -402,7 +404,7 @@ function PreviewPricesStep({
+         </BlockStack>
+       </Card>
+ 
+-      <InlineStack gap="200">
++      <InlineStack gap="200" align="end">
+         <Button variant="primary" onClick={onDone} disabled={!hasPreviewed}>
+           {t("welcome.step.next")}
+         </Button>
+@@ -462,7 +464,7 @@ function ApplyUpdateStep({
+         </BlockStack>
+       </Card>
+ 
+-      <InlineStack gap="200">
++      <InlineStack gap="200" align="end">
+         <Button variant="primary" onClick={onDone} disabled={!hasApplied}>
+           {t("welcome.step.next")}
+         </Button>
