@@ -1,0 +1,188 @@
+diff --git a/app/routes/app.preview.tsx b/app/routes/app.preview.tsx
+index 8bc2850..60bfc0a 100644
+--- a/app/routes/app.preview.tsx
++++ b/app/routes/app.preview.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from "react";
++import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+ import { useNavigate, useOutletContext, useSearchParams } from "react-router";
+ import type { PricingPreviewItem } from "../types/pricing";
+ import { useAppFetch } from "../utils/fetch";
+@@ -7,12 +7,16 @@ import {
+   BlockStack,
+   Button,
+   Card,
++  EmptyState,
+   InlineStack,
+   Page,
+-  Spinner,
++  SkeletonBodyText,
++  SkeletonDisplayText,
+   Text,
+ } from "@shopify/polaris";
+ 
++const PREVIEW_SAMPLE_SIZE = 30;
++
+ export default function PreviewPage() {
+   const navigate = useNavigate();
+   const { currencyCode } = useOutletContext<{ currencyCode: string }>();
+@@ -25,6 +29,8 @@ export default function PreviewPage() {
+   const [isLoading, setIsLoading] = useState(true);
+   const [error, setError] = useState<string | null>(null);
+   const [previews, setPreviews] = useState<PricingPreviewItem[]>([]);
++  const [showAll, setShowAll] = useState(false);
++  const toggleButtonRef = useRef<HTMLDivElement | null>(null);
+ 
+   useEffect(() => {
+     let active = true;
+@@ -50,6 +56,36 @@ export default function PreviewPage() {
+     };
+   }, [appFetch]);
+ 
++  // Phase 3 (UX): client-side sample display. The API response is
++  // unchanged — we only slice on the client so the wizard preview stays
++  // lightweight. Users can opt in to the full list via "View Full Preview".
++  const totalCount = previews.length;
++  const hasMoreThanSample = totalCount > PREVIEW_SAMPLE_SIZE;
++  const visiblePreviews = useMemo(
++    () => (showAll || !hasMoreThanSample ? previews : previews.slice(0, PREVIEW_SAMPLE_SIZE)),
++    [previews, showAll, hasMoreThanSample]
++  );
++  const visibleCount = visiblePreviews.length;
++
++  // Verification refinement (Phase 3): when collapsing the expanded list,
++  // scroll the toggle button back into view so the merchant keeps their
++  // anchor. Expanding never moves scroll; collapsing focuses the button.
++  const handleTogglePreviewScope = useCallback(() => {
++    setShowAll((prev) => {
++      const next = !prev;
++      if (prev === true) {
++        // We are collapsing — restore anchor after the DOM updates.
++        requestAnimationFrame(() => {
++          toggleButtonRef.current?.scrollIntoView({
++            behavior: "smooth",
++            block: "center",
++          });
++        });
++      }
++      return next;
++    });
++  }, []);
++
+   // Phase 2 (UX): when arriving from the onboarding wizard, hide the tiny
+   // Polaris backAction chevron (which merchants mis-read as "Previous Step")
+   // in favour of explicit navigation buttons rendered in the page body.
+@@ -77,47 +113,76 @@ export default function PreviewPage() {
+         ) : null}
+ 
+         <Card>
+-          <BlockStack gap="300">
+-            {isLoading ? (
+-              <InlineStack align="center">
+-                <Spinner accessibilityLabel="Loading product previews" />
+-              </InlineStack>
+-            ) : previews.length === 0 ? (
+-              <BlockStack gap="100" align="center">
+-                <Text as="h2" variant="headingMd">
+-                  No preview products yet
+-                </Text>
+-                <Text as="p" tone="subdued" alignment="center">
+-                  Create a pricing rule, then refresh previews to see proposed pricing updates.
+-                </Text>
++          {isLoading ? (
++            <BlockStack gap="300">
++              <SkeletonDisplayText size="small" />
++              <BlockStack gap="150">
++                {Array.from({ length: 4 }).map((_, index) => (
++                  <Card key={`preview-skeleton-${index}`}>
++                    <BlockStack gap="150">
++                      <SkeletonDisplayText size="small" />
++                      <SkeletonBodyText lines={1} />
++                    </BlockStack>
++                  </Card>
++                ))}
+               </BlockStack>
+-            ) : (
+-              <BlockStack gap="200">
+-                <Text as="p" tone="subdued">
+-                  Showing {previews.length} preview items.
++            </BlockStack>
++          ) : previews.length === 0 ? (
++            <EmptyState
++              heading="No products to preview yet"
++              image=""
++              action={{
++                content: "Adjust pricing rule",
++                onAction: () =>
++                  navigate(
++                    isFromOnboarding
++                      ? `/app/rules?from=onboarding${revisitSuffix}`
++                      : "/app/rules"
++                  ),
++              }}
++            >
++              <p>
++                Once you create or refine a pricing rule, we'll show a live preview of the new prices here so you can review them before applying.
++              </p>
++            </EmptyState>
++          ) : (
++            <BlockStack gap="300">
++              <InlineStack align="space-between" blockAlign="center" wrap>
++                <Text as="p" tone="subdued" variant="bodySm">
++                  {`Showing ${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} product${totalCount === 1 ? "" : "s"}`}
+                 </Text>
+-                <BlockStack gap="150">
+-                  {previews.slice(0, 30).map((p) => (
+-                    <Card key={String(p.variantId)}>
+-                      <BlockStack gap="100">
+-                        <Text as="h3" variant="headingMd">
+-                          {p.title}
+-                        </Text>
+-                        <Text as="p" tone="subdued">
+-                          Old: {p.oldPrice} → New: {p.newPrice}
+-                        </Text>
+-                      </BlockStack>
+-                    </Card>
+-                  ))}
+-                </BlockStack>
+-                {previews.length > 30 ? (
+-                  <Text as="p" tone="subdued">
+-                    Showing first 30 items.
+-                  </Text>
++                {hasMoreThanSample ? (
++                  <div ref={toggleButtonRef}>
++                    <Button
++                      variant="plain"
++                      onClick={handleTogglePreviewScope}
++                      accessibilityLabel={
++                        showAll
++                          ? `Collapse the preview list back to the first ${PREVIEW_SAMPLE_SIZE} products`
++                          : `Expand the preview to show all ${totalCount.toLocaleString()} products`
++                      }
++                    >
++                      {showAll ? "Show fewer" : "View Full Preview"}
++                    </Button>
++                  </div>
+                 ) : null}
++              </InlineStack>
++              <BlockStack gap="150">
++                {visiblePreviews.map((p) => (
++                  <Card key={String(p.variantId)}>
++                    <BlockStack gap="100">
++                      <Text as="h3" variant="headingMd">
++                        {p.title}
++                      </Text>
++                      <Text as="p" tone="subdued">
++                        Old: {p.oldPrice} → New: {p.newPrice}
++                      </Text>
++                    </BlockStack>
++                  </Card>
++                ))}
+               </BlockStack>
+-            )}
+-          </BlockStack>
++            </BlockStack>
++          )}
+         </Card>
+ 
+         {isFromOnboarding ? (

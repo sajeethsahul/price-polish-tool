@@ -459,11 +459,133 @@ code-only.
 
 ---
 
-## Phase 3 — Preview Improvements (planned, not yet started)
+## Phase 3 — Preview Improvements
 
-Scope: relabel to `Showing 30 of {total} products`, add optional
-`View Full Preview` toggle, improve empty and loading states. Preview
-sample size stays at 30 per current guidance.
+Status: Implemented — awaiting review.
+Files touched: 1 (`app/routes/app.preview.tsx`).
+Patch: `docs/onboarding-ux-phase-3.patch` (rollback: `git apply -R`).
+
+### 3.1 "Showing X of N products" label
+
+- Change: The card now shows
+  `Showing {visibleCount} of {totalCount} product(s)`, both formatted
+  via `toLocaleString()`. Singular / plural handled naturally.
+- Rationale: Merchants had no idea how large their catalogue really
+  is when the preview page showed "Showing 30 preview items". This
+  addresses problem-statement item #5 for the current 30-item limit
+  without changing the sample size.
+- Risk: Very Low — presentation only.
+
+### 3.2 "View Full Preview" toggle
+
+- Change: When `previews.length > 30`, a right-aligned Polaris
+  `<Button variant="plain">View Full Preview</Button>` appears next to
+  the count label. Clicking it flips a local `showAll` state, at which
+  point the button becomes `Show fewer` and the visible list expands
+  to `previews.length`. Purely client-side — no additional fetch, no
+  pagination changes, no API touched.
+- Rationale: Keeps the onboarding preview lightweight (30 items) while
+  giving merchants an opt-in path to review the full list. Merchants
+  can also collapse back to the sample.
+- Risk: Very Low — local `useState` boolean plus a `useMemo` slice.
+
+### 3.3 Polaris `<EmptyState>` for zero-product case
+
+- Change: The previous inline "No preview products yet" text block is
+  replaced with a Polaris `<EmptyState>` component. The primary action
+  routes to `/app/rules` (with `?from=onboarding` and, if applicable,
+  `?revisit=1` preserved). No external illustration URL — `image=""`
+  is passed, matching the pattern used by many embedded Shopify apps
+  to avoid third-party CDN dependencies.
+- Rationale: Native Polaris empty state gives merchants a clear
+  recovery path ("Adjust pricing rule") instead of a dead-end message.
+- Risk: Very Low — presentation only, action targets existing routes.
+
+### 3.4 Polaris skeleton loading state
+
+- Change: The `<Spinner>` in the loading branch is replaced with a
+  Polaris skeleton composition:
+  `<SkeletonDisplayText size="small"/>` followed by three
+  `<SkeletonBodyText lines={3}/>` blocks. Wrapped inside the existing
+  `<Card>` for continuity.
+- Rationale: Skeleton previews feel like a Shopify-native loading
+  experience and give merchants a sense of what will appear once the
+  preview loads.
+- Risk: Very Low — visual only; loading state entry / exit unchanged.
+
+### Files changed (Phase 3)
+
+- `app/routes/app.preview.tsx` — +75 / -39 lines
+
+### Risk assessment (Phase 3)
+
+- API `/api/preview-price`: untouched.
+- Pricing calculation, rule persistence, publish flow, billing,
+  GraphQL, App Proxy, Prisma schema: untouched.
+- Pagination logic: untouched — the slice is purely client-side
+  presentation.
+- Fetch effect, error state, and success state boundaries are byte-
+  identical to Phase 2 for merchants who don't hit the empty state.
+
+### Manual QA checklist (Phase 3)
+
+- [ ] With a shop that has more than 30 products in preview:
+      label reads "Showing 30 of {N} products"; the `View Full Preview`
+      button is visible.
+- [ ] Clicking `View Full Preview` expands the list to all items;
+      label updates to "Showing {N} of {N} products"; button becomes
+      `Show fewer`.
+- [ ] Clicking `Show fewer` collapses back to 30; label reverts.
+- [ ] With a shop that has fewer than 30 products: label reads
+      "Showing {N} of {N}"; the `View Full Preview` button is hidden.
+- [ ] With a shop that has 1 product: label reads "Showing 1 of 1
+      product" (singular).
+- [ ] With a shop that has 0 products (or before creating a rule):
+      Polaris `EmptyState` renders with heading "No preview products
+      yet" and a primary action "Adjust pricing rule".
+- [ ] Clicking "Adjust pricing rule" from onboarding routes to
+      `/app/rules?from=onboarding` (and preserves `revisit=1` if
+      applicable). From direct navigation, it routes to `/app/rules`
+      with no query string.
+- [ ] While the preview is loading, the card shows skeleton lines
+      (no spinner). Skeleton disappears as soon as data arrives.
+- [ ] Error state (simulate a network error): critical banner
+      "Unable to load previews" renders; card shows empty layout.
+      (Behavior unchanged from Phase 2 — verify no regression.)
+- [ ] Explicit ← Previous Step / Continue → buttons (Phase 2)
+      continue to appear only when `?from=onboarding` is present.
+- [ ] `Back to dashboard` label continues to render for direct
+      navigation only.
+- [ ] TypeScript on `app.preview.tsx`: zero new errors.
+
+### Rollback instructions (Phase 3)
+
+Preferred:
+
+```
+git apply -R docs/onboarding-ux-phase-3.patch
+```
+
+Full revert of all three phases (in reverse order):
+
+```
+git apply -R docs/onboarding-ux-phase-3.patch
+git apply -R docs/onboarding-ux-phase-2.patch
+git apply -R docs/onboarding-ux-phase-1.patch
+```
+
+Alternative — restore `app/routes/app.preview.tsx` from HEAD:
+
+```
+git checkout HEAD -- app/routes/app.preview.tsx
+```
+
+No DB migrations, no yarn/npm changes, no env changes. Rollback is
+code-only.
+
+---
+
+---
 
 ## Phase 4 — Visual Polish (planned)
 
