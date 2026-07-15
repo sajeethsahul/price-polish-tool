@@ -24,6 +24,20 @@ import { t } from "../utils/i18n";
 
 type WizardStep = "welcome" | "create-rule" | "preview-prices" | "apply-update";
 
+const VALID_WIZARD_STEPS: readonly WizardStep[] = [
+  "welcome",
+  "create-rule",
+  "preview-prices",
+  "apply-update",
+];
+
+function parseWizardStepParam(value: string | null): WizardStep | null {
+  if (!value) return null;
+  return (VALID_WIZARD_STEPS as readonly string[]).includes(value)
+    ? (value as WizardStep)
+    : null;
+}
+
 interface OnboardingState {
   hasRule: boolean;
   hasPreviewed: boolean;
@@ -88,10 +102,45 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function WelcomePage() {
   const navigate = useNavigate();
   const data = useLoaderData() as { onboarding: OnboardingState };
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isRevisit = searchParams.get("revisit") === "1";
-  const [step, setStep] = useState<WizardStep>("welcome");
+  const stepParam = parseWizardStepParam(searchParams.get("step"));
+  const [step, setStepState] = useState<WizardStep>(stepParam ?? "welcome");
   const [onboarding, setOnboarding] = useState<OnboardingState>(() => data.onboarding);
+
+  // Preserve `revisit=1` through outbound navigation so that the app.tsx
+  // loader guard (onboarded → /app/welcome ⇒ redirect) does not fire when
+  // an already-onboarded merchant is browsing the wizard via "Revisit Setup".
+  const withOnboardingContext = (path: string) => {
+    const url = new URL(path, "http://placeholder");
+    url.searchParams.set("from", "onboarding");
+    if (isRevisit) url.searchParams.set("revisit", "1");
+    return `${url.pathname}${url.search}`;
+  };
+
+  // Keep local wizard step in sync with the URL (?step=). This enables
+  // deep-links from Phase 2 return-to-wizard flows (e.g. Rules save →
+  // /app/welcome?step=preview-prices) and preserves position on refresh
+  // or browser back/forward navigation.
+  useEffect(() => {
+    const next = parseWizardStepParam(searchParams.get("step"));
+    if (next && next !== step) {
+      setStepState(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const setStep = (next: WizardStep) => {
+    if (next === step) return;
+    setStepState(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "welcome") {
+      params.delete("step");
+    } else {
+      params.set("step", next);
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   useEffect(() => {
     setOnboarding(data.onboarding);
@@ -122,6 +171,7 @@ export default function WelcomePage() {
           {step === "create-rule" && (
             <CreateRuleStep
               hasRule={onboarding.hasRule}
+              onPrimary={() => navigate(withOnboardingContext("/app/rules"))}
               onDone={() => setStep("preview-prices")}
               onSkip={() => setStep("preview-prices")}
             />
@@ -129,6 +179,7 @@ export default function WelcomePage() {
           {step === "preview-prices" && (
             <PreviewPricesStep
               hasPreviewed={onboarding.hasPreviewed}
+              onPrimary={() => navigate(withOnboardingContext("/app/preview"))}
               onDone={() => setStep("apply-update")}
               onSkip={() => setStep("apply-update")}
             />
@@ -137,7 +188,7 @@ export default function WelcomePage() {
             <ApplyUpdateStep
               hasApplied={onboarding.hasApplied}
               onDone={() => navigate("/app")}
-              onSkip={() => navigate("/app/preview")}
+              onSkip={() => navigate("/app")}
             />
           )}
         </BlockStack>
@@ -234,15 +285,15 @@ function WelcomeStep({ onGetStarted }: { onGetStarted: () => void }) {
 
 function CreateRuleStep({
   hasRule,
+  onPrimary,
   onDone,
   onSkip,
 }: {
   hasRule: boolean;
+  onPrimary: () => void;
   onDone: () => void;
   onSkip: () => void;
 }) {
-  const navigate = useNavigate();
-
   return (
     <BlockStack gap="400">
       <Card>
@@ -267,7 +318,7 @@ function CreateRuleStep({
               <InlineStack gap="200">
                 <Button
                   variant="primary"
-                  onClick={() => navigate("/app/rules")}
+                  onClick={onPrimary}
                 >
                   {t("welcome.step.createRule.cta")}
                 </Button>
@@ -302,15 +353,15 @@ function CreateRuleStep({
 
 function PreviewPricesStep({
   hasPreviewed,
+  onPrimary,
   onDone,
   onSkip,
 }: {
   hasPreviewed: boolean;
+  onPrimary: () => void;
   onDone: () => void;
   onSkip: () => void;
 }) {
-  const navigate = useNavigate();
-
   return (
     <BlockStack gap="400">
       <Card>
@@ -338,7 +389,7 @@ function PreviewPricesStep({
               <InlineStack gap="200">
                 <Button
                   variant="primary"
-                  onClick={() => navigate("/app/preview")}
+                  onClick={onPrimary}
                 >
                   {t("welcome.step.preview.cta")}
                 </Button>

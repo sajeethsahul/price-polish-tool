@@ -7,6 +7,7 @@ import {
     useActionData,
     useOutletContext,
     useNavigate,
+    useSearchParams,
 } from "react-router";
 
 import {
@@ -260,6 +261,10 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     const navigate = useNavigate();
     const navigation = useNavigation();
     const shopify = useAppBridge();
+    const [searchParams] = useSearchParams();
+    const isFromOnboarding = searchParams.get("from") === "onboarding";
+    const isRevisit = searchParams.get("revisit") === "1";
+    const revisitSuffix = isRevisit ? "&revisit=1" : "";
 
     const isSubmitting = navigation.state === "submitting";
 
@@ -284,6 +289,14 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     useEffect(() => {
         if (actionData?.saved) {
             shopify.toast.show(t("toast.savedSuccessfully"));
+            // Phase 2 (UX): only when the user came from the onboarding
+            // wizard (query param ?from=onboarding), auto-return to the
+            // wizard on Step 2 (Preview). Normal navigation to Pricing
+            // Rules remains unchanged. Preserves ?revisit=1 so already-
+            // onboarded merchants stay inside the wizard.
+            if (isFromOnboarding) {
+                navigate(`/app/welcome?step=preview-prices${revisitSuffix}`, { replace: true });
+            }
         }
         if (actionData?.code === "BILLING_INACTIVE") {
             setBillingBlockModalCode("BILLING_INACTIVE");
@@ -316,7 +329,18 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     });
 
     return (
-        <Page title={t("rules.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
+        <Page
+            title={t("rules.pageTitle")}
+            backAction={{
+                onAction: () =>
+                    navigate(
+                        isFromOnboarding
+                            ? `/app/welcome?step=create-rule${revisitSuffix}`
+                            : "/app"
+                    ),
+            }}
+            fullWidth
+        >
             <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
             <Layout>
 

@@ -248,17 +248,216 @@ changes. Rollback is code-only.
 
 ---
 
-## Phase 2 — Flow Improvements (planned, not yet started)
+## Phase 2 — Flow Improvements
 
-Scope (to be implemented after Phase 1 sign-off):
+Status: Implemented — awaiting review.
+Files touched: 3
+(`app/routes/app.welcome.tsx`, `app/routes/app.rules.tsx`,
+ `app/routes/app.preview.tsx`).
+Patch: `docs/onboarding-ux-phase-2.patch` (rollback: `git apply -R`).
 
-- `app.welcome.tsx`: read `?step=` from URL to deep-link a wizard step.
-- `app.rules.tsx`: on successful save, if `?from=onboarding` was set,
-  navigate back to `/app/welcome?step=preview-prices`. Non-onboarding
-  saves are unchanged.
-- `app.preview.tsx`: when `?from=onboarding` is present, render explicit
-  `← Previous Step` / `Continue →` buttons. Default nav uses the
-  existing back arrow.
+### 2.1 URL-driven wizard step (`?step=`)
+
+- File: `app/routes/app.welcome.tsx`.
+- Change: The wizard now reads `?step=` from the URL to determine the
+  starting step, and internal `setStep()` calls sync the URL via
+  `setSearchParams({ ... }, { replace: true })`. A `parseWizardStepParam`
+  helper safely rejects invalid values.
+- Rationale: Enables deep-linking from Phase 2 return-to-wizard flows,
+  preserves position across refresh / back / forward, and provides a
+  stable URL for the "Revisit Setup" navigation entry.
+- Risk: Low — local state and URL are kept in sync via `useEffect` +
+  `setSearchParams`. `replace: true` avoids polluting browser history.
+- Rollback: `git apply -R docs/onboarding-ux-phase-2.patch`.
+
+### 2.2 Outbound navigation carries `?from=onboarding`
+
+- File: `app/routes/app.welcome.tsx`.
+- Change: Primary CTA on Step 1 navigates to
+  `/app/rules?from=onboarding`; primary CTA on Step 2 navigates to
+  `/app/preview?from=onboarding`. Step 3 primary and skip both go to
+  `/app` (unchanged for primary; Step 3 skip was previously routed to
+  `/app/preview` and has been corrected to `/app`).
+- Rationale: A single query parameter is the trigger for onboarding-
+  scoped behavior on Rules and Preview pages. No other navigation path
+  is affected.
+- Risk: Very Low — parameter addition only.
+- Rollback: `git apply -R docs/onboarding-ux-phase-2.patch`.
+
+### 2.3 Rules — return-to-wizard on save (onboarding only)
+
+- File: `app/routes/app.rules.tsx`.
+- Change: Added `useSearchParams()` and a boolean
+  `isFromOnboarding = searchParams.get("from") === "onboarding"`. In the
+  existing `useEffect` that handles `actionData.saved`, if
+  `isFromOnboarding` is true we additionally call
+  `navigate("/app/welcome?step=preview-prices", { replace: true })`.
+  The Page `backAction` also routes back to `/app/welcome?step=create-rule`
+  in onboarding mode; otherwise it retains its previous target `/app`.
+- Rationale: Delivers the merchant flow requested in the problem
+  statement: "Create Pricing Rule → save → automatically return to Get
+  Started → Continue Step 2." All logic is gated behind the query
+  parameter — non-onboarding saves are byte-for-byte identical to the
+  previous behavior.
+- Risk: Low — one added effect branch, one Page prop change, both
+  gated. Action, validation, DB writes untouched.
+- Rollback: `git apply -R docs/onboarding-ux-phase-2.patch`.
+
+### 2.4 Preview — explicit Previous / Continue buttons and clearer back
+
+- File: `app/routes/app.preview.tsx`.
+- Change: Added `useSearchParams()` and `isFromOnboarding`. When
+  `isFromOnboarding` is true, the Polaris `<Page>` `backAction` is
+  omitted (removes the ambiguous tiny chevron) and a footer
+  `<InlineStack>` renders two explicit buttons:
+  `← Previous Step` (navigates to `/app/welcome?step=create-rule`) and
+  `Continue →` (primary, navigates to `/app/welcome?step=apply-update`).
+  When `isFromOnboarding` is false, the `backAction` label was
+  corrected from the previously misleading "Back to onboarding" to
+  "Back to dashboard" pointing at `/app`, so post-onboarding merchants
+  landing on the preview page no longer get bounced back to the
+  wizard.
+- Rationale: Directly addresses problem-statement item #6 — the tiny
+  arrow was mis-read as "Previous Step" and the label incorrectly
+  suggested returning to onboarding for merchants who had already
+  finished.
+- Risk: Low — presentation-only. `useEffect` for preview data fetching
+  is identical to before. No changes to the API call or the rendered
+  preview list.
+- Rollback: `git apply -R docs/onboarding-ux-phase-2.patch`.
+
+### 2.5 Revisit mode: preserve `?revisit=1` through the flow
+
+- Files: `app/routes/app.welcome.tsx`, `app/routes/app.rules.tsx`,
+  `app/routes/app.preview.tsx`.
+- Change: Outbound URLs from the wizard now include `revisit=1` when
+  the user entered via "Revisit Setup". `rules.tsx` and `preview.tsx`
+  preserve `revisit=1` in every navigation target that leads back into
+  the wizard.
+- Rationale: The `app.tsx` loader redirects an onboarded merchant off
+  `/app/welcome` unless `?revisit=1` is present (Phase 1 guard). Without
+  this preservation, the auto-return after saving a rule would drop a
+  Revisit-mode merchant on the Dashboard.
+- Risk: Very Low — string concatenation of an already-validated
+  boolean-driven suffix.
+- Rollback: `git apply -R docs/onboarding-ux-phase-2.patch`.
+
+### Files changed (Phase 2)
+
+- `app/routes/app.welcome.tsx` — +69 / -11 lines
+- `app/routes/app.rules.tsx`   — +25 / -1 lines
+- `app/routes/app.preview.tsx` — +42 / -6 lines
+
+Total: +136 / -18 across 3 files.
+
+### Risk assessment (Phase 2)
+
+- Backend logic: untouched.
+- Pricing calculation, preview API, publish flow, billing, GraphQL,
+  App Proxy, Prisma schema, `api.onboarding.ts`: untouched.
+- Onboarding state machine (loader guards, DB flag writes): unchanged.
+- Every new behavior is gated behind an explicit query parameter
+  (`?from=onboarding` on Rules and Preview; `?step=` on Welcome).
+  Merchants navigating from primary nav or dashboard experience zero
+  change.
+
+### Manual QA checklist (Phase 2)
+
+Return-to-wizard flow:
+
+- [ ] From `/app/welcome`, click "Create Pricing Rule" on Step 1
+      → URL becomes `/app/rules?from=onboarding`.
+- [ ] Save the rule → toast "Saved successfully" appears → automatic
+      redirect to `/app/welcome?step=preview-prices`. Step indicator
+      shows Step 1 as `complete/success`, Step 2 as active.
+- [ ] Click "Preview Prices" on Step 2 → URL becomes
+      `/app/preview?from=onboarding`.
+- [ ] Preview page renders WITHOUT the small `backAction` chevron.
+      Two explicit buttons appear at the bottom: `← Previous Step`
+      and `Continue →` (primary).
+- [ ] Click `← Previous Step` → returns to
+      `/app/welcome?step=create-rule`. Step indicator reflects state.
+- [ ] Click `Continue →` from Preview → advances to
+      `/app/welcome?step=apply-update`. Step indicator shows Steps 1
+      and 2 as `complete/success`, Step 3 as active.
+
+Non-onboarding safety:
+
+- [ ] From primary nav, click "Pricing Rules" → URL is `/app/rules`
+      (no query). Save the rule → toast fires → merchant STAYS on the
+      Pricing Rules page. No redirect to `/app/welcome`.
+- [ ] From primary nav, click "Pricing Rules" and change a value.
+      Click the Polaris back arrow → returns to `/app` (Dashboard),
+      not to onboarding.
+- [ ] From primary nav, navigate to `/app/preview` directly. The
+      back action now reads "Back to dashboard" and returns to `/app`.
+      No explicit `Previous / Continue` buttons appear.
+
+Deep-link and history:
+
+- [ ] Open `/app/welcome?step=preview-prices` directly (bookmark or
+      copy-paste). Page loads on Step 2 with the correct indicator.
+- [ ] Refresh at any wizard step → URL is preserved, wizard reopens
+      at the same step.
+- [ ] Browser back / forward within the wizard: setStep uses
+      `replace: true`, so back/forward remains scoped to actual
+      navigations (into rules, preview, dashboard) rather than
+      per-step history noise.
+- [ ] `/app/welcome?step=invalid-value` falls back to the welcome
+      intro (invalid step values are ignored).
+
+Revisit mode (onboarded merchant clicks "Revisit Setup"):
+
+- [ ] Clicking `Revisit Setup` opens `/app/welcome?revisit=1` and
+      stays there.
+- [ ] Advancing to Step 1 inside the wizard changes URL to
+      `/app/welcome?revisit=1&step=create-rule`.
+- [ ] Clicking "Create Pricing Rule" navigates to
+      `/app/rules?from=onboarding&revisit=1`.
+- [ ] Saving a rule inside the Revisit flow auto-returns to
+      `/app/welcome?step=preview-prices&revisit=1` — the merchant is
+      NOT redirected to the Dashboard by the loader guard.
+- [ ] Clicking `← Previous Step` from the preview page returns to
+      `/app/welcome?step=create-rule&revisit=1`.
+
+Regression checks:
+
+- [ ] Dashboard renders identically to Phase 1.
+- [ ] Pricing calculation and rule persistence unchanged.
+- [ ] Preview API result is rendered identically (list, "Showing first
+      30 items" text, empty-state, error banner).
+- [ ] Publish flow unchanged.
+- [ ] Billing enforcement unchanged.
+- [ ] TypeScript on the three modified files: zero new errors.
+
+### Rollback instructions (Phase 2)
+
+Preferred (patches must be applied in order; reverse in reverse order):
+
+```
+# revert Phase 2 only, keep Phase 1
+git apply -R docs/onboarding-ux-phase-2.patch
+```
+
+Full revert of both phases:
+
+```
+git apply -R docs/onboarding-ux-phase-2.patch
+git apply -R docs/onboarding-ux-phase-1.patch
+```
+
+Alternative — restore individual files:
+
+```
+git checkout HEAD -- app/routes/app.welcome.tsx \
+                     app/routes/app.rules.tsx \
+                     app/routes/app.preview.tsx
+```
+
+No DB migrations, no yarn/npm changes, no env changes. Rollback is
+code-only.
+
+---
 
 ## Phase 3 — Preview Improvements (planned, not yet started)
 

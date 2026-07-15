@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router";
+import { useNavigate, useOutletContext, useSearchParams } from "react-router";
 import type { PricingPreviewItem } from "../types/pricing";
 import { useAppFetch } from "../utils/fetch";
 import {
   Banner,
   BlockStack,
+  Button,
   Card,
   InlineStack,
   Page,
@@ -16,6 +17,10 @@ export default function PreviewPage() {
   const navigate = useNavigate();
   const { currencyCode } = useOutletContext<{ currencyCode: string }>();
   const appFetch = useAppFetch();
+  const [searchParams] = useSearchParams();
+  const isFromOnboarding = searchParams.get("from") === "onboarding";
+  const isRevisit = searchParams.get("revisit") === "1";
+  const revisitSuffix = isRevisit ? "&revisit=1" : "";
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +50,24 @@ export default function PreviewPage() {
     };
   }, [appFetch]);
 
+  // Phase 2 (UX): when arriving from the onboarding wizard, hide the tiny
+  // Polaris backAction chevron (which merchants mis-read as "Previous Step")
+  // in favour of explicit navigation buttons rendered in the page body.
+  // Direct navigation (not from onboarding) keeps a clear "Back to dashboard"
+  // action to avoid dropping merchants onto the confusing "Back to onboarding"
+  // label that shipped before Phase 2.
+  const backActionProps = isFromOnboarding
+    ? undefined
+    : {
+        content: "Back to dashboard",
+        onAction: () => navigate("/app"),
+      };
+
   return (
     <Page
       title="Product Previews"
       subtitle={`Currency: ${currencyCode}`}
-      backAction={{
-        content: "Back to onboarding",
-        onAction: () => navigate("/app/welcome"),
-      }}
+      backAction={backActionProps}
     >
       <BlockStack gap="400">
         {error ? (
@@ -104,8 +119,29 @@ export default function PreviewPage() {
             )}
           </BlockStack>
         </Card>
+
+        {isFromOnboarding ? (
+          <InlineStack align="space-between" gap="200" wrap>
+            <Button
+              onClick={() =>
+                navigate(`/app/welcome?step=create-rule${revisitSuffix}`)
+              }
+              accessibilityLabel="Return to Step 1: Create Pricing Rule"
+            >
+              ← Previous Step
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() =>
+                navigate(`/app/welcome?step=apply-update${revisitSuffix}`)
+              }
+              accessibilityLabel="Continue to Step 3: Apply Pricing"
+            >
+              Continue →
+            </Button>
+          </InlineStack>
+        ) : null}
       </BlockStack>
     </Page>
   );
 }
-
