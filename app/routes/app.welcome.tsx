@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import {
+  Badge,
+  Banner,
   BlockStack,
   Button,
   Card,
+  Divider,
   Icon,
   InlineStack,
   List,
@@ -85,6 +88,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function WelcomePage() {
   const navigate = useNavigate();
   const data = useLoaderData() as { onboarding: OnboardingState };
+  const [searchParams] = useSearchParams();
+  const isRevisit = searchParams.get("revisit") === "1";
   const [step, setStep] = useState<WizardStep>("welcome");
   const [onboarding, setOnboarding] = useState<OnboardingState>(() => data.onboarding);
 
@@ -96,6 +101,19 @@ export default function WelcomePage() {
     <Page title={t("welcome.pageTitle")}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 0" }}>
         <BlockStack gap="400">
+          {isRevisit ? (
+            <Banner
+              tone="info"
+              title="You're revisiting the setup guide"
+            >
+              <p>
+                Reopening the guide won't change your pricing rules, published prices, or any existing configuration. Feel free to review the steps and close this page whenever you're done.
+              </p>
+            </Banner>
+          ) : null}
+          {step !== "welcome" ? (
+            <StepIndicator step={step} onboarding={onboarding} />
+          ) : null}
           {step === "welcome" && (
             <WelcomeStep
               onGetStarted={() => setStep("create-rule")}
@@ -253,7 +271,7 @@ function CreateRuleStep({
                 >
                   {t("welcome.step.createRule.cta")}
                 </Button>
-                <Button variant="tertiary" onClick={onSkip}>
+                <Button onClick={onSkip}>
                   {t("welcome.step.skip")}
                 </Button>
               </InlineStack>
@@ -274,7 +292,7 @@ function CreateRuleStep({
       </Card>
 
       <InlineStack gap="200">
-        <Button onClick={onDone} disabled={!hasRule}>
+        <Button variant="primary" onClick={onDone} disabled={!hasRule}>
           {t("welcome.step.next")}
         </Button>
       </InlineStack>
@@ -324,7 +342,7 @@ function PreviewPricesStep({
                 >
                   {t("welcome.step.preview.cta")}
                 </Button>
-                <Button variant="tertiary" onClick={onSkip}>
+                <Button onClick={onSkip}>
                   {t("welcome.step.skip")}
                 </Button>
               </InlineStack>
@@ -334,7 +352,7 @@ function PreviewPricesStep({
       </Card>
 
       <InlineStack gap="200">
-        <Button onClick={onDone} disabled={!hasPreviewed}>
+        <Button variant="primary" onClick={onDone} disabled={!hasPreviewed}>
           {t("welcome.step.next")}
         </Button>
       </InlineStack>
@@ -384,7 +402,7 @@ function ApplyUpdateStep({
                 >
                   {t("welcome.step.apply.cta")}
                 </Button>
-                <Button variant="tertiary" onClick={onSkip}>
+                <Button onClick={onSkip}>
                   {t("welcome.step.skip")}
                 </Button>
               </InlineStack>
@@ -394,7 +412,7 @@ function ApplyUpdateStep({
       </Card>
 
       <InlineStack gap="200">
-        <Button onClick={onDone} disabled={!hasApplied}>
+        <Button variant="primary" onClick={onDone} disabled={!hasApplied}>
           {t("welcome.step.next")}
         </Button>
       </InlineStack>
@@ -403,6 +421,76 @@ function ApplyUpdateStep({
 }
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────────
+
+const WIZARD_STEP_ORDER: Array<{
+  key: Exclude<WizardStep, "welcome">;
+  label: string;
+  completedKey: keyof OnboardingState;
+}> = [
+  { key: "create-rule", label: "Create Pricing Rule", completedKey: "hasRule" },
+  { key: "preview-prices", label: "Preview Prices", completedKey: "hasPreviewed" },
+  { key: "apply-update", label: "Apply Pricing", completedKey: "hasApplied" },
+];
+
+function StepIndicator({
+  step,
+  onboarding,
+}: {
+  step: WizardStep;
+  onboarding: OnboardingState;
+}) {
+  const activeIndex = WIZARD_STEP_ORDER.findIndex((entry) => entry.key === step);
+  const currentIndex = activeIndex >= 0 ? activeIndex : 0;
+  const currentEntry = WIZARD_STEP_ORDER[currentIndex];
+  const totalSteps = WIZARD_STEP_ORDER.length;
+
+  return (
+    <Card>
+      <BlockStack gap="200">
+        <InlineStack align="space-between" blockAlign="center" wrap={false}>
+          <Text as="p" variant="bodySm" tone="subdued">
+            {`Step ${currentIndex + 1} of ${totalSteps}`}
+          </Text>
+          <Text as="p" variant="bodySm" fontWeight="semibold">
+            {currentEntry.label}
+          </Text>
+        </InlineStack>
+        <Divider />
+        <InlineStack
+          gap="200"
+          blockAlign="center"
+          wrap
+          aria-label={`Onboarding progress. Currently on step ${currentIndex + 1} of ${totalSteps}: ${currentEntry.label}.`}
+        >
+          {WIZARD_STEP_ORDER.map((entry, index) => {
+            const isCompleted = Boolean(onboarding[entry.completedKey]);
+            const isActive = index === currentIndex;
+            const progress: "complete" | "partiallyComplete" | "incomplete" = isCompleted
+              ? "complete"
+              : isActive
+              ? "partiallyComplete"
+              : "incomplete";
+            const tone: "success" | "attention" | undefined = isCompleted
+              ? "success"
+              : isActive
+              ? "attention"
+              : undefined;
+
+            return (
+              <Badge
+                key={entry.key}
+                progress={progress}
+                tone={tone}
+              >
+                {`Step ${index + 1}: ${entry.label}`}
+              </Badge>
+            );
+          })}
+        </InlineStack>
+      </BlockStack>
+    </Card>
+  );
+}
 
 function TrustItem({ icon, label }: { icon: any; label: string }) {
   return (

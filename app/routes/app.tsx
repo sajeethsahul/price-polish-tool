@@ -113,6 +113,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     Boolean(appState?.onboardingFirstRuleAt) ||
     Boolean(appState?.onboardingFirstPreviewAt);
 
+  // Phase 1 (UX): allow explicit revisit of onboarding via ?revisit=1.
+  // Preserves the existing guard for all other navigation paths.
+  const isRevisit = url.searchParams.get("revisit") === "1";
+
   console.log("[ONBOARDING CHECK]", {
     shop,
     onboardingCompletedAt: appState?.onboardingCompletedAt ?? null,
@@ -179,7 +183,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     return redirect(to);
   }
-  if (isOnboarded && isWelcomeRoute) {
+  if (isOnboarded && isWelcomeRoute && !isRevisit) {
     const outgoingSearchParams = new URLSearchParams(url.searchParams);
     if (!outgoingSearchParams.get("host")) {
       outgoingSearchParams.set("host", host);
@@ -301,12 +305,17 @@ export default function AppLayout() {
         <>
           <NavMenu>
             <Link to="/app">Dashboard</Link>
-            <Link to="/app/welcome">Get Started</Link>
+            {!isOnboarded ? (
+              <Link to="/app/welcome">Get Started</Link>
+            ) : null}
             <Link to="/app/campaign-history">Campaign History</Link>
             <Link to="/app/rules">Pricing Rules</Link>
             <Link to="/app/billing">Billing</Link>
             <Link to="/app/settings">Settings</Link>
             <Link to="/app/help">Help</Link>
+            {isOnboarded ? (
+              <Link to="/app/welcome?revisit=1">Revisit Setup</Link>
+            ) : null}
           </NavMenu>
 
           <BillingStatusBanner
