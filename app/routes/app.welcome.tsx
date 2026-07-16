@@ -9,8 +9,8 @@ import {
   Card,
   Divider,
   Icon,
+  InlineGrid,
   InlineStack,
-  List,
   Page,
   Text,
 } from "@shopify/polaris";
@@ -202,86 +202,203 @@ export default function WelcomePage() {
 function WelcomeStep({ onGetStarted }: { onGetStarted: () => void }) {
   return (
     <BlockStack gap="400">
+      {/* HERO — single dominant CTA, scannable proof points */}
       <Card>
-        <BlockStack gap="300">
+        <BlockStack gap="500">
           <BlockStack gap="200">
-            <Text as="p" tone="subdued">
-              {t("welcome.hero.line1")}
+            <Text as="h1" variant="headingXl">
+              {t("welcome.landing.heroTitle")}
             </Text>
-            <Text as="p" tone="subdued">
-              {t("welcome.hero.line2")}
-            </Text>
-            <Text as="p" tone="subdued">
-              {t("welcome.hero.line3")}
-            </Text>
-            <Text as="p" tone="subdued">
-              {t("welcome.hero.why")}
+            <Text as="p" variant="bodyLg" tone="subdued">
+              {t("welcome.landing.heroSubtitle")}
             </Text>
           </BlockStack>
-          <InlineStack gap="200">
+
+          <BlockStack gap="200">
+            <HeroBullet label={t("welcome.landing.heroBullet1")} />
+            <HeroBullet label={t("welcome.landing.heroBullet2")} />
+            <HeroBullet label={t("welcome.landing.heroBullet3")} />
+            <HeroBullet label={t("welcome.landing.heroBullet4")} />
+          </BlockStack>
+
+          <InlineStack gap="300" blockAlign="center" wrap>
             <Button
               variant="primary"
-              onClick={() => {
-                onGetStarted();
-              }}
+              size="large"
+              onClick={onGetStarted}
             >
-              {t("welcome.hero.primary")}
+              {t("welcome.landing.heroPrimary")}
+            </Button>
+            <Button variant="plain" onClick={onGetStarted}>
+              {t("welcome.landing.heroSecondary")}
             </Button>
           </InlineStack>
         </BlockStack>
       </Card>
 
+      {/* HOW IT WORKS — compact 3-step strip */}
       <Card>
-        <BlockStack gap="200">
-          <InlineStack gap="200" blockAlign="center">
-            <Icon source={ShieldCheckMarkIcon} tone="success" />
-            <Text as="h3" variant="headingMd">
-              {t("welcome.trust.title")}
-            </Text>
+        <BlockStack gap="300">
+          <Text as="h2" variant="headingMd">
+            {t("welcome.landing.howItWorksTitle")}
+          </Text>
+          <InlineStack gap="400" wrap blockAlign="center">
+            <StepChip index={1} label={t("welcome.landing.step1")} />
+            <StepConnector />
+            <StepChip index={2} label={t("welcome.landing.step2")} />
+            <StepConnector />
+            <StepChip index={3} label={t("welcome.landing.step3")} />
           </InlineStack>
-          <BlockStack gap="200">
-            <TrustItem icon={ShieldCheckMarkIcon} label={t("welcome.trust.bulk")} />
-            <TrustItem icon={CalendarTimeIcon} label={t("welcome.trust.schedule")} />
-            <TrustItem icon={ShieldCheckMarkIcon} label={t("welcome.trust.history")} />
-            <TrustItem icon={ShieldCheckMarkIcon} label={t("welcome.trust.revert")} />
-            <TrustItem icon={ShieldCheckMarkIcon} label={t("welcome.trust.billing")} />
-            <TrustItem icon={ShieldCheckMarkIcon} label={t("welcome.trust.integrated")} />
-          </BlockStack>
         </BlockStack>
       </Card>
 
+      {/* PROTECTION — 2-column feature grid, icon + title + one-line body */}
       <Card>
-        <BlockStack gap="200">
-          <InlineStack gap="200" blockAlign="center">
-            <Icon source={ShieldCheckMarkIcon} tone="success" />
-            <Text as="h3" variant="headingMd">
-              {t("welcome.safety.title")}
-            </Text>
-          </InlineStack>
-          <Text as="p" tone="subdued">
-            {t("welcome.safety.subtitle")}
+        <BlockStack gap="400">
+          <Text as="h2" variant="headingMd">
+            {t("welcome.landing.protectionTitle")}
           </Text>
-          <List type="bullet">
-            <List.Item>{t("welcome.safety.item1")}</List.Item>
-            <List.Item>{t("welcome.safety.item2")}</List.Item>
-            <List.Item>{t("welcome.safety.item3")}</List.Item>
-            <List.Item>{t("welcome.safety.item4")}</List.Item>
-            <List.Item>{t("welcome.safety.item5")}</List.Item>
-          </List>
-        </BlockStack>
-      </Card>
-
-      <Card>
-        <BlockStack gap="200">
-          <Text as="h3" variant="headingMd">
-            {t("welcome.social.title")}
-          </Text>
-          <Text as="p" tone="subdued">
-            {t("welcome.social.subtitle")}
-          </Text>
+          <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
+            <FeatureItem
+              icon={CheckIcon}
+              title={t("welcome.landing.protection1Title")}
+              body={t("welcome.landing.protection1Body")}
+            />
+            <FeatureItem
+              icon={CheckIcon}
+              title={t("welcome.landing.protection2Title")}
+              body={t("welcome.landing.protection2Body")}
+            />
+            <FeatureItem
+              icon={CalendarTimeIcon}
+              title={t("welcome.landing.protection3Title")}
+              body={t("welcome.landing.protection3Body")}
+            />
+            <FeatureItem
+              icon={CheckIcon}
+              title={t("welcome.landing.protection4Title")}
+              body={t("welcome.landing.protection4Body")}
+            />
+            <FeatureItem
+              icon={ShieldCheckMarkIcon}
+              title={t("welcome.landing.protection5Title")}
+              body={t("welcome.landing.protection5Body")}
+            />
+            <FeatureItem
+              icon={CheckIcon}
+              title={t("welcome.landing.protection6Title")}
+              body={t("welcome.landing.protection6Body")}
+            />
+          </InlineGrid>
         </BlockStack>
       </Card>
     </BlockStack>
+  );
+}
+
+function HeroBullet({ label }: { label: string }) {
+  return (
+    <InlineStack gap="200" blockAlign="center" wrap={false}>
+      <span
+        aria-hidden="true"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 20,
+          height: 20,
+          flexShrink: 0,
+        }}
+      >
+        <Icon source={CheckIcon} tone="success" />
+      </span>
+      <Text as="span" variant="bodyMd">
+        {label}
+      </Text>
+    </InlineStack>
+  );
+}
+
+function StepChip({ index, label }: { index: number; label: string }) {
+  return (
+    <InlineStack gap="200" blockAlign="center" wrap={false}>
+      <span
+        aria-label={`Step ${index}`}
+        role="img"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 24,
+          height: 24,
+          borderRadius: "50%",
+          background: "var(--p-color-bg-fill-emphasis)",
+          color: "var(--p-color-text-inverse)",
+          fontSize: 13,
+          fontWeight: 600,
+          lineHeight: 1,
+          flexShrink: 0,
+        }}
+      >
+        {index}
+      </span>
+      <Text as="span" variant="bodyMd" fontWeight="semibold">
+        {label}
+      </Text>
+    </InlineStack>
+  );
+}
+
+function StepConnector() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-block",
+        width: 24,
+        height: 2,
+        background: "var(--p-color-border)",
+        borderRadius: 1,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function FeatureItem({
+  icon,
+  title,
+  body,
+}: {
+  icon: any;
+  title: string;
+  body: string;
+}) {
+  return (
+    <InlineStack gap="300" blockAlign="start" wrap={false}>
+      <span
+        aria-hidden="true"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 20,
+          height: 20,
+          flexShrink: 0,
+          marginTop: 2,
+        }}
+      >
+        <Icon source={icon} tone="success" />
+      </span>
+      <BlockStack gap="050">
+        <Text as="span" variant="bodyMd" fontWeight="semibold">
+          {title}
+        </Text>
+        <Text as="span" variant="bodySm" tone="subdued">
+          {body}
+        </Text>
+      </BlockStack>
+    </InlineStack>
   );
 }
 
@@ -542,16 +659,5 @@ function StepIndicator({
         </InlineStack>
       </BlockStack>
     </Card>
-  );
-}
-
-function TrustItem({ icon, label }: { icon: any; label: string }) {
-  return (
-    <InlineStack gap="200" blockAlign="center">
-      <Icon source={icon} tone="success" />
-      <Text as="span" variant="bodyMd">
-        {label}
-      </Text>
-    </InlineStack>
   );
 }
