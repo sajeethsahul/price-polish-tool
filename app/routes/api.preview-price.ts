@@ -49,6 +49,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               id
               title
               status
+              productType 
+              vendor      
               featuredImage {
                 url
               }
@@ -59,6 +61,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                   sku
                   price
                   compareAtPrice
+                  inventoryQuantity
                 }
               }
             }
@@ -150,6 +153,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 compareAtPrice: Number.isFinite(compareAtPrice) ? compareAtPrice.toFixed(2) : null,
                 storefrontVariantPrice: currentPrice.toFixed(2),
                 originalVariantPrice: basePrice.toFixed(2),
+                productType: product.productType ?? "",
+                vendor: product.vendor ?? "",
+                inventoryQuantity: variant?.inventoryQuantity ?? 0,
             };
         });
 

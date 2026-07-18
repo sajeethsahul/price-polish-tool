@@ -572,9 +572,11 @@ function ApplyUpdateStep({
                 >
                   {t("welcome.step.apply.cta")}
                 </Button>
+                {/*
                 <Button onClick={onSkip}>
                   {t("welcome.step.skip")}
                 </Button>
+                */}
               </InlineStack>
             </>
           )}

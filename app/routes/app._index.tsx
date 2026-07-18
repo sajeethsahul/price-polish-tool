@@ -24,7 +24,7 @@ import {
   Grid,
   Tooltip,
   Icon,
-  SkeletonPage,
+  SkeletonPage
 } from "@shopify/polaris";
 import {
   InfoIcon,
@@ -35,7 +35,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CheckIcon,
-  BoltIcon,
+  SearchIcon,
 } from "@shopify/polaris-icons";
 import {
   formatMoney,
@@ -3641,171 +3641,141 @@ function DashboardContent({
               <Box paddingBlockEnd="300">
                 <BlockStack gap="200">
                   {/* 🔹 2. FILTER CARD */}
-                  <Card padding="300">
-                    <BlockStack gap="200">
-                      {/* Clean, low-profile header row */}
-                      <InlineStack align="space-between" blockAlign="center">
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          Filters & Smart Segments
-                        </Text>
-                      </InlineStack>
+{/* 🔹 2. FILTER CARD */}
+<Card padding="300">
+  <BlockStack gap="250">
+    {/* Clean, low-profile header row */}
+    <InlineStack align="space-between" blockAlign="center">
+      <Text as="h3" variant="headingSm" fontWeight="semibold" tone="subdued">
+        Filters & Smart Segments
+      </Text>
+    </InlineStack>
 
-                      {/* Ultra-compact combined filter & query row */}
-                      <InlineStack
-                        align="space-between"
-                        blockAlign="center"
-                        gap="300"
-                        wrap
-                      >
-                        {/* Left side: Tabbed Quick Segments (styled to look like a premium segmented control) */}
-                        <InlineStack gap="100" blockAlign="center">
-                          <Button
-                            size="slim"
-                            variant={
-                              activeFilter === "all" ? "secondary" : "tertiary"
-                            }
-                            pressed={activeFilter === "all"}
-                            onClick={() => setActiveFilter("all")}
-                          >
-                            All
-                          </Button>
-                          <Button
-                            size="slim"
-                            variant={
-                              activeFilter === "increase"
-                                ? "secondary"
-                                : "tertiary"
-                            }
-                            pressed={activeFilter === "increase"}
-                            onClick={() => setActiveFilter("increase")}
-                          >
-                            Price Increase
-                          </Button>
-                          <Button
-                            size="slim"
-                            variant={
-                              activeFilter === "decrease"
-                                ? "secondary"
-                                : "tertiary"
-                            }
-                            pressed={activeFilter === "decrease"}
-                            onClick={() => setActiveFilter("decrease")}
-                          >
-                            Price Decrease
-                          </Button>
-                          <Button
-                            size="slim"
-                            variant={
-                              activeFilter === "high_impact"
-                                ? "secondary"
-                                : "tertiary"
-                            }
-                            pressed={activeFilter === "high_impact"}
-                            onClick={() => setActiveFilter("high_impact")}
-                          >
-                            {"High Impact (>10%)"}
-                          </Button>
-                        </InlineStack>
+    {/* Anchored Control Bar with a subtle background to pop on the screen */}
+    <Box 
+      background="bg-surface-secondary" 
+      padding="300" 
+      borderRadius="200"
+    >
+      <InlineStack
+        align="space-between"
+        blockAlign="center"
+        gap="300"
+        wrap
+      >
+        {/* Left side: Tabbed Quick Segments */}
+        <InlineStack gap="100" blockAlign="center">
+          <Button
+            size="slim"
+            variant={activeFilter === "all" ? "secondary" : "tertiary"}
+            pressed={activeFilter === "all"}
+            onClick={() => setActiveFilter("all")}
+          >
+            All
+          </Button>
+          <Button
+            size="slim"
+            variant={activeFilter === "increase" ? "secondary" : "tertiary"}
+            pressed={activeFilter === "increase"}
+            onClick={() => setActiveFilter("increase")}
+          >
+            Price Increase
+          </Button>
+          <Button
+            size="slim"
+            variant={activeFilter === "decrease" ? "secondary" : "tertiary"}
+            pressed={activeFilter === "decrease"}
+            onClick={() => setActiveFilter("decrease")}
+          >
+            Price Decrease
+          </Button>
+          <Button
+            size="slim"
+            variant={activeFilter === "high_impact" ? "secondary" : "tertiary"}
+            pressed={activeFilter === "high_impact"}
+            onClick={() => setActiveFilter("high_impact")}
+          >
+            {"High Impact (>10%)"}
+          </Button>
+        </InlineStack>
 
-                        {/* Right side: Inline Search, Sort & Numeric Range Inputs */}
-                        <div style={{ flexGrow: 1, maxWidth: "680px" }}>
-                          <InlineStack
-                            gap="150"
-                            align="end"
-                            blockAlign="center"
-                            wrap
-                          >
-                            {/* Search Input */}
-                            <div
-                              style={{ flex: "2 1 180px", minWidth: "150px" }}
-                            >
-                              <TextField
-                                label="Search Products"
-                                labelHidden // Hides the top layout row to dramatically shave off card height
-                                value={searchQuery}
-                                onChange={handleSearchChange}
-                                autoComplete="off"
-                                placeholder="Search product title..."
-                                maxLength={100}
-                              />
-                            </div>
+        {/* Right side: Inline Search, Sort & Numeric Range Inputs */}
+        <div style={{ flexGrow: 1, minWidth: "320px" }}>
+          <InlineStack
+            gap="150"
+            align="end"
+            blockAlign="center"
+            wrap
+          >
+            {/* Search Input - Now with high-visibility Search Icon */}
+            <div style={{ flex: "2 1 180px", minWidth: "160px" }}>
+              <TextField
+                label="Search Products"
+                labelHidden
+                value={searchQuery}
+                onChange={handleSearchChange}
+                autoComplete="off"
+                placeholder="Search product title..."
+                prefix={<Icon source={SearchIcon} tone="base" />}
+                maxLength={100}
+              />
+            </div>
 
-                            {/* Sort Menu Selector */}
-                            <div
-                              style={{ flex: "1.5 1 140px", minWidth: "130px" }}
-                            >
-                              <Select
-                                label="Sort by"
-                                labelHidden // Removes the label height spacing layout
-                                options={[
-                                  {
-                                    label: "Sort: A–Z",
-                                    value: "alphabetical_az",
-                                  },
-                                  {
-                                    label: "Sort: Z–A",
-                                    value: "alphabetical_za",
-                                  },
-                                  {
-                                    label: "Sort: Highest Increase",
-                                    value: "highest_increase",
-                                  },
-                                  {
-                                    label: "Sort: Highest Decrease",
-                                    value: "highest_decrease",
-                                  },
-                                  {
-                                    label: "Sort: Highest Final Price",
-                                    value: "highest_final_price",
-                                  },
-                                  {
-                                    label: "Sort: Lowest Final Price",
-                                    value: "lowest_final_price",
-                                  },
-                                ]}
-                                value={sortOrder}
-                                onChange={(value) =>
-                                  setSortOrder(value as PreviewSortOrder)
-                                }
-                              />
-                            </div>
+            {/* Sort Menu Selector */}
+            <div style={{ flex: "1.5 1 140px", minWidth: "140px" }}>
+              <Select
+                label="Sort by"
+                labelHidden
+                options={[
+                  { label: "Sort: A–Z", value: "alphabetical_az" },
+                  { label: "Sort: Z–A", value: "alphabetical_za" },
+                  { label: "Sort: Highest Increase", value: "highest_increase" },
+                  { label: "Sort: Highest Decrease", value: "highest_decrease" },
+                  { label: "Sort: Highest Final Price", value: "highest_final_price" },
+                  { label: "Sort: Lowest Final Price", value: "lowest_final_price" },
+                ]}
+                value={sortOrder}
+                onChange={(value) => setSortOrder(value as PreviewSortOrder)}
+              />
+            </div>
 
-                            {/* Min Price Field */}
-                            <div style={{ flex: "1 1 90px", minWidth: "90px" }}>
-                              <TextField
-                                label="Min Price"
-                                labelHidden
-                                type="text"
-                                inputMode="decimal"
-                                value={minPrice}
-                                onChange={handleMinPriceChange}
-                                autoComplete="off"
-                                prefix={currencySymbol}
-                                placeholder="Min"
-                                maxLength={15}
-                              />
-                            </div>
+            {/* Min Price Field */}
+            <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
+              <TextField
+                label="Min Price"
+                labelHidden
+                type="text"
+                inputMode="decimal"
+                value={minPrice}
+                onChange={handleMinPriceChange}
+                autoComplete="off"
+                prefix={currencySymbol}
+                placeholder="Min"
+                maxLength={15}
+              />
+            </div>
 
-                            {/* Max Price Field */}
-                            <div style={{ flex: "1 1 90px", minWidth: "90px" }}>
-                              <TextField
-                                label="Max Price"
-                                labelHidden
-                                type="text"
-                                inputMode="decimal"
-                                value={maxPrice}
-                                onChange={handleMaxPriceChange}
-                                autoComplete="off"
-                                prefix={currencySymbol}
-                                placeholder="Max"
-                                maxLength={15}
-                              />
-                            </div>
-                          </InlineStack>
-                        </div>
-                      </InlineStack>
-                    </BlockStack>
-                  </Card>
+            {/* Max Price Field */}
+            <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
+              <TextField
+                label="Max Price"
+                labelHidden
+                type="text"
+                inputMode="decimal"
+                value={maxPrice}
+                onChange={handleMaxPriceChange}
+                autoComplete="off"
+                prefix={currencySymbol}
+                placeholder="Max"
+                maxLength={15}
+              />
+            </div>
+          </InlineStack>
+        </div>
+      </InlineStack>
+    </Box>
+  </BlockStack>
+</Card>
 
                   {previews.length > 0 && (
                     <Card>
@@ -4303,512 +4273,458 @@ function DashboardContent({
                           </Box>
                         )}
 
-                        {paginatedPreviews.length > 0 && (
-                          <Box
-                            paddingBlockEnd="200"
-                            paddingInline="300"
-                            borderBlockEndWidth="025"
-                            borderColor="border-secondary"
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                gap: "16px",
-                                width: "100%",
-                              }}
-                            >
-                              <div style={{ flex: 1, paddingLeft: "76px" }}>
-                                <Text
-                                  as="span"
-                                  variant="bodySm"
-                                  tone="subdued"
-                                  fontWeight="medium"
-                                >
-                                  Product
-                                </Text>
-                              </div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "24px",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "24px",
-                                    alignItems: "center",
-                                  }}
-                                >
-                                  <Box minWidth="80px" paddingInlineEnd="100">
-                                    <div style={{ textAlign: "right" }}>
-                                      <Text
-                                        as="span"
-                                        variant="bodySm"
-                                        tone="subdued"
-                                        fontWeight="medium"
-                                      >
-                                        Original Catalog
-                                      </Text>
-                                    </div>
-                                  </Box>
-                                  <Box minWidth="80px" paddingInlineEnd="100">
-                                    <div style={{ textAlign: "right" }}>
-                                      <Text
-                                        as="span"
-                                        variant="bodySm"
-                                        tone="subdued"
-                                        fontWeight="medium"
-                                      >
-                                        Live Storefront
-                                      </Text>
-                                    </div>
-                                  </Box>
-                                  <Box width="100px">
-                                    <div style={{ textAlign: "left" }}>
-                                      <Text
-                                        as="span"
-                                        variant="bodySm"
-                                        tone="subdued"
-                                        fontWeight="medium"
-                                      >
-                                        New Preview
-                                      </Text>
-                                    </div>
-                                  </Box>
-                                </div>
-                                <div style={{ minWidth: "140px" }} />
-                              </div>
-                            </div>
-                          </Box>
-                        )}
+{paginatedPreviews.length > 0 && (
+  <Box
+    paddingBlockEnd="200"
+    paddingInline="300"
+    borderBlockEndWidth="025"
+    borderColor="border-secondary"
+  >
+    <Box padding="200">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "16px",
+          width: "100%",
+        }}
+      >
+        {/* Left Area: Product Name Column Offset */}
+        <div style={{ flex: 1, paddingLeft: "84px" }}>
+          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+            Product
+          </Text>
+        </div>
 
-                        {paginatedPreviews.map((p) => {
-                          const currentPrice = parseFloat(p.oldPrice);
-                          const originalPrice = parseFloat(p.originalBasePrice);
-                          const isManual = p.overriddenPrice !== undefined;
-                          const targetPrice = isManual
-                            ? Number(p.overriddenPrice!) || 0
-                            : parseFloat(p.newPrice);
-                          const isPolished = currentPrice !== originalPrice;
-                          const isChanged = currentPrice !== targetPrice;
-                          const diffFromOriginal =
-                            originalPrice !== 0
-                              ? ((targetPrice - originalPrice) /
-                                  originalPrice) *
-                                100
-                              : 0;
-                          const isSelected = selectedItems.has(p.variantId);
-                          const rowSafeguardNotices: string[] = [];
+        {/* Right Area: Main Header Layout alignment matching row items */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "70px 100px 140px 95px 95px 340px",
+            gap: "16px",
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          {/* Inventory */}
+          <div style={{ textAlign: "left" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              Inventory
+            </Text>
+          </div>
 
-                          if (
-                            !isManual &&
-                            previewPricingRule &&
-                            isFinite(originalPrice)
-                          ) {
-                            const minPrice =
-                              typeof previewPricingRule.minPrice === "number" &&
-                              isFinite(previewPricingRule.minPrice)
-                                ? previewPricingRule.minPrice
-                                : null;
-                            const maxPrice =
-                              typeof previewPricingRule.maxPrice === "number" &&
-                              isFinite(previewPricingRule.maxPrice)
-                                ? previewPricingRule.maxPrice
-                                : null;
+          {/* Product Type */}
+          <div style={{ textAlign: "left" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              Product type
+            </Text>
+          </div>
 
-                            if (minPrice != null) {
-                              const withoutMin = calculatePrice(originalPrice, {
-                                ...previewPricingRule,
-                                minPrice: null,
-                              });
-                              if (
-                                withoutMin + 0.01 < minPrice &&
-                                Math.abs(targetPrice - minPrice) < 0.01
-                              ) {
-                                rowSafeguardNotices.push(
-                                  "Adjusted to minimum allowed price.",
-                                );
-                              }
-                            }
+          {/* Vendor */}
+          <div style={{ textAlign: "left" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              Vendor
+            </Text>
+          </div>
 
-                            if (maxPrice != null) {
-                              const withoutMax = calculatePrice(originalPrice, {
-                                ...previewPricingRule,
-                                maxPrice: null,
-                              });
-                              if (
-                                withoutMax - 0.01 > maxPrice &&
-                                Math.abs(targetPrice - maxPrice) < 0.01
-                              ) {
-                                rowSafeguardNotices.push(
-                                  "Adjusted to maximum allowed price.",
-                                );
-                              }
-                            }
+          {/* Original Catalog */}
+          <div style={{ textAlign: "right" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              Original Catalog
+            </Text>
+          </div>
 
-                            const roundingPrecision = String(
-                              previewPricingRule.roundingPrecision ??
-                                "standard",
-                            )
-                              .trim()
-                              .toLowerCase();
-                            if (
-                              roundingPrecision !== "" &&
-                              roundingPrecision !== "standard"
-                            ) {
-                              const standardRoundedFinal = calculatePrice(
-                                originalPrice,
-                                {
-                                  ...previewPricingRule,
-                                  roundingPrecision: "standard",
-                                },
-                              );
+          {/* Live Storefront */}
+          <div style={{ textAlign: "right" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              Live Storefront
+            </Text>
+          </div>
 
-                              if (
-                                Math.abs(targetPrice - standardRoundedFinal) >
-                                0.01
-                              ) {
-                                if (roundingPrecision === "nearest-0.05") {
-                                  rowSafeguardNotices.push(
-                                    "Rounded to nearest 0.05.",
-                                  );
-                                } else if (roundingPrecision === "whole") {
-                                  rowSafeguardNotices.push(
-                                    "Rounded to whole amount.",
-                                  );
-                                } else {
-                                  rowSafeguardNotices.push(
-                                    "Rounded for storefront consistency.",
-                                  );
-                                }
-                              }
-                            }
+          {/* New Preview */}
+          <div style={{ textAlign: "left" }}>
+            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
+              New Preview
+            </Text>
+          </div>
+        </div>
+      </div>
+    </Box>
+  </Box>
+)}
+
+{paginatedPreviews.map((p) => {
+  const currentPrice = parseFloat(p.oldPrice);
+  const originalPrice = parseFloat(p.originalBasePrice);
+  const isManual = p.overriddenPrice !== undefined;
+  const targetPrice = isManual
+    ? Number(p.overriddenPrice!) || 0
+    : parseFloat(p.newPrice);
+  const isPolished = currentPrice !== originalPrice;
+  const isChanged = currentPrice !== targetPrice;
+  const diffFromOriginal =
+    originalPrice !== 0
+      ? ((targetPrice - originalPrice) / originalPrice) * 100
+      : 0;
+  const isSelected = selectedItems.has(p.variantId);
+  const rowSafeguardNotices: string[] = [];
+
+  if (
+    !isManual &&
+    previewPricingRule &&
+    isFinite(originalPrice)
+  ) {
+    const minPrice =
+      typeof previewPricingRule.minPrice === "number" &&
+      isFinite(previewPricingRule.minPrice)
+        ? previewPricingRule.minPrice
+        : null;
+    const maxPrice =
+      typeof previewPricingRule.maxPrice === "number" &&
+      isFinite(previewPricingRule.maxPrice)
+        ? previewPricingRule.maxPrice
+        : null;
+
+    if (minPrice != null) {
+      const withoutMin = calculatePrice(originalPrice, {
+        ...previewPricingRule,
+        minPrice: null,
+      });
+      if (
+        withoutMin + 0.01 < minPrice &&
+        Math.abs(targetPrice - minPrice) < 0.01
+      ) {
+        rowSafeguardNotices.push("Adjusted to minimum allowed price.");
+      }
+    }
+
+    if (maxPrice != null) {
+      const withoutMax = calculatePrice(originalPrice, {
+        ...previewPricingRule,
+        maxPrice: null,
+      });
+      if (
+        withoutMax - 0.01 > maxPrice &&
+        Math.abs(targetPrice - maxPrice) < 0.01
+      ) {
+        rowSafeguardNotices.push("Adjusted to maximum allowed price.");
+      }
+    }
+
+    const roundingPrecision = String(
+      previewPricingRule.roundingPrecision ?? "standard",
+    )
+      .trim()
+      .toLowerCase();
+    if (
+      roundingPrecision !== "" &&
+      roundingPrecision !== "standard"
+    ) {
+      const standardRoundedFinal = calculatePrice(originalPrice, {
+        ...previewPricingRule,
+        roundingPrecision: "standard",
+      });
+
+      if (Math.abs(targetPrice - standardRoundedFinal) > 0.01) {
+        if (roundingPrecision === "nearest-0.05") {
+          rowSafeguardNotices.push("Rounded to nearest 0.05.");
+        } else if (roundingPrecision === "whole") {
+          rowSafeguardNotices.push("Rounded to whole amount.");
+        } else {
+          rowSafeguardNotices.push("Rounded for storefront consistency.");
+        }
+      }
+    }
+  }
+
+  return (
+    <Box
+      key={p.variantId}
+      paddingBlockStart="400"
+      paddingBlockEnd="400"
+      paddingInline="300"
+      borderBlockEndWidth="025"
+      borderColor="border-secondary"
+    >
+      <Box
+        background={isManual ? "bg-surface-caution" : undefined}
+        padding="200"
+        borderRadius="200"
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "16px",
+            width: "100%",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* LEFT SIDE: Product Info */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "12px",
+              minWidth: 0,
+              flex: 1,
+              overflowX: "hidden",
+            }}
+          >
+            <div style={{ paddingTop: "2px" }}>
+              <Checkbox
+                label=""
+                labelHidden
+                checked={isSelected}
+                onChange={() => toggleSelection(p.variantId)}
+              />
+            </div>
+
+            <Thumbnail source={p.image || ""} alt={p.title} size="small" />
+
+            <BlockStack gap="100">
+              <Text as="span" variant="bodyMd" fontWeight="medium">
+                {p.title}
+              </Text>
+
+              {(() => {
+                const subtitle = buildVariantSubtitle({
+                  productTitle: p.title,
+                  variantTitle: p.variantTitle ?? null,
+                  sku: p.sku ?? null,
+                });
+
+                if (!subtitle) return null;
+
+                return (
+                  <div
+                    style={{
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: "100%",
+                    }}
+                  >
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      {subtitle}
+                    </Text>
+                  </div>
+                );
+              })()}
+
+              {rowSafeguardNotices.length > 0 && (
+                <Text as="span" variant="bodySm" tone="subdued">
+                  {rowSafeguardNotices.join(" • ")}
+                </Text>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "6px",
+                  flexWrap: "wrap",
+                  opacity: 0.92,
+                  marginTop: "4px",
+                }}
+              >
+                {isManual && <Badge tone="attention">Manual override</Badge>}
+
+                {Math.abs(diffFromOriginal) >= 20 && (
+                  <Badge tone="warning">High impact</Badge>
+                )}
+              </div>
+            </BlockStack>
+          </div>
+
+          {/* RIGHT SIDE: Table Metadata and Inline Action Controls */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "70px 100px 140px 95px 95px 340px",
+              gap: "16px",
+              alignItems: "center",
+            }}
+          >
+            {/* COLUMN 1: Inventory */}
+            <Box>
+              <BlockStack gap="0" inlineAlign="start">
+                <Text as="span" variant="bodyMd" tone="subdued">
+                  {p.inventory !== undefined && p.inventory !== null
+                    ? p.inventory
+                    : "—"}
+                </Text>
+              </BlockStack>
+            </Box>
+
+            {/* COLUMN 2: Product Type */}
+            <Box>
+              <BlockStack gap="0" inlineAlign="start">
+                <Text as="span" variant="bodyMd" tone="subdued">
+                  {p.productType || "—"}
+                </Text>
+              </BlockStack>
+            </Box>
+
+            {/* COLUMN 3: Vendor */}
+            <Box>
+              <BlockStack gap="0" inlineAlign="start">
+                <Text as="span" variant="bodyMd" tone="subdued">
+                  {p.vendor || "—"}
+                </Text>
+              </BlockStack>
+            </Box>
+
+            {/* COLUMN 4: Original Catalog */}
+            <Box>
+              <BlockStack gap="0" inlineAlign="end">
+                <Text as="span" variant="bodyMd" tone="subdued">
+                  {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
+                </Text>
+              </BlockStack>
+            </Box>
+
+            {/* COLUMN 5: Live Storefront */}
+            <Box>
+              <BlockStack gap="0" inlineAlign="end">
+                <Text
+                  as="span"
+                  variant="bodyMd"
+                  tone={isPolished || isChanged ? "subdued" : "base"}
+                  textDecorationLine={
+                    isPolished || isChanged ? "line-through" : undefined
+                  }
+                >
+                  {formatMoney(parseFloat(p.oldPrice), currencyCode)}
+                </Text>
+              </BlockStack>
+            </Box>
+
+            {/* COLUMN 6: Restored Original Inline Flow Controls */}
+            <Box>
+              <InlineStack gap="150" blockAlign="center" wrap={false}>
+                {/* Slim Price input field */}
+                <div style={{ width: "100px", flexShrink: 0 }}>
+                  <TextField
+                    label=""
+                    labelHidden
+                    value={String(
+                      p.overriddenPrice !== undefined
+                        ? p.overriddenPrice
+                        : p.newPrice,
+                    )}
+                    onChange={(val) => handlePriceChange(p.variantId, val)}
+                    autoComplete="off"
+                    prefix={currencySymbol}
+                    size="slim"
+                    maxLength={15}
+                  />
+                </div>
+
+                {/* Inline Action Container holding logic indicators and buttons */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    flexGrow: 1,
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  {/* Directional Chevron Impact Percentage Indicators */}
+                  {(isPolished || isChanged) &&
+                    Math.abs(diffFromOriginal) > 0.01 && (
+                      <InlineStack
+                        gap="100"
+                        blockAlign="center"
+                        wrap={false}
+                      >
+                        <Icon
+                          source={
+                            targetPrice > originalPrice
+                              ? ChevronUpIcon
+                              : ChevronDownIcon
                           }
+                          tone={
+                            targetPrice > originalPrice
+                              ? "success"
+                              : "critical"
+                          }
+                        />
+                        <Text
+                          as="span"
+                          variant="bodySm"
+                          tone={
+                            targetPrice > originalPrice
+                              ? "success"
+                              : "critical"
+                          }
+                          fontWeight="medium"
+                        >
+                          {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
+                        </Text>
+                      </InlineStack>
+                    )}
 
-                          return (
-                            <Box
-                              key={p.variantId}
-                              paddingBlockStart="400"
-                              paddingBlockEnd="400"
-                              paddingInline="300"
-                              borderBlockEndWidth="025"
-                              borderColor="border-secondary"
-                            >
-                              <Box
-                                background={
-                                  isManual ? "bg-surface-caution" : undefined
-                                }
-                                padding="200"
-                                borderRadius="200"
-                              >
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "flex-start",
-                                    gap: "16px",
-                                    width: "100%",
-                                    flexWrap: "wrap",
-                                  }}
-                                >
-                                  {/* LEFT SIDE */}
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "flex-start",
-                                      gap: "12px",
-                                      minWidth: 0,
-                                      flex: 1,
-                                      overflowX: "hidden",
-                                    }}
-                                  >
-                                    <div style={{ paddingTop: "2px" }}>
-                                      <Checkbox
-                                        label=""
-                                        labelHidden
-                                        checked={isSelected}
-                                        onChange={() =>
-                                          toggleSelection(p.variantId)
-                                        }
-                                      />
-                                    </div>
+                  {/* Restored Reset Action */}
+                  {isManual && (
+                    <Button
+                      size="slim"
+                      variant="tertiary"
+                      onClick={() => resetOverride(p.variantId)}
+                    >
+                      Reset
+                    </Button>
+                  )}
 
-                                    <Thumbnail
-                                      source={p.image || ""}
-                                      alt={p.title}
-                                      size="small"
-                                    />
+                  {/* Restored Apply Action workflow with Tooltip safeguards */}
+                  {isChanged ? (
+                    <Button
+                      size="slim"
+                      onClick={() => handleApplySingle(p)}
+                      loading={updatingItem === p.variantId}
+                      disabled={
+                        !hasActivePlan ||
+                        !!updatingItem ||
+                        isProcessing ||
+                        (isManual && p.overriddenPrice === "") ||
+                        !hasRules
+                      }
+                      tone="success"
+                    >
+                      Apply
+                    </Button>
+                  ) : (
+                    <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                      <span style={{ display: "inline-block" }}>
+                        <Button
+                          size="slim"
+                          onClick={() => handleApplySingle(p)}
+                          loading={updatingItem === p.variantId}
+                          disabled={
+                            !hasActivePlan ||
+                            !!updatingItem ||
+                            isProcessing ||
+                            (isManual && p.overriddenPrice === "") ||
+                            !hasRules
+                          }
+                        >
+                          Apply
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
+              </InlineStack>
+            </Box>
+          </div>
+        </div>
+      </Box>
+    </Box>
+  );
+})}
 
-                                    <BlockStack gap="100">
-                                      <Text
-                                        as="span"
-                                        variant="bodyMd"
-                                        fontWeight="medium"
-                                      >
-                                        {p.title}
-                                      </Text>
 
-                                      {(() => {
-                                        const subtitle = buildVariantSubtitle({
-                                          productTitle: p.title,
-                                          variantTitle: p.variantTitle ?? null,
-                                          sku: p.sku ?? null,
-                                        });
-
-                                        if (!subtitle) return null;
-
-                                        return (
-                                          <div
-                                            style={{
-                                              whiteSpace: "nowrap",
-                                              overflow: "hidden",
-                                              textOverflow: "ellipsis",
-                                              maxWidth: "100%",
-                                            }}
-                                          >
-                                            <Text
-                                              as="span"
-                                              variant="bodySm"
-                                              tone="subdued"
-                                            >
-                                              {subtitle}
-                                            </Text>
-                                          </div>
-                                        );
-                                      })()}
-
-                                      {rowSafeguardNotices.length > 0 && (
-                                        <Text
-                                          as="span"
-                                          variant="bodySm"
-                                          tone="subdued"
-                                        >
-                                          {rowSafeguardNotices.join(" • ")}
-                                        </Text>
-                                      )}
-
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          gap: "6px",
-                                          flexWrap: "wrap",
-                                          opacity: 0.92,
-                                          marginTop: "4px",
-                                        }}
-                                      >
-                                        {isManual && (
-                                          <Badge tone="attention">
-                                            Manual override
-                                          </Badge>
-                                        )}
-
-                                        {Math.abs(diffFromOriginal) >= 20 && (
-                                          <Badge tone="warning">
-                                            High impact
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </BlockStack>
-                                  </div>
-
-                                  {/* RIGHT SIDE */}
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "24px",
-                                      flexShrink: 0,
-                                      flexWrap: "wrap",
-                                      justifyContent: "flex-end",
-                                      fontVariantNumeric: "tabular-nums",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        gap: "24px",
-                                        alignItems: "center",
-                                      }}
-                                    >
-                                      <Box
-                                        minWidth="80px"
-                                        paddingInlineEnd="100"
-                                      >
-                                        <BlockStack gap="0" inlineAlign="end">
-                                          <Text
-                                            as="span"
-                                            variant="bodyMd"
-                                            tone="subdued"
-                                          >
-                                            {formatMoney(
-                                              parseFloat(p.originalBasePrice),
-                                              currencyCode,
-                                            )}
-                                          </Text>
-                                        </BlockStack>
-                                      </Box>
-
-                                      <Box
-                                        minWidth="80px"
-                                        paddingInlineEnd="100"
-                                      >
-                                        <BlockStack gap="0" inlineAlign="end">
-                                          <Text
-                                            as="span"
-                                            variant="bodyMd"
-                                            tone={
-                                              isPolished || isChanged
-                                                ? "subdued"
-                                                : "base"
-                                            }
-                                            textDecorationLine={
-                                              isPolished || isChanged
-                                                ? "line-through"
-                                                : undefined
-                                            }
-                                          >
-                                            {formatMoney(
-                                              parseFloat(p.oldPrice),
-                                              currencyCode,
-                                            )}
-                                          </Text>
-                                        </BlockStack>
-                                      </Box>
-
-                                      <Box width="100px">
-                                        <BlockStack gap="0" inlineAlign="start">
-                                          <TextField
-                                            label=""
-                                            labelHidden
-                                            value={String(
-                                              p.overriddenPrice !== undefined
-                                                ? p.overriddenPrice
-                                                : p.newPrice,
-                                            )}
-                                            onChange={(val) =>
-                                              handlePriceChange(
-                                                p.variantId,
-                                                val,
-                                              )
-                                            }
-                                            autoComplete="off"
-                                            prefix={currencySymbol}
-                                            size="slim"
-                                            maxLength={15}
-                                          />
-                                        </BlockStack>
-                                      </Box>
-                                    </div>
-
-                                    <div
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "16px",
-                                        minWidth: "140px",
-                                        justifyContent: "flex-end",
-                                      }}
-                                    >
-                                      {(isPolished || isChanged) &&
-                                        Math.abs(diffFromOriginal) > 0.01 && (
-                                          <InlineStack
-                                            gap="100"
-                                            blockAlign="center"
-                                          >
-                                            <Icon
-                                              source={
-                                                targetPrice > originalPrice
-                                                  ? ChevronUpIcon
-                                                  : ChevronDownIcon
-                                              }
-                                              tone={
-                                                targetPrice > originalPrice
-                                                  ? "success"
-                                                  : "critical"
-                                              }
-                                            />
-                                            <Text
-                                              as="span"
-                                              variant="bodySm"
-                                              tone={
-                                                targetPrice > originalPrice
-                                                  ? "success"
-                                                  : "critical"
-                                              }
-                                              fontWeight="medium"
-                                            >
-                                              {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
-                                            </Text>
-                                          </InlineStack>
-                                        )}
-
-                                      {isManual && (
-                                        <Button
-                                          size="slim"
-                                          variant="tertiary"
-                                          onClick={() =>
-                                            resetOverride(p.variantId)
-                                          }
-                                        >
-                                          Reset
-                                        </Button>
-                                      )}
-
-                                      {isChanged ? (
-                                        <Button
-                                          size="slim"
-                                          onClick={() => handleApplySingle(p)}
-                                          loading={updatingItem === p.variantId}
-                                          disabled={
-                                            !hasActivePlan ||
-                                            !!updatingItem ||
-                                            isProcessing ||
-                                            (isManual &&
-                                              p.overriddenPrice === "") ||
-                                            !hasRules
-                                          }
-                                          tone="success"
-                                        >
-                                          Apply
-                                        </Button>
-                                      ) : (
-                                        <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
-                                          <span
-                                            style={{ display: "inline-block" }}
-                                          >
-                                            <Button
-                                              size="slim"
-                                              onClick={() =>
-                                                handleApplySingle(p)
-                                              }
-                                              loading={
-                                                updatingItem === p.variantId
-                                              }
-                                              disabled={
-                                                !hasActivePlan ||
-                                                !!updatingItem ||
-                                                isProcessing ||
-                                                (isManual &&
-                                                  p.overriddenPrice === "") ||
-                                                !hasRules
-                                              }
-                                            >
-                                              Apply
-                                            </Button>
-                                          </span>
-                                        </Tooltip>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </Box>
-                            </Box>
-                          );
-                        })}
                       </BlockStack>
 
                       <InlineStack align="center">
