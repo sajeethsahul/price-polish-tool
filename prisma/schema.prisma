@@ -161,6 +161,7 @@ model AppState {
   onboardingCelebratedAt      DateTime?
   reviewRequestShownAt        DateTime?
   reviewRequestDismissedAt    DateTime?
+  activeCampaignId              String?
 }
 
 model PushJob {

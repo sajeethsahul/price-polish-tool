@@ -44,12 +44,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   await prisma.appState.upsert({
     where: { shop: session.shop },
     update: {
-      onboardingFirstApplyStartAt: appState?.onboardingFirstApplyStartAt ? undefined : now,
+      onboardingFirstApplyStartAt: appState?.onboardingFirstApplyStartAt
+        ? undefined
+        : now,
+  
+      // NEW
+      activeCampaignId: campaignId,
     },
     create: {
       shop: session.shop,
       isLive: appState?.isLive ?? false,
       onboardingFirstApplyStartAt: now,
+  
+      // NEW
+      activeCampaignId: campaignId,
     },
   });
 
@@ -67,13 +75,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  if (!appState?.onboardingFirstApplyAt) {
-    await prisma.appState.upsert({
-      where: { shop: session.shop },
-      update: { onboardingFirstApplyAt: now },
-      create: { shop: session.shop, isLive: appState?.isLive ?? false, onboardingFirstApplyAt: now },
-    });
-  }
+if (!appState?.onboardingFirstApplyAt) {
+  await prisma.appState.upsert({
+    where: { shop: session.shop },
+    update: {
+      onboardingFirstApplyAt: now,
+
+      // NEW
+      activeCampaignId: campaignId,
+    },
+    create: {
+      shop: session.shop,
+      isLive: appState?.isLive ?? false,
+      onboardingFirstApplyAt: now,
+
+      // NEW
+      activeCampaignId: campaignId,
+    },
+  });
+}
 
   console.log("[STAGING] stage.completed", { shop, successCount: result.successCount, failCount: result.failedCount, campaignId, durationMs: Date.now() - stagingStartMs });
 

@@ -167,10 +167,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 latestInfluenceAt,
                 openCampaignCount,
                 closedCampaignCount,
+                activeCampaignId: appState?.activeCampaignId ?? null,
                 canGoLive,
                 goLiveMessage: canGoLive
                     ? "Staged prices are ready to publish."
-                    : "No staged prices are ready. Apply pricing before going live.",
+                    : "No staged prices are ready. Apply pricing before going live."
             },
         }), {
             headers: { "Content-Type": "application/json" },

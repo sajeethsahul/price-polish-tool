@@ -687,10 +687,8 @@ function DashboardContent({
     details?: string;
   } | null>(null);
   const [applyCampaignTitle, setApplyCampaignTitle] = useState("");
-  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
-  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>(
-    [],
-  );
+ const [activeCampaignId, setActiveCampaignId] =useState<string | null>(null);
+  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([],);
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
   const [campaignHistoryExpanded, setCampaignHistoryExpanded] = useState(true);
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
@@ -858,6 +856,9 @@ function DashboardContent({
           ...(metricsData?.storefrontControl ?? {}),
         },
       }));
+      setActiveCampaignId(
+  metricsData?.storefrontControl?.activeCampaignId ?? null
+);
       const campaigns = Array.isArray(campaignHistoryData?.campaigns)
         ? campaignHistoryData.campaigns
         : [];
@@ -989,7 +990,7 @@ function DashboardContent({
           typeof result?.campaignId === "string" && result.campaignId.length > 0
             ? result.campaignId
             : null;
-        console.log("[Apply] staging campaignId received:", stagingCampaignId);
+        setActiveCampaignId(stagingCampaignId);  
 
         if (!response.ok) {
           const billingError =
@@ -2260,6 +2261,7 @@ const filteredPreviews = useMemo(() => {
 
   const handlePushStorefront = useCallback(
     async (clear = false) => {
+
       setIsProcessing(true);
       setShowGoLiveModal(false);
       setShowStopModal(false);
@@ -2280,7 +2282,13 @@ const filteredPreviews = useMemo(() => {
             setMetrics((prev) => ({ ...prev, isLive: false }));
             await handlePreview();
           } else {
-            throw new Error(data.error || "Failed to stop live pricing.");
+            if (!res.ok) {
+              throw new Error(
+                data.message ??
+                data.error ??
+                "Failed to stop live pricing."
+              );
+            }
           }
         } catch (err) {
           const errorMessage =
@@ -2325,9 +2333,13 @@ const filteredPreviews = useMemo(() => {
 
           const data = await res.json();
 
-          if (!res.ok) {
-            throw new Error(data.error || "Failed to publish prices.");
-          }
+            if (!res.ok) {
+              throw new Error(
+                data.message ??
+                data.error ??
+                "Failed to publish prices."
+              );
+            }
 
           // Count this batch: successful + failed = processed in this pass
           const batchProcessed = (data.applied ?? 0) + (data.failed ?? 0);
@@ -2347,6 +2359,7 @@ const filteredPreviews = useMemo(() => {
           shopify.toast.show("Prices are now live on your storefront");
         else console.log("BYPASS: Prices are now live on your storefront");
         setMetrics((prev) => ({ ...prev, isLive: true }));
+        setActiveCampaignId(null);
         await handlePreview();
       } catch (err) {
         const errorMessage =
@@ -3619,7 +3632,7 @@ const filteredPreviews = useMemo(() => {
                             onClick={handleStopLiveClick}
                             disabled={isProcessing || !hasRules}
                             tone="critical"
-                            variant="secondary"
+                            variant="primary"
                             size="slim"
                           >
                             Pause Live Pricing
@@ -3627,12 +3640,14 @@ const filteredPreviews = useMemo(() => {
                         ) : (
                           <Button
                             variant="primary"
+                            tone="success"
                             onClick={handleGoLiveClick}
                             loading={isProcessing}
                             disabled={
                               isProcessing ||
                               !hasRules ||
-                              !storefrontControl.canGoLive
+                              !storefrontControl.canGoLive ||
+                              (storefrontControl.stagedPendingCount ?? 0) <= 0
                             }
                             size="slim"
                           >
