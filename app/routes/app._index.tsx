@@ -35,7 +35,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CheckIcon,
-  SearchIcon,
+  SearchIcon, XCircleIcon
 } from "@shopify/polaris-icons";
 import {
   formatMoney,
@@ -1450,44 +1450,76 @@ function DashboardContent({
     return notices;
   }, [previews.length, revertPreview]);
 
-  const revertPreviewFilteredRows = useMemo(() => {
-    if (!revertPreview) return [] as CampaignRevertPreviewRow[];
+const revertPreviewFilteredRows = useMemo(() => {
+  // 🔍 DEBUG TRACE - Now tracking the true active state variables
+  console.log("=== REVERT PREVIEW TRACE ===");
+  console.log("1. Full object:", revertPreview);
+  console.log("2. Rows array:", revertPreview?.rows);
+  console.log("3. Search input state value:", searchQuery); // Changed to tracked search state
 
-    const normalizedQuery = revertPreviewSearchQuery.trim().toLowerCase();
+  // Early exit check - if no object or rows array, match initial trace state safely
+  if (!revertPreview || !revertPreview.rows) return [] as CampaignRevertPreviewRow[];
 
-    return revertPreview.rows.filter((row) => {
-      if (
-        normalizedQuery &&
-        !row.productTitle.toLowerCase().includes(normalizedQuery)
-      ) {
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  return revertPreview.rows.filter((row) => {
+    // 🔹 1. Robust Extended Search Logic
+    if (normalizedQuery) {
+      const title = (row.productTitle || "").toLowerCase();
+      
+      // Fallback matching logic for multiple common Shopify object schemas
+      const type = (
+        (row as any).productType || 
+        (row as any).type || 
+        (row as any).product_type || 
+        (row as any).productVariant?.product?.productType || 
+        ""
+      ).toLowerCase();
+
+      const vendor = (
+        (row as any).vendor || 
+        (row as any).vendorName || 
+        (row as any).brand || 
+        (row as any).productVariant?.product?.vendor ||
+        ""
+      ).toLowerCase();
+
+      const matchesTitle = title.includes(normalizedQuery);
+      const matchesType = type.includes(normalizedQuery);
+      const matchesVendor = vendor.includes(normalizedQuery);
+
+      if (!matchesTitle && !matchesType && matchesVendor) {
         return false;
       }
+    }
 
-      if (revertPreviewMovementFilter === "all") {
-        return true;
-      }
+    // 🔹 2. Movement Filters (Ensure dependency matches your exact state naming, e.g., activeFilter)
+    if (activeFilter === "all") return true;
+    
+    if (row.currentPrice == null || row.currentPrice <= 0) {
+      return activeFilter === "high_impact" ? false : true; 
+    }
 
-      if (row.currentPrice == null || row.currentPrice <= 0) {
-        return revertPreviewMovementFilter === "large_movement" ? false : true;
-      }
+    const delta = row.revertTargetPrice - row.currentPrice;
+    const deltaPercent = (delta / row.currentPrice) * 100;
 
-      const delta = row.revertTargetPrice - row.currentPrice;
-      const deltaPercent = (delta / row.currentPrice) * 100;
+    if (activeFilter === "increase") return delta > 0;
+    if (activeFilter === "decrease") return delta < 0;
+    if (activeFilter === "high_impact") {
+      return Math.abs(deltaPercent) >= 10; // Matches your card's high impact threshold rule
+    }
+    return true;
+  });
+  // 💡 Ensure the hook updates whenever the active states or data payload rows change!
+}, [revertPreview, activeFilter, searchQuery]);
 
-      if (revertPreviewMovementFilter === "increase") {
-        return delta > 0;
-      }
-      if (revertPreviewMovementFilter === "decrease") {
-        return delta < 0;
-      }
-      if (revertPreviewMovementFilter === "large_movement") {
-        return (
-          Math.abs(deltaPercent) >= REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD
-        );
-      }
-      return true;
-    });
-  }, [revertPreview, revertPreviewMovementFilter, revertPreviewSearchQuery]);
+const handleClearFilters = useCallback(() => {
+  setSearchQuery("");
+  setMinPrice("");
+  setMaxPrice("");
+  setActiveFilter("all");
+  // Optional: Reset sort if desired, e.g., setSortOrder("alphabetical_az");
+}, []);
 
   const revertPreviewTotalPages = Math.max(
     1,
@@ -1520,68 +1552,92 @@ function DashboardContent({
     }
   }, [revertPreviewPage, revertPreviewTotalPages]);
 
-  const filteredPreviews = useMemo(() => {
-    console.log(
-      `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
-    );
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
-    const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
+const filteredPreviews = useMemo(() => {
+  console.log(
+    `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
+  );
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
+  const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
 
-    const derived = previews.map((p) => {
-      const livePrice = parseFloat(p.oldPrice);
-      const finalPrice =
-        p.overriddenPrice !== undefined
-          ? Number(p.overriddenPrice) || 0
-          : parseFloat(p.newPrice);
-      const delta = finalPrice - livePrice;
-      const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
-      return {
-        ...p,
-        livePrice,
-        finalPrice,
-        delta,
-        deltaPercent,
-      };
-    });
+  const derived = previews.map((p) => {
+    const livePrice = parseFloat(p.oldPrice);
+    const finalPrice =
+      p.overriddenPrice !== undefined
+        ? Number(p.overriddenPrice) || 0
+        : parseFloat(p.newPrice);
+    const delta = finalPrice - livePrice;
+    const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
+    return {
+      ...p,
+      livePrice,
+      finalPrice,
+      delta,
+      deltaPercent,
+    };
+  });
 
-    let result = derived.filter((p) => {
-      const matchesSearch =
-        normalizedQuery.length === 0 ||
-        p.title.toLowerCase().includes(normalizedQuery);
-      const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
-      const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
+  let result = derived.filter((p) => {
+    // 🔹 1. Extended Multi-Field Search (Title, Product Type, and Vendor)
+    let matchesSearch = normalizedQuery.length === 0;
+    
+    if (!matchesSearch) {
+      const title = (p.title || "").toLowerCase();
+      
+      // Dynamic property mapping for variant/product types & vendors
+      const type = (
+        (p as any).productType || 
+        (p as any).type || 
+        (p as any).product_type || 
+        ""
+      ).toLowerCase();
 
-      let matchesSmartFilter = true;
-      if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
-      else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
-      else if (activeFilter === "high_impact")
-        matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
+      const vendor = (
+        (p as any).vendor || 
+        (p as any).vendorName || 
+        ""
+      ).toLowerCase();
 
-      return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
-    });
+      matchesSearch = 
+        title.includes(normalizedQuery) || 
+        type.includes(normalizedQuery) || 
+        vendor.includes(normalizedQuery);
+    }
 
-    result.sort((a, b) => {
-      switch (sortOrder) {
-        case "alphabetical_az":
-          return a.title.localeCompare(b.title);
-        case "alphabetical_za":
-          return b.title.localeCompare(a.title);
-        case "highest_increase":
-          return b.delta - a.delta || a.title.localeCompare(b.title);
-        case "highest_decrease":
-          return a.delta - b.delta || a.title.localeCompare(b.title);
-        case "highest_final_price":
-          return b.finalPrice - a.finalPrice || a.title.localeCompare(b.title);
-        case "lowest_final_price":
-          return a.finalPrice - b.finalPrice || a.title.localeCompare(b.title);
-        default:
-          return 0;
-      }
-    });
+    // 🔹 2. Existing Price & Smart Segment Filters (Unchanged)
+    const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
+    const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
 
-    return result;
-  }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
+    let matchesSmartFilter = true;
+    if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
+    else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
+    else if (activeFilter === "high_impact")
+      matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
+
+    return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
+  });
+
+  result.sort((a, b) => {
+    switch (sortOrder) {
+      case "alphabetical_az":
+        return a.title.localeCompare(b.title);
+      case "alphabetical_za":
+        return b.title.localeCompare(a.title);
+      case "highest_increase":
+        return b.delta - a.delta || a.title.localeCompare(b.title);
+      case "highest_decrease":
+        return a.delta - b.delta || a.title.localeCompare(b.title);
+      case "highest_final_price":
+        return b.finalPrice - a.finalPrice || a.title.localeCompare(b.title);
+      case "lowest_final_price":
+        return a.finalPrice - b.finalPrice || a.title.localeCompare(b.title);
+      default:
+        return 0;
+    }
+  });
+
+  return result;
+}, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
   const previewImpactSummary = useMemo(() => {
     const rows = filteredPreviews;
@@ -3641,7 +3697,8 @@ function DashboardContent({
               <Box paddingBlockEnd="300">
                 <BlockStack gap="200">
                   {/* 🔹 2. FILTER CARD */}
-{/* 🔹 2. FILTER CARD */}
+
+
 <Card padding="300">
   <BlockStack gap="250">
     {/* Clean, low-profile header row */}
@@ -3707,7 +3764,7 @@ function DashboardContent({
             blockAlign="center"
             wrap
           >
-            {/* Search Input - Now with high-visibility Search Icon */}
+            {/* Search Input */}
             <div style={{ flex: "2 1 180px", minWidth: "160px" }}>
               <TextField
                 label="Search Products"
@@ -3715,7 +3772,7 @@ function DashboardContent({
                 value={searchQuery}
                 onChange={handleSearchChange}
                 autoComplete="off"
-                placeholder="Search product title..."
+                placeholder="Search by product, type, vendor, or category..."
                 prefix={<Icon source={SearchIcon} tone="base" />}
                 maxLength={100}
               />
@@ -3770,6 +3827,21 @@ function DashboardContent({
                 maxLength={15}
               />
             </div>
+
+            {/* 🔴 Added: Clear Filter Icon Action Button with Tooltip */}
+            {(searchQuery || minPrice || maxPrice || activeFilter !== "all") && (
+              <Tooltip content="Clear all active filters" dismissOnMouseOut>
+             <Button
+              variant="tertiary"
+              tone="critical"
+              icon={XCircleIcon}
+              onClick={handleClearFilters}
+              accessibilityLabel="Clear active dataset filters"
+            >
+              Clear 
+            </Button>
+              </Tooltip>
+            )}
           </InlineStack>
         </div>
       </InlineStack>
