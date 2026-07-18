@@ -3,6 +3,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { useNavigate, useOutletContext } from "react-router";
 import {
   Page,
+  BannerTone,
   Card,
   Text,
   BlockStack,
@@ -33,37 +34,55 @@ import {
   UndoIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  CheckIcon,
+  BoltIcon,
 } from "@shopify/polaris-icons";
-import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
+import {
+  formatMoney,
+  getCurrencySymbol,
+  ZERO_DECIMAL_CURRENCIES,
+} from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
 import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
 import {
   ImmediateApplyConfirmationModal,
   type ImmediateApplyImpactSummary,
 } from "../components/ImmediateApplyConfirmationModal";
-import { PricePolishLoader, PRICE_POLISH_LOADER_COPY, useDelayedVisibility } from "../components/PricePolishLoader";
-import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
-import type { OperationalSafeguardNotice, PricingPreviewItem } from "../types/pricing";
+import {
+  PricePolishLoader,
+  PRICE_POLISH_LOADER_COPY,
+  useDelayedVisibility,
+} from "../components/PricePolishLoader";
+import {
+  BillingBlockModal,
+  type BillingBlockModalCode,
+} from "../components/BillingBlockModal";
+import type {
+  OperationalSafeguardNotice,
+  PricingPreviewItem,
+} from "../types/pricing";
 import { calculatePrice, type PricingRuleLike } from "../utils/pricing";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 import { t } from "../utils/i18n";
 
+interface Message {
+  text: string;
+  type: BannerTone; // ensures tone matches Polaris union
+  details?: string;
+}
 
 const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
 /** Number of staged variants processed per publish API call for client-side progress tracking. */
 const PUBLISH_BATCH_SIZE = 50;
-const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
+const CAMPAIGN_DETAIL_COMPARISON_GRID =
+  "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
 const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px";
 const LARGE_OPERATION_THRESHOLD = 100;
 const VERY_LARGE_OPERATION_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
 const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
 const MAJOR_MOVEMENT_THRESHOLD = 40;
-
-
-
-
 
 type PreviewItem = PricingPreviewItem;
 type ImmediateApplyScope = "all" | "selected" | "single";
@@ -204,12 +223,19 @@ const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
 
 type TimelineTone = "success" | "warning" | "critical" | "info" | "attention";
 
-function normalizeMeaningfulVariantTitle(value: string | null | undefined, productTitle?: string | null) {
+function normalizeMeaningfulVariantTitle(
+  value: string | null | undefined,
+  productTitle?: string | null,
+) {
   const trimmed = (value ?? "").trim();
   if (!trimmed) return null;
   if (trimmed.toLowerCase() === "default title") return null;
   const normalizedProductTitle = (productTitle ?? "").trim().toLowerCase();
-  if (normalizedProductTitle && trimmed.toLowerCase() === normalizedProductTitle) return null;
+  if (
+    normalizedProductTitle &&
+    trimmed.toLowerCase() === normalizedProductTitle
+  )
+    return null;
   return trimmed;
 }
 
@@ -218,8 +244,15 @@ function normalizeSku(value: string | null | undefined) {
   return trimmed ? trimmed : null;
 }
 
-function buildVariantSubtitle(params: { productTitle?: string | null; variantTitle?: string | null; sku?: string | null }) {
-  const variantTitle = normalizeMeaningfulVariantTitle(params.variantTitle, params.productTitle);
+function buildVariantSubtitle(params: {
+  productTitle?: string | null;
+  variantTitle?: string | null;
+  sku?: string | null;
+}) {
+  const variantTitle = normalizeMeaningfulVariantTitle(
+    params.variantTitle,
+    params.productTitle,
+  );
   const sku = normalizeSku(params.sku);
   const parts: string[] = [];
   if (variantTitle) parts.push(variantTitle);
@@ -227,7 +260,9 @@ function buildVariantSubtitle(params: { productTitle?: string | null; variantTit
   return parts.length > 0 ? parts.join(" • ") : null;
 }
 
-function computeProductVariantCounts(items: Array<{ productId?: string | null; variantId?: string | null }>) {
+function computeProductVariantCounts(
+  items: Array<{ productId?: string | null; variantId?: string | null }>,
+) {
   const productIds = new Set<string>();
   const variantIds = new Set<string>();
 
@@ -252,10 +287,29 @@ interface CampaignTimelineMilestone {
   description: string;
 }
 
-type CampaignHistoryStatusFilter = "all" | "active" | "partial" | "scheduled" | "closed";
-type CampaignHistorySourceFilter = "all" | "manual" | "scheduled" | "time-window";
-type CampaignHistoryTimeframeFilter = "week" | "month" | "3_months" | "6_months" | "year" | "all";
-type RevertPreviewMovementFilter = "all" | "increase" | "decrease" | "large_movement";
+type CampaignHistoryStatusFilter =
+  | "all"
+  | "active"
+  | "partial"
+  | "scheduled"
+  | "closed";
+type CampaignHistorySourceFilter =
+  | "all"
+  | "manual"
+  | "scheduled"
+  | "time-window";
+type CampaignHistoryTimeframeFilter =
+  | "week"
+  | "month"
+  | "3_months"
+  | "6_months"
+  | "year"
+  | "all";
+type RevertPreviewMovementFilter =
+  | "all"
+  | "increase"
+  | "decrease"
+  | "large_movement";
 type PreviewSortOrder =
   | "highest_increase"
   | "highest_decrease"
@@ -276,39 +330,60 @@ function normalizeCampaignStatus(status: string) {
 
 function isClosedCampaignStatus(status: string) {
   const normalized = normalizeCampaignStatus(status);
-  return normalized === "reverted" ||
+  return (
+    normalized === "reverted" ||
     normalized === "unrecoverable" ||
     normalized === "auto-restored" ||
     normalized === "window-stopped" ||
     normalized === "cancelled-publish" ||
-    normalized === "cancelled-window";
+    normalized === "cancelled-window"
+  );
 }
 
 function normalizeCampaignSource(source: string | null) {
   return (source ?? "").trim().toLowerCase();
 }
 
-function resolveCampaignRuntimeStatus(campaign: CampaignHistoryItem, now: Date = new Date()) {
+function resolveCampaignRuntimeStatus(
+  campaign: CampaignHistoryItem,
+  now: Date = new Date(),
+) {
   if (normalizeCampaignSource(campaign.source) !== "time-window") {
-    const status = normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
-    if (normalizeCampaignSource(campaign.source) === "scheduled" && status === "scheduled-publish") {
-      const runAtMs = campaign.runAt ? new Date(campaign.runAt).getTime() : null;
-      if (runAtMs != null && !Number.isNaN(runAtMs) && now.getTime() >= runAtMs) {
+    const status = normalizeCampaignStatus(
+      campaign.runtimeStatus ?? campaign.status,
+    );
+    if (
+      normalizeCampaignSource(campaign.source) === "scheduled" &&
+      status === "scheduled-publish"
+    ) {
+      const runAtMs = campaign.runAt
+        ? new Date(campaign.runAt).getTime()
+        : null;
+      if (
+        runAtMs != null &&
+        !Number.isNaN(runAtMs) &&
+        now.getTime() >= runAtMs
+      ) {
         return "publishing";
       }
     }
     return normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
   }
 
-  return resolveWindowLifecycleState({
-    status: campaign.status,
-    source: "schedule-window",
-    runAt: campaign.runAt,
-    windowEndAt: campaign.windowEndAt,
-    totalTrackedCount: campaign.totalTrackedCount,
-    revertedCount: campaign.revertedCount,
-    unrecoverableCount: campaign.unrecoverableCount,
-  }, now) ?? normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status);
+  return (
+    resolveWindowLifecycleState(
+      {
+        status: campaign.status,
+        source: "schedule-window",
+        runAt: campaign.runAt,
+        windowEndAt: campaign.windowEndAt,
+        totalTrackedCount: campaign.totalTrackedCount,
+        revertedCount: campaign.revertedCount,
+        unrecoverableCount: campaign.unrecoverableCount,
+      },
+      now,
+    ) ?? normalizeCampaignStatus(campaign.runtimeStatus ?? campaign.status)
+  );
 }
 
 function formatCampaignSourceLabel(source: string | null) {
@@ -323,8 +398,12 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
   if (normalizeCampaignSource(campaign.source) !== "time-window") return null;
 
   const status = resolveCampaignRuntimeStatus(campaign);
-  const start = campaign.runAt ? new Date(campaign.runAt).toLocaleString() : null;
-  const end = campaign.windowEndAt ? new Date(campaign.windowEndAt).toLocaleString() : null;
+  const start = campaign.runAt
+    ? new Date(campaign.runAt).toLocaleString()
+    : null;
+  const end = campaign.windowEndAt
+    ? new Date(campaign.windowEndAt).toLocaleString()
+    : null;
 
   if (status === "scheduled-window" && start && end) {
     return `Pricing will publish at ${start} and automatically restore at ${end}.`;
@@ -348,19 +427,30 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
   return null;
 }
 
-function formatScheduledPublishSummary(campaign: CampaignHistoryItem, now: Date = new Date()) {
+function formatScheduledPublishSummary(
+  campaign: CampaignHistoryItem,
+  now: Date = new Date(),
+) {
   if (normalizeCampaignSource(campaign.source) !== "scheduled") return null;
   const status = resolveCampaignRuntimeStatus(campaign, now);
   const runAt = campaign.runAt ? new Date(campaign.runAt) : null;
-  if (status === "scheduled-publish" && runAt && !Number.isNaN(runAt.getTime())) {
-    return `Pricing will publish automatically at ${runAt.toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    })}`;
+  if (
+    status === "scheduled-publish" &&
+    runAt &&
+    !Number.isNaN(runAt.getTime())
+  ) {
+    return `Pricing will publish automatically at ${runAt.toLocaleTimeString(
+      [],
+      {
+        hour: "numeric",
+        minute: "2-digit",
+      },
+    )}`;
   }
   if (status === "publishing") return "Applying scheduled pricing.";
   if (status === "published") return "Pricing was published successfully.";
-  if (status === "cancelled-publish") return "This scheduled publish was cancelled before it started.";
+  if (status === "cancelled-publish")
+    return "This scheduled publish was cancelled before it started.";
   if (status === "failed") return "Scheduled publish needs attention.";
   return null;
 }
@@ -379,7 +469,10 @@ function formatDurationParts(totalMs: number) {
   return `${seconds}s`;
 }
 
-function getTimeframeStart(filter: CampaignHistoryTimeframeFilter, now = new Date()) {
+function getTimeframeStart(
+  filter: CampaignHistoryTimeframeFilter,
+  now = new Date(),
+) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   if (filter === "all") return null;
@@ -422,9 +515,11 @@ function formatRelativeTime(isoString: string): string {
   const diffSecs = Math.floor(diffMs / 1000);
   if (diffSecs < 60) return "Just now";
   const diffMins = Math.floor(diffSecs / 60);
-  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+  if (diffMins < 60)
+    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  if (diffHours < 24)
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
@@ -435,16 +530,12 @@ function StoreHealthCard({
   pendingRetryCount,
   scheduledRunsCount,
   latestInfluenceAt,
-  isProcessing,
-  onRetry,
 }: {
   isLive: boolean;
   stagedPendingCount: number;
   pendingRetryCount: number;
   scheduledRunsCount: number;
   latestInfluenceAt: string;
-  isProcessing: boolean;
-  onRetry: () => void;
 }) {
   // Status priority: Attention > Healthy > Changes Ready > Not Configured
   type StoreStatusKey = "attention" | "healthy" | "staged" | "not-configured";
@@ -452,10 +543,10 @@ function StoreHealthCard({
     pendingRetryCount > 0
       ? "attention"
       : isLive
-      ? "healthy"
-      : stagedPendingCount > 0
-      ? "staged"
-      : "not-configured";
+        ? "healthy"
+        : stagedPendingCount > 0
+          ? "staged"
+          : "not-configured";
 
   const statusBadge = {
     attention: <Badge tone="critical">Attention Required</Badge>,
@@ -468,45 +559,49 @@ function StoreHealthCard({
 
   return (
     <Card>
-      <BlockStack gap="300">
-        <Text as="h2" variant="headingSm">Store Health</Text>
-        {statusBadge}
-        {pendingRetryCount > 0 && (
-          <BlockStack gap="200">
-            <Text as="p" variant="bodySm" tone="critical">
-              {pendingRetryCount} product{pendingRetryCount === 1 ? "" : "s"} failed to publish and {pendingRetryCount === 1 ? "is" : "are"} ready to retry.
+      <div
+        style={{
+          backgroundColor: "rgba(0, 82, 124, 0.08)", // soft info-blue background
+          border: "1px solid rgba(0, 82, 124, 0.3)", // subtle border
+          borderRadius: "12px", // inner curve
+          padding: "16px",
+        }}
+      >
+        <BlockStack gap="200">
+          <InlineStack align="space-between" blockAlign="center">
+            <Text as="h2" variant="headingSm">
+              Store Health
             </Text>
-            <Button
-              variant="primary"
-              onClick={onRetry}
-              loading={isProcessing}
-              disabled={isProcessing}
-            >
-              Retry Failed Products
-            </Button>
-          </BlockStack>
-        )}
-        <BlockStack gap="150">
-          <InlineStack align="space-between">
-            <Text as="p" variant="bodySm" tone="subdued">Products Ready to Publish</Text>
-            <Text as="p" variant="bodySm" fontWeight="medium">{stagedPendingCount}</Text>
+            {statusBadge}
           </InlineStack>
-          {pendingRetryCount > 0 && (
+          <BlockStack gap="100">
             <InlineStack align="space-between">
-              <Text as="p" variant="bodySm" tone="subdued">Pending Retry</Text>
-              <Text as="p" variant="bodySm" fontWeight="medium" tone="critical">{pendingRetryCount}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Products Ready to Publish
+              </Text>
+              <Text as="p" variant="bodySm" fontWeight="semibold">
+                {stagedPendingCount}
+              </Text>
             </InlineStack>
-          )}
-          <InlineStack align="space-between">
-            <Text as="p" variant="bodySm" tone="subdued">Scheduled Jobs</Text>
-            <Text as="p" variant="bodySm" fontWeight="medium">{scheduledRunsCount}</Text>
-          </InlineStack>
-          <InlineStack align="space-between">
-            <Text as="p" variant="bodySm" tone="subdued">Last Publish</Text>
-            <Text as="p" variant="bodySm">{lastPublish}</Text>
-          </InlineStack>
+            <InlineStack align="space-between">
+              <Text as="p" variant="bodySm" tone="subdued">
+                Scheduled Jobs
+              </Text>
+              <Text as="p" variant="bodySm" fontWeight="semibold">
+                {scheduledRunsCount}
+              </Text>
+            </InlineStack>
+            <InlineStack align="space-between">
+              <Text as="p" variant="bodySm" tone="subdued">
+                Last Publish
+              </Text>
+              <Text as="p" variant="bodySm" fontWeight="semibold">
+                {lastPublish}
+              </Text>
+            </InlineStack>
+          </BlockStack>
         </BlockStack>
-      </BlockStack>
+      </div>
     </Card>
   );
 }
@@ -514,21 +609,67 @@ function StoreHealthCard({
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
-  const { currencyCode = "USD", shop = "", host = "", isBypass } = useOutletContext<{ currencyCode?: string; shop?: string; host?: string; isBypass?: boolean }>() || {};
+  const {
+    currencyCode = "USD",
+    shop = "",
+    host = "",
+    isBypass,
+  } = useOutletContext<{
+    currencyCode?: string;
+    shop?: string;
+    host?: string;
+    isBypass?: boolean;
+  }>() || {};
 
   if (isBypass) {
-    return <DashboardContent isBypass={true} currencyCode={currencyCode} shop={shop} host={host} />;
+    return (
+      <DashboardContent
+        isBypass={true}
+        currencyCode={currencyCode}
+        shop={shop}
+        host={host}
+      />
+    );
   }
 
-  return <DashboardWithBridge currencyCode={currencyCode} shop={shop} host={host} />;
+  return (
+    <DashboardWithBridge currencyCode={currencyCode} shop={shop} host={host} />
+  );
 }
 
-function DashboardWithBridge({ currencyCode, shop, host }: { currencyCode: string; shop: string; host: string }) {
+function DashboardWithBridge({
+  currencyCode,
+  shop,
+  host,
+}: {
+  currencyCode: string;
+  shop: string;
+  host: string;
+}) {
   const shopify = useAppBridge();
-  return <DashboardContent shopify={shopify} currencyCode={currencyCode} shop={shop} host={host} />;
+  return (
+    <DashboardContent
+      shopify={shopify}
+      currencyCode={currencyCode}
+      shop={shop}
+      host={host}
+    />
+  );
 }
 
-function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { shopify?: any; isBypass?: boolean; currencyCode: string; shop: string; host: string }) {
+function DashboardContent({
+  shopify,
+  isBypass,
+  currencyCode,
+  shop,
+  host,
+}: {
+  shopify?: any;
+  isBypass?: boolean;
+  currencyCode: string;
+  shop: string;
+  host: string;
+}) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   // ruleExists = null → not yet fetched; true/false comes from backend DB check
   const [ruleExists, setRuleExists] = useState<boolean | null>(null);
@@ -538,35 +679,53 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const [progress, setProgress] = useState(0);
   const [publishTotal, setPublishTotal] = useState(0);
   const [lastUpdate, setLastUpdate] = useState<LastUpdateInfo | null>(null);
-  const [showGoLiveModal, setShowGoLiveModal] = useState(false);  // UPDATED
-  const [showStopModal, setShowStopModal] = useState(false);      // UPDATED
-  const [message, setMessage] = useState<{ type: "success" | "critical" | "warning"; text: string; details?: string } | null>(null);
+  const [showGoLiveModal, setShowGoLiveModal] = useState(false); // UPDATED
+  const [showStopModal, setShowStopModal] = useState(false); // UPDATED
+  const [message, setMessage] = useState<{
+    type: "success" | "critical" | "warning";
+    text: string;
+    details?: string;
+  } | null>(null);
   const [applyCampaignTitle, setApplyCampaignTitle] = useState("");
   const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
-  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([]);
+  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>(
+    [],
+  );
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
   const [campaignHistoryExpanded, setCampaignHistoryExpanded] = useState(true);
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
-  const [campaignHistoryStatusFilter, setCampaignHistoryStatusFilter] = useState<CampaignHistoryStatusFilter>("all");
-  const [campaignHistorySourceFilter, setCampaignHistorySourceFilter] = useState<CampaignHistorySourceFilter>("all");
+  const [campaignHistoryStatusFilter, setCampaignHistoryStatusFilter] =
+    useState<CampaignHistoryStatusFilter>("all");
+  const [campaignHistorySourceFilter, setCampaignHistorySourceFilter] =
+    useState<CampaignHistorySourceFilter>("all");
   const [campaignHistoryTimeframeFilter, setCampaignHistoryTimeframeFilter] =
     useState<CampaignHistoryTimeframeFilter>("month");
-  const [campaignHistorySearchQuery, setCampaignHistorySearchQuery] = useState("");
-  const [campaignRuntimeNow, setCampaignRuntimeNow] = useState(() => new Date());
+  const [campaignHistorySearchQuery, setCampaignHistorySearchQuery] =
+    useState("");
+  const [campaignRuntimeNow, setCampaignRuntimeNow] = useState(
+    () => new Date(),
+  );
   const [revertPreviewOpen, setRevertPreviewOpen] = useState(false);
   const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
-  const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] = useState(false);
-  const [selectedCampaignForRevert, setSelectedCampaignForRevert] = useState<CampaignHistoryItem | null>(null);
-  const [revertPreview, setRevertPreview] = useState<CampaignRevertPreviewData | null>(null);
+  const [revertPreviewRetryFailedOnly, setRevertPreviewRetryFailedOnly] =
+    useState(false);
+  const [selectedCampaignForRevert, setSelectedCampaignForRevert] =
+    useState<CampaignHistoryItem | null>(null);
+  const [revertPreview, setRevertPreview] =
+    useState<CampaignRevertPreviewData | null>(null);
   const [revertPreviewSearchQuery, setRevertPreviewSearchQuery] = useState("");
   const [revertPreviewMovementFilter, setRevertPreviewMovementFilter] =
     useState<RevertPreviewMovementFilter>("all");
-  const [revertPreviewPageSize, setRevertPreviewPageSize] = useState(REVERT_PREVIEW_DEFAULT_PAGE_SIZE);
+  const [revertPreviewPageSize, setRevertPreviewPageSize] = useState(
+    REVERT_PREVIEW_DEFAULT_PAGE_SIZE,
+  );
   const [revertPreviewPage, setRevertPreviewPage] = useState(1);
   const [campaignDetailOpen, setCampaignDetailOpen] = useState(false);
   const [campaignDetailLoading, setCampaignDetailLoading] = useState(false);
-  const [selectedCampaignForDetail, setSelectedCampaignForDetail] = useState<CampaignHistoryItem | null>(null);
-  const [campaignDetail, setCampaignDetail] = useState<CampaignRevertPreviewData | null>(null);
+  const [selectedCampaignForDetail, setSelectedCampaignForDetail] =
+    useState<CampaignHistoryItem | null>(null);
+  const [campaignDetail, setCampaignDetail] =
+    useState<CampaignRevertPreviewData | null>(null);
   const [campaignDetailPageSize, setCampaignDetailPageSize] = useState(15);
   const [campaignDetailPage, setCampaignDetailPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -574,24 +733,36 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const [maxPrice, setMaxPrice] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [updatingItem, setUpdatingItem] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<"all" | "increase" | "decrease" | "high_impact">("all");
-  const [sortOrder, setSortOrder] = useState<PreviewSortOrder>("alphabetical_az");
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "increase" | "decrease" | "high_impact"
+  >("all");
+  const [sortOrder, setSortOrder] =
+    useState<PreviewSortOrder>("alphabetical_az");
   const [firstVisit, setFirstVisit] = useState(false);
   const [activeMarkup, setActiveMarkup] = useState(0);
   const [roundingStep, setRoundingStep] = useState(1);
   const [charmPricing, setCharmPricing] = useState(true);
-  const [previewPricingRule, setPreviewPricingRule] = useState<PricingRuleLike | null>(null);
-  const [metrics, setMetrics] = useState<DashboardMetrics>(DEFAULT_DASHBOARD_METRICS);
+  const [previewPricingRule, setPreviewPricingRule] =
+    useState<PricingRuleLike | null>(null);
+  const [metrics, setMetrics] = useState<DashboardMetrics>(
+    DEFAULT_DASHBOARD_METRICS,
+  );
   const collectionId = "";
   const [immediateApplyModalOpen, setImmediateApplyModalOpen] = useState(false);
-  const [immediateApplyScope, setImmediateApplyScope] = useState<ImmediateApplyScope>("selected");
-  const [immediateApplySingleItem, setImmediateApplySingleItem] = useState<PreviewItem | null>(null);
-  const [immediateApplyModalItems, setImmediateApplyModalItems] = useState<PreviewItem[]>([]);
-  const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] = useState(false);
+  const [immediateApplyScope, setImmediateApplyScope] =
+    useState<ImmediateApplyScope>("selected");
+  const [immediateApplySingleItem, setImmediateApplySingleItem] =
+    useState<PreviewItem | null>(null);
+  const [immediateApplyModalItems, setImmediateApplyModalItems] = useState<
+    PreviewItem[]
+  >([]);
+  const [scheduleHistoryModalOpen, setScheduleHistoryModalOpen] =
+    useState(false);
 
   // Billing block modal state
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
-  const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
+  const [billingBlockModalCode, setBillingBlockModalCode] =
+    useState<BillingBlockModalCode | null>(null);
 
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
@@ -600,11 +771,14 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   }, [shopify]);
 
   const hasActivePlan = metrics.hasActivePlan;
-  const storefrontControl = metrics.storefrontControl ?? DEFAULT_STOREFRONT_CONTROL_METRICS;
+  const storefrontControl =
+    metrics.storefrontControl ?? DEFAULT_STOREFRONT_CONTROL_METRICS;
 
   // UPDATED: hasRules driven by backend DB check (ruleExists), NOT previews.length
   const hasRules = ruleExists === true;
-  console.log(`[hasRules DEBUG] ruleExists=${ruleExists} → hasRules=${hasRules}, previews.length=${previews.length}`);
+  console.log(
+    `[hasRules DEBUG] ruleExists=${ruleExists} → hasRules=${hasRules}, previews.length=${previews.length}`,
+  );
 
   const navigate = useNavigate();
   const appFetch = useAppFetch();
@@ -613,7 +787,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   // ADDED: Guard helper — shows toast and blocks execution when no rules exist
   const guardNoRules = useCallback(() => {
     if (!hasRules) {
-      if (shopify) shopify.toast.show(t("toast.configureRulesFirst"), { isError: true });
+      if (shopify)
+        shopify.toast.show(t("toast.configureRulesFirst"), { isError: true });
       else console.warn("BYPASS: Please configure pricing rules first");
       return true; // blocked
     }
@@ -641,37 +816,59 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
       const fetchedPreviews = data.previews ?? [];
       setPreviews(fetchedPreviews);
-      console.log("[Operational Refresh] preview/grid refreshed", { count: fetchedPreviews.length });
+      console.log("[Operational Refresh] preview/grid refreshed", {
+        count: fetchedPreviews.length,
+      });
       setLastUpdate(data.lastUpdate ?? null);
       // UPDATED: Use backend's ruleExists flag as authoritative source for hasRules
-      console.log(`[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`);
+      console.log(
+        `[FETCH DEBUG] data.ruleExists=${data.ruleExists}, previews.length=${fetchedPreviews.length}`,
+      );
       setRuleExists(data.ruleExists === true);
       setActiveMarkup(data.markupPercent ?? 0);
       setRoundingStep(data.roundingStep ?? 1);
       setCharmPricing(data.charmPricing ?? true);
       setPreviewPricingRule({
         adjustmentType: data.adjustmentType ?? "percentage",
-        adjustmentDirection: data.adjustmentDirection ?? ((data.markupPercent ?? 0) < 0 ? "decrease" : "increase"),
-        adjustmentValue: data.adjustmentValue ?? Math.abs(data.markupPercent ?? 0),
-        endingOption: data.endingOption ?? ((data.charmPricing ?? true) ? "0.99" : ((data.roundingStep ?? 0) > 0 ? Number(data.roundingStep).toFixed(2) : "none")),
+        adjustmentDirection:
+          data.adjustmentDirection ??
+          ((data.markupPercent ?? 0) < 0 ? "decrease" : "increase"),
+        adjustmentValue:
+          data.adjustmentValue ?? Math.abs(data.markupPercent ?? 0),
+        endingOption:
+          data.endingOption ??
+          ((data.charmPricing ?? true)
+            ? "0.99"
+            : (data.roundingStep ?? 0) > 0
+              ? Number(data.roundingStep).toFixed(2)
+              : "none"),
         roundingPrecision: data.roundingPrecision ?? "standard",
         minPrice: data.minPrice ?? null,
         maxPrice: data.maxPrice ?? null,
       });
-      setMetrics(prev => ({
+      setMetrics((prev) => ({
         ...prev,
         ...metricsData,
-        hasActivePlan: metricsData.hasActivePlan !== undefined ? metricsData.hasActivePlan : true,
+        hasActivePlan:
+          metricsData.hasActivePlan !== undefined
+            ? metricsData.hasActivePlan
+            : true,
         storefrontControl: {
           ...DEFAULT_STOREFRONT_CONTROL_METRICS,
           ...(metricsData?.storefrontControl ?? {}),
         },
       }));
-      const campaigns = Array.isArray(campaignHistoryData?.campaigns) ? campaignHistoryData.campaigns : [];
+      const campaigns = Array.isArray(campaignHistoryData?.campaigns)
+        ? campaignHistoryData.campaigns
+        : [];
       setCampaignHistory(campaigns);
       console.log("[Campaign History UI] loaded count:", campaigns.length);
-      console.log("[Campaign History UI] operational metrics rendered", { count: campaigns.length });
-      console.log("[Operational Refresh] campaign history refreshed", { count: campaigns.length });
+      console.log("[Campaign History UI] operational metrics rendered", {
+        count: campaigns.length,
+      });
+      console.log("[Operational Refresh] campaign history refreshed", {
+        count: campaigns.length,
+      });
 
       if (fetchedPreviews.length === 0) {
         setFirstVisit(true);
@@ -679,11 +876,17 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         setFirstVisit(false);
       }
     } catch (err) {
-      const error = err instanceof Error ? err : new Error("An unknown error occurred.");
+      const error =
+        err instanceof Error ? err : new Error("An unknown error occurred.");
       console.error("DEBUG: Preview Error detail:", error);
-      if (shopify) shopify.toast.show(t("toast.networkErrorTryAgain"), { isError: true });
+      if (shopify)
+        shopify.toast.show(t("toast.networkErrorTryAgain"), { isError: true });
       else console.warn("BYPASS: Network error. Please try again.");
-      setMessage({ type: "critical", text: "Failed to load preview data.", details: error.message });
+      setMessage({
+        type: "critical",
+        text: "Failed to load preview data.",
+        details: error.message,
+      });
     } finally {
       console.log("DEBUG: Finalizing handlePreview loading state.");
       setLoading(false);
@@ -715,146 +918,166 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
     console.log("DEBUG: Dashboard mounted → fetching preview");
     handlePreview();
-
   }, [handlePreview]);
 
-  const handleApplyBatch = useCallback(async (
-    itemsToUpdate: PreviewItem[],
-    campaignTitle: string,
-  ): Promise<boolean> => {
-    if (!hasRules) {
-      shopify.toast.show(t("toast.configureRulesFirstShort"), { isError: true });
-      return false;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // handleApplyBatch ONLY stages the items passed to it.
-      // Callers determine the item list/scope.
-      const scopedItems = itemsToUpdate;
-
-      if (scopedItems.length === 0) {
-        shopify.toast.show(t("toast.noProductsToApply"), { isError: true });
-        return false;
-      }
-
-      const normalizedCampaignTitle = campaignTitle.trim();
-      if (!normalizedCampaignTitle) {
-        shopify.toast.show(t("toast.campaignTitleRequired"), {
+  const handleApplyBatch = useCallback(
+    async (
+      itemsToUpdate: PreviewItem[],
+      campaignTitle: string,
+    ): Promise<boolean> => {
+      if (!hasRules) {
+        shopify.toast.show(t("toast.configureRulesFirstShort"), {
           isError: true,
         });
         return false;
       }
 
-      const itemsWithFinalPrices = scopedItems.map(item => ({
-        productId: item.productId,
-        variantId: item.variantId,
-        oldPrice: item.oldPrice,
-        newPrice:
-          item.overriddenPrice !== undefined
-            ? item.overriddenPrice
-            : item.newPrice,
-        isManual: item.overriddenPrice !== undefined,
-      }));
+      setIsProcessing(true);
 
-      console.log("Selected items:", selectedItems);
-      console.log("Scoped items:", scopedItems);
-      console.log("Sending payload:", itemsWithFinalPrices);
-      const campaignId = crypto.randomUUID();
-      console.log("[Apply] campaign title submitted:", normalizedCampaignTitle);
+      try {
+        // handleApplyBatch ONLY stages the items passed to it.
+        // Callers determine the item list/scope.
+        const scopedItems = itemsToUpdate;
 
-      const response = await fetch("/api/staging-price", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          products: itemsWithFinalPrices,
-          campaignId,
-          campaignTitle: normalizedCampaignTitle,
-        })
-      });
+        if (scopedItems.length === 0) {
+          shopify.toast.show(t("toast.noProductsToApply"), { isError: true });
+          return false;
+        }
 
-      const result = await response.json();
-      const stagingCampaignId =
-        typeof result?.campaignId === "string" && result.campaignId.length > 0
-          ? result.campaignId
-          : null;
-      console.log("[Apply] staging campaignId received:", stagingCampaignId);
+        const normalizedCampaignTitle = campaignTitle.trim();
+        if (!normalizedCampaignTitle) {
+          shopify.toast.show(t("toast.campaignTitleRequired"), {
+            isError: true,
+          });
+          return false;
+        }
 
-      if (!response.ok) {
-        const billingError = result.code === "BILLING_INACTIVE"
-          ? "Subscription inactive. Please reactivate billing to continue using Price Polish."
-          : result.code === "BILLING_UNKNOWN"
-          ? "Billing status could not be verified. Please refresh the app and try again."
-          : result.error || "Failed to apply pricing";
-        throw new Error(billingError);
-      }
+        const itemsWithFinalPrices = scopedItems.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          oldPrice: item.oldPrice,
+          newPrice:
+            item.overriddenPrice !== undefined
+              ? item.overriddenPrice
+              : item.newPrice,
+          isManual: item.overriddenPrice !== undefined,
+        }));
 
-      setActiveCampaignId(stagingCampaignId);
+        console.log("Selected items:", selectedItems);
+        console.log("Scoped items:", scopedItems);
+        console.log("Sending payload:", itemsWithFinalPrices);
+        const campaignId = crypto.randomUUID();
+        console.log(
+          "[Apply] campaign title submitted:",
+          normalizedCampaignTitle,
+        );
 
-      // ── Auto-push when Live Pricing is Active ────────────────────────────
-      if (metrics.isLive) {
-        const manualVariantIds = itemsWithFinalPrices
-          .filter((p) => p.isManual)
-          .map((p) => p.variantId);
-        console.log("[Apply] push-storefront called with campaignId:", stagingCampaignId);
-        const pushRes = await fetch("/api/push-storefront", {
+        const response = await fetch("/api/staging-price", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
-            clear: false,
-            manualVariantIds,
-            ...(stagingCampaignId ? { campaignId: stagingCampaignId } : {}),
+            products: itemsWithFinalPrices,
+            campaignId,
+            campaignTitle: normalizedCampaignTitle,
           }),
         });
 
-        const pushData = await pushRes.json();
+        const result = await response.json();
+        const stagingCampaignId =
+          typeof result?.campaignId === "string" && result.campaignId.length > 0
+            ? result.campaignId
+            : null;
+        console.log("[Apply] staging campaignId received:", stagingCampaignId);
 
-        if (!pushRes.ok) {
-          const pushBillingError =
-            pushData.code === "BILLING_INACTIVE"
+        if (!response.ok) {
+          const billingError =
+            result.code === "BILLING_INACTIVE"
               ? "Subscription inactive. Please reactivate billing to continue using Price Polish."
-              : pushData.code === "BILLING_UNKNOWN"
-              ? "Billing status could not be verified. Please refresh the app and try again."
-              : pushData.error || "Prices staged but failed to push live";
-          console.log("Prices staged but failed to push live : - push data :", pushData);
-          throw new Error(pushBillingError);
+              : result.code === "BILLING_UNKNOWN"
+                ? "Billing status could not be verified. Please refresh the app and try again."
+                : result.error || "Failed to apply pricing";
+          throw new Error(billingError);
         }
 
-        shopify.toast.show(t("toast.pricesLiveUpdated"));
-        console.log("Prices updated and live on storefront-Sajeeth");
-      } else {
-        shopify.toast.show(t("toast.pricingApplied"));
-        console.log("Prices updated and live on storefront-Sajeeth");
-      }
-      // ─────────────────────────────────────────────────────────────────────
+        setActiveCampaignId(stagingCampaignId);
 
-      await handlePreview();
+        // ── Auto-push when Live Pricing is Active ────────────────────────────
+        if (metrics.isLive) {
+          const manualVariantIds = itemsWithFinalPrices
+            .filter((p) => p.isManual)
+            .map((p) => p.variantId);
+          console.log(
+            "[Apply] push-storefront called with campaignId:",
+            stagingCampaignId,
+          );
+          const pushRes = await fetch("/api/push-storefront", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clear: false,
+              manualVariantIds,
+              ...(stagingCampaignId ? { campaignId: stagingCampaignId } : {}),
+            }),
+          });
 
-      return true;
-    } catch (error: any) {
-      const message = error?.message || "Apply failed";
-      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
-      if (isBillingError) {
-        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
-        // Close parent confirmation modal before showing billing modal
-        setImmediateApplyModalOpen(false);
-        setBillingBlockModalCode(code);
-        setBillingBlockModalOpen(true);
-      } else {
-        shopify.toast.show(message, { isError: true });
+          const pushData = await pushRes.json();
+
+          if (!pushRes.ok) {
+            const pushBillingError =
+              pushData.code === "BILLING_INACTIVE"
+                ? "Subscription inactive. Please reactivate billing to continue using Price Polish."
+                : pushData.code === "BILLING_UNKNOWN"
+                  ? "Billing status could not be verified. Please refresh the app and try again."
+                  : pushData.error || "Prices staged but failed to push live";
+            console.log(
+              "Prices staged but failed to push live : - push data :",
+              pushData,
+            );
+            throw new Error(pushBillingError);
+          }
+
+          shopify.toast.show(t("toast.pricesLiveUpdated"));
+          console.log("Prices updated and live on storefront-Sajeeth");
+        } else {
+          shopify.toast.show(t("toast.pricingApplied"));
+          console.log("Prices updated and live on storefront-Sajeeth");
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
+        await handlePreview();
+
+        return true;
+      } catch (error: any) {
+        const message = error?.message || "Apply failed";
+        const isBillingError =
+          message.includes("Subscription inactive") ||
+          message.includes("Billing status could not be verified");
+        if (isBillingError) {
+          const code: BillingBlockModalCode = message.includes(
+            "Subscription inactive",
+          )
+            ? "BILLING_INACTIVE"
+            : "BILLING_UNKNOWN";
+          // Close parent confirmation modal before showing billing modal
+          setImmediateApplyModalOpen(false);
+          setBillingBlockModalCode(code);
+          setBillingBlockModalOpen(true);
+        } else {
+          shopify.toast.show(message, { isError: true });
+        }
+        return false;
+      } finally {
+        setIsProcessing(false);
       }
-      return false;
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [hasRules, shopify, metrics.isLive, handlePreview]);
+    },
+    [hasRules, shopify, metrics.isLive, handlePreview],
+  );
 
   const selectedPreviewItems = useMemo(
     () => previews.filter((item) => selectedItems.has(String(item.variantId))),
-    [previews, selectedItems]
+    [previews, selectedItems],
   );
 
   const immediateApplyItems = useMemo(
@@ -866,7 +1089,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             ? [immediateApplySingleItem]
             : []
           : selectedPreviewItems,
-    [immediateApplyScope, previews, selectedPreviewItems, immediateApplySingleItem]
+    [
+      immediateApplyScope,
+      previews,
+      selectedPreviewItems,
+      immediateApplySingleItem,
+    ],
   );
 
   const immediateApplyScopeLabel =
@@ -876,71 +1104,88 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         ? "product"
         : "selected products";
 
-  const immediateApplyContextItems = immediateApplyModalItems.length > 0 ? immediateApplyModalItems : immediateApplyItems;
+  const immediateApplyContextItems =
+    immediateApplyModalItems.length > 0
+      ? immediateApplyModalItems
+      : immediateApplyItems;
 
-  const immediateApplyImpactSummary = useMemo<ImmediateApplyImpactSummary>(() => {
-    const summary: ImmediateApplyImpactSummary = {
-      increaseCount: 0,
-      decreaseCount: 0,
-      averageChangePercent: 0,
-      largestMovementPercent: null,
-      largestMovementDirection: null,
-      singleItemDirection: null,
-    };
+  const immediateApplyImpactSummary =
+    useMemo<ImmediateApplyImpactSummary>(() => {
+      const summary: ImmediateApplyImpactSummary = {
+        increaseCount: 0,
+        decreaseCount: 0,
+        averageChangePercent: 0,
+        largestMovementPercent: null,
+        largestMovementDirection: null,
+        singleItemDirection: null,
+      };
 
-    if (immediateApplyContextItems.length === 0) {
+      if (immediateApplyContextItems.length === 0) {
+        return summary;
+      }
+
+      let totalPercentChange = 0;
+      let validPercentCount = 0;
+
+      for (const item of immediateApplyContextItems) {
+        const oldPrice = Number.parseFloat(item.oldPrice);
+        const proposedRaw =
+          item.overriddenPrice !== undefined
+            ? item.overriddenPrice
+            : item.newPrice;
+        const proposedPrice = Number(proposedRaw);
+
+        if (
+          !Number.isFinite(oldPrice) ||
+          !Number.isFinite(proposedPrice) ||
+          oldPrice <= 0
+        ) {
+          continue;
+        }
+
+        const deltaPercent = ((proposedPrice - oldPrice) / oldPrice) * 100;
+        totalPercentChange += deltaPercent;
+        validPercentCount += 1;
+
+        if (deltaPercent > 0) {
+          summary.increaseCount += 1;
+        } else if (deltaPercent < 0) {
+          summary.decreaseCount += 1;
+        }
+
+        if (
+          summary.largestMovementPercent === null ||
+          Math.abs(deltaPercent) > Math.abs(summary.largestMovementPercent)
+        ) {
+          summary.largestMovementPercent = deltaPercent;
+          summary.largestMovementDirection =
+            deltaPercent > 0
+              ? "increase"
+              : deltaPercent < 0
+                ? "decrease"
+                : null;
+        }
+      }
+
+      if (validPercentCount > 0) {
+        summary.averageChangePercent = totalPercentChange / validPercentCount;
+      }
+
+      if (immediateApplyContextItems.length === 1) {
+        summary.singleItemDirection =
+          summary.largestMovementDirection === "increase"
+            ? "increase"
+            : summary.largestMovementDirection === "decrease"
+              ? "decrease"
+              : "no_change";
+      }
+
       return summary;
-    }
+    }, [immediateApplyContextItems]);
 
-    let totalPercentChange = 0;
-    let validPercentCount = 0;
-
-    for (const item of immediateApplyContextItems) {
-      const oldPrice = Number.parseFloat(item.oldPrice);
-      const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
-      const proposedPrice = Number(proposedRaw);
-
-      if (!Number.isFinite(oldPrice) || !Number.isFinite(proposedPrice) || oldPrice <= 0) {
-        continue;
-      }
-
-      const deltaPercent = ((proposedPrice - oldPrice) / oldPrice) * 100;
-      totalPercentChange += deltaPercent;
-      validPercentCount += 1;
-
-      if (deltaPercent > 0) {
-        summary.increaseCount += 1;
-      } else if (deltaPercent < 0) {
-        summary.decreaseCount += 1;
-      }
-
-      if (
-        summary.largestMovementPercent === null ||
-        Math.abs(deltaPercent) > Math.abs(summary.largestMovementPercent)
-      ) {
-        summary.largestMovementPercent = deltaPercent;
-        summary.largestMovementDirection =
-          deltaPercent > 0 ? "increase" : deltaPercent < 0 ? "decrease" : null;
-      }
-    }
-
-    if (validPercentCount > 0) {
-      summary.averageChangePercent = totalPercentChange / validPercentCount;
-    }
-
-    if (immediateApplyContextItems.length === 1) {
-      summary.singleItemDirection =
-        summary.largestMovementDirection === "increase"
-          ? "increase"
-          : summary.largestMovementDirection === "decrease"
-            ? "decrease"
-            : "no_change";
-    }
-
-    return summary;
-  }, [immediateApplyContextItems]);
-
-  const immediateApplySafeguardNotices = useMemo<OperationalSafeguardNotice[]>(() => {
+  const immediateApplySafeguardNotices = useMemo<
+    OperationalSafeguardNotice[]
+  >(() => {
     if (immediateApplyContextItems.length <= 1) {
       return [];
     }
@@ -949,13 +1194,24 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     const totalVisibleProducts = previews.length;
     const affectsMostVisible =
       totalVisibleProducts > 0 &&
-      immediateApplyContextItems.length >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
-    const largestMovement = Math.abs(immediateApplyImpactSummary.largestMovementPercent ?? 0);
+      immediateApplyContextItems.length >=
+        Math.max(
+          25,
+          Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO),
+        );
+    const largestMovement = Math.abs(
+      immediateApplyImpactSummary.largestMovementPercent ?? 0,
+    );
     const isStorefrontWide =
-      totalVisibleProducts > 0 && immediateApplyContextItems.length >= Math.ceil(totalVisibleProducts * 0.95);
+      totalVisibleProducts > 0 &&
+      immediateApplyContextItems.length >=
+        Math.ceil(totalVisibleProducts * 0.95);
     const isAllProductsScope = immediateApplyScope === "all";
 
-    if (isAllProductsScope || immediateApplyContextItems.length >= LARGE_OPERATION_THRESHOLD) {
+    if (
+      isAllProductsScope ||
+      immediateApplyContextItems.length >= LARGE_OPERATION_THRESHOLD
+    ) {
       notices.push({
         id: "immediate-large-operation",
         severity: "informational",
@@ -1004,7 +1260,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     }
 
     return notices;
-  }, [immediateApplyContextItems.length, immediateApplyImpactSummary.largestMovementPercent, immediateApplyScope, previews.length]);
+  }, [
+    immediateApplyContextItems.length,
+    immediateApplyImpactSummary.largestMovementPercent,
+    immediateApplyScope,
+    previews.length,
+  ]);
 
   const normalizeCampaignTitle = useCallback((value: string) => {
     return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -1019,39 +1280,47 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     return set;
   }, [campaignHistory, normalizeCampaignTitle]);
 
-  const validateCampaignTitle = useCallback((title: string) => {
-    const normalized = normalizeCampaignTitle(title);
-    if (!normalized) return undefined;
-    if (existingCampaignTitleSet.has(normalized)) {
-      return "A campaign with this title already exists. Choose a unique title.";
-    }
-    return undefined;
-  }, [existingCampaignTitleSet, normalizeCampaignTitle]);
+  const validateCampaignTitle = useCallback(
+    (title: string) => {
+      const normalized = normalizeCampaignTitle(title);
+      if (!normalized) return undefined;
+      if (existingCampaignTitleSet.has(normalized)) {
+        return "A campaign with this title already exists. Choose a unique title.";
+      }
+      return undefined;
+    },
+    [existingCampaignTitleSet, normalizeCampaignTitle],
+  );
 
   const campaignHistoryTitles = useMemo(
     () => campaignHistory.map((campaign) => campaign.title),
-    [campaignHistory]
+    [campaignHistory],
   );
 
-  const openImmediateApplyModal = useCallback((scope: ImmediateApplyScope, item?: PreviewItem) => {
-    const scopeItems =
-      scope === "all"
-        ? previews
-        : scope === "single"
-          ? item
-            ? [item]
-            : []
-          : previews.filter((preview) => selectedItems.has(String(preview.variantId)));
+  const openImmediateApplyModal = useCallback(
+    (scope: ImmediateApplyScope, item?: PreviewItem) => {
+      const scopeItems =
+        scope === "all"
+          ? previews
+          : scope === "single"
+            ? item
+              ? [item]
+              : []
+            : previews.filter((preview) =>
+                selectedItems.has(String(preview.variantId)),
+              );
 
-    setImmediateApplyScope(scope);
-    if (scope === "single" && item) {
-      setImmediateApplySingleItem(item);
-    } else {
-      setImmediateApplySingleItem(null);
-    }
-    setImmediateApplyModalItems(scopeItems);
-    setImmediateApplyModalOpen(true);
-  }, [previews, selectedItems]);
+      setImmediateApplyScope(scope);
+      if (scope === "single" && item) {
+        setImmediateApplySingleItem(item);
+      } else {
+        setImmediateApplySingleItem(null);
+      }
+      setImmediateApplyModalItems(scopeItems);
+      setImmediateApplyModalOpen(true);
+    },
+    [previews, selectedItems],
+  );
 
   const closeImmediateApplyModal = useCallback(() => {
     setImmediateApplyModalOpen(false);
@@ -1059,9 +1328,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     setImmediateApplyModalItems([]);
   }, []);
 
-  const handleApplySingle = useCallback((item: PreviewItem) => {
-    openImmediateApplyModal("single", item);
-  }, [openImmediateApplyModal]);
+  const handleApplySingle = useCallback(
+    (item: PreviewItem) => {
+      openImmediateApplyModal("single", item);
+    },
+    [openImmediateApplyModal],
+  );
 
   const resetRevertPreviewViewState = useCallback(() => {
     setRevertPreviewSearchQuery("");
@@ -1073,9 +1345,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const campaignDetailRows = campaignDetail?.rows ?? [];
   const campaignDetailCounts = useMemo(
     () => computeProductVariantCounts(campaignDetailRows),
-    [campaignDetailRows]
+    [campaignDetailRows],
   );
-  const campaignDetailTotalPages = Math.max(1, Math.ceil(campaignDetailRows.length / campaignDetailPageSize));
+  const campaignDetailTotalPages = Math.max(
+    1,
+    Math.ceil(campaignDetailRows.length / campaignDetailPageSize),
+  );
   const campaignDetailPaginatedRows = useMemo(() => {
     const start = (campaignDetailPage - 1) * campaignDetailPageSize;
     return campaignDetailRows.slice(start, start + campaignDetailPageSize);
@@ -1106,17 +1381,26 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     if (!revertPreview || revertPreview.terminal) return [];
 
     const notices: OperationalSafeguardNotice[] = [];
-    const productCount = Number.isFinite(revertPreview.productCount) ? revertPreview.productCount : 0;
+    const productCount = Number.isFinite(revertPreview.productCount)
+      ? revertPreview.productCount
+      : 0;
     const totalVisibleProducts = previews.length;
     const affectsMostVisible =
       totalVisibleProducts > 0 &&
-      productCount >= Math.max(25, Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO));
-    const storefrontWide = totalVisibleProducts > 0 && productCount >= Math.ceil(totalVisibleProducts * 0.95);
+      productCount >=
+        Math.max(
+          25,
+          Math.ceil(totalVisibleProducts * MOST_VISIBLE_SCOPE_RATIO),
+        );
+    const storefrontWide =
+      totalVisibleProducts > 0 &&
+      productCount >= Math.ceil(totalVisibleProducts * 0.95);
     let largestMovement = 0;
 
     for (const row of revertPreview.rows) {
       if (row.currentPrice == null || row.currentPrice <= 0) continue;
-      const deltaPercent = ((row.revertTargetPrice - row.currentPrice) / row.currentPrice) * 100;
+      const deltaPercent =
+        ((row.revertTargetPrice - row.currentPrice) / row.currentPrice) * 100;
       if (Number.isFinite(deltaPercent)) {
         largestMovement = Math.max(largestMovement, Math.abs(deltaPercent));
       }
@@ -1158,7 +1442,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       notices.push({
         id: "revert-storefront-major-movement",
         severity: "warning",
-        message: "Storefront-wide revert scope includes major pricing movement.",
+        message:
+          "Storefront-wide revert scope includes major pricing movement.",
       });
     }
 
@@ -1171,7 +1456,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     const normalizedQuery = revertPreviewSearchQuery.trim().toLowerCase();
 
     return revertPreview.rows.filter((row) => {
-      if (normalizedQuery && !row.productTitle.toLowerCase().includes(normalizedQuery)) {
+      if (
+        normalizedQuery &&
+        !row.productTitle.toLowerCase().includes(normalizedQuery)
+      ) {
         return false;
       }
 
@@ -1193,7 +1481,9 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         return delta < 0;
       }
       if (revertPreviewMovementFilter === "large_movement") {
-        return Math.abs(deltaPercent) >= REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD;
+        return (
+          Math.abs(deltaPercent) >= REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD
+        );
       }
       return true;
     });
@@ -1201,11 +1491,14 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
   const revertPreviewTotalPages = Math.max(
     1,
-    Math.ceil(revertPreviewFilteredRows.length / revertPreviewPageSize)
+    Math.ceil(revertPreviewFilteredRows.length / revertPreviewPageSize),
   );
   const revertPreviewPaginatedRows = useMemo(() => {
     const start = (revertPreviewPage - 1) * revertPreviewPageSize;
-    return revertPreviewFilteredRows.slice(start, start + revertPreviewPageSize);
+    return revertPreviewFilteredRows.slice(
+      start,
+      start + revertPreviewPageSize,
+    );
   }, [revertPreviewFilteredRows, revertPreviewPage, revertPreviewPageSize]);
 
   const revertPreviewCounts = useMemo(() => {
@@ -1215,7 +1508,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
   useEffect(() => {
     setRevertPreviewPage(1);
-  }, [revertPreviewSearchQuery, revertPreviewMovementFilter, revertPreviewPageSize]);
+  }, [
+    revertPreviewSearchQuery,
+    revertPreviewMovementFilter,
+    revertPreviewPageSize,
+  ]);
 
   useEffect(() => {
     if (revertPreviewPage > revertPreviewTotalPages) {
@@ -1224,16 +1521,19 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   }, [revertPreviewPage, revertPreviewTotalPages]);
 
   const filteredPreviews = useMemo(() => {
-    console.log(`DEBUG: compute filteredPreviews. Source length: ${previews.length}`);
+    console.log(
+      `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
+    );
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
     const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
 
-    const derived = previews.map(p => {
+    const derived = previews.map((p) => {
       const livePrice = parseFloat(p.oldPrice);
-      const finalPrice = p.overriddenPrice !== undefined
-        ? Number(p.overriddenPrice) || 0
-        : parseFloat(p.newPrice);
+      const finalPrice =
+        p.overriddenPrice !== undefined
+          ? Number(p.overriddenPrice) || 0
+          : parseFloat(p.newPrice);
       const delta = finalPrice - livePrice;
       const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
       return {
@@ -1245,15 +1545,18 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       };
     });
 
-    let result = derived.filter(p => {
-      const matchesSearch = normalizedQuery.length === 0 || p.title.toLowerCase().includes(normalizedQuery);
+    let result = derived.filter((p) => {
+      const matchesSearch =
+        normalizedQuery.length === 0 ||
+        p.title.toLowerCase().includes(normalizedQuery);
       const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
       const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
 
       let matchesSmartFilter = true;
       if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
       else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
-      else if (activeFilter === "high_impact") matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
+      else if (activeFilter === "high_impact")
+        matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
 
       return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
     });
@@ -1265,13 +1568,13 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         case "alphabetical_za":
           return b.title.localeCompare(a.title);
         case "highest_increase":
-          return (b.delta - a.delta) || a.title.localeCompare(b.title);
+          return b.delta - a.delta || a.title.localeCompare(b.title);
         case "highest_decrease":
-          return (a.delta - b.delta) || a.title.localeCompare(b.title);
+          return a.delta - b.delta || a.title.localeCompare(b.title);
         case "highest_final_price":
-          return (b.finalPrice - a.finalPrice) || a.title.localeCompare(b.title);
+          return b.finalPrice - a.finalPrice || a.title.localeCompare(b.title);
         case "lowest_final_price":
-          return (a.finalPrice - b.finalPrice) || a.title.localeCompare(b.title);
+          return a.finalPrice - b.finalPrice || a.title.localeCompare(b.title);
         default:
           return 0;
       }
@@ -1297,9 +1600,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       if (item.variantId) variantIds.add(String(item.variantId));
 
       const oldP = parseFloat(item.oldPrice);
-      const finalP = item.overriddenPrice !== undefined
-        ? Number(item.overriddenPrice) || 0
-        : parseFloat(item.newPrice);
+      const finalP =
+        item.overriddenPrice !== undefined
+          ? Number(item.overriddenPrice) || 0
+          : parseFloat(item.newPrice);
 
       if (!isFinite(oldP) || !isFinite(finalP)) continue;
       sumFinal += finalP;
@@ -1337,7 +1641,9 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           ...previewPricingRule,
           endingOption: "none",
         });
-        const endingOption = String(previewPricingRule.endingOption ?? "none").trim().toLowerCase();
+        const endingOption = String(previewPricingRule.endingOption ?? "none")
+          .trim()
+          .toLowerCase();
         const endingAdjusted =
           endingOption !== "" &&
           endingOption !== "none" &&
@@ -1347,7 +1653,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           ...previewPricingRule,
           roundingPrecision: "standard",
         });
-        const roundingPrecision = String(previewPricingRule.roundingPrecision ?? "standard").trim().toLowerCase();
+        const roundingPrecision = String(
+          previewPricingRule.roundingPrecision ?? "standard",
+        )
+          .trim()
+          .toLowerCase();
         const roundingAdjusted =
           roundingPrecision !== "" &&
           roundingPrecision !== "standard" &&
@@ -1375,7 +1685,9 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
   const handleUndo = useCallback(async () => {
     if (!lastUpdate?.batchId) return;
-    console.log(`DEBUG: Initializing handleUndo for batch: ${lastUpdate.batchId}...`);
+    console.log(
+      `DEBUG: Initializing handleUndo for batch: ${lastUpdate.batchId}...`,
+    );
     setIsProcessing(true);
     setMessage(null);
 
@@ -1391,15 +1703,20 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       console.log("DEBUG: /api/undo-price data received:", !!data);
 
       if (res.ok) {
-        if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
+        if (shopify)
+          shopify.toast.show(`Restored ${data.restoredCount} products`);
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
         await handlePreview();
         setSelectedItems(new Set());
       } else {
         if (data.code === "BILLING_INACTIVE") {
-          throw new Error("Subscription inactive. Please reactivate billing to continue using Price Polish.");
+          throw new Error(
+            "Subscription inactive. Please reactivate billing to continue using Price Polish.",
+          );
         } else if (data.code === "BILLING_UNKNOWN") {
-          throw new Error("Billing status could not be verified. Please refresh the app and try again.");
+          throw new Error(
+            "Billing status could not be verified. Please refresh the app and try again.",
+          );
         } else {
           throw new Error(data.error || "Failed to undo changes.");
         }
@@ -1407,13 +1724,21 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     } catch (err) {
       console.error("DEBUG: Undo Error detail:", err);
       const message = err instanceof Error ? err.message : String(err);
-      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      const isBillingError =
+        message.includes("Subscription inactive") ||
+        message.includes("Billing status could not be verified");
       if (isBillingError) {
-        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        const code: BillingBlockModalCode = message.includes(
+          "Subscription inactive",
+        )
+          ? "BILLING_INACTIVE"
+          : "BILLING_UNKNOWN";
         setBillingBlockModalCode(code);
         setBillingBlockModalOpen(true);
       } else if (shopify) {
-        shopify.toast.show(message || "Failed to undo changes", { isError: true });
+        shopify.toast.show(message || "Failed to undo changes", {
+          isError: true,
+        });
       } else {
         console.error("BYPASS: Failed to undo changes");
       }
@@ -1423,90 +1748,115 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     }
   }, [lastUpdate, shopify, handlePreview]);
 
-  const openCampaignDetailView = useCallback(async (campaign: CampaignHistoryItem) => {
-    console.log("[Campaign History UI] campaign detail view opened", {
-      campaignId: campaign.campaignId,
-      title: campaign.title,
-    });
-    setCampaignDetailPageSize(15);
-    setCampaignDetailPage(1);
-    setSelectedCampaignForDetail(campaign);
-    setCampaignDetailOpen(true);
-    setCampaignDetailLoading(true);
-    setCampaignDetail(null);
-    try {
-      const res = await fetch("/api/campaign-revert-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId: campaign.campaignId,
-          ...(campaign.latestBatchId ? { batchId: campaign.latestBatchId } : {}),
-          includeAllStatuses: true,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load campaign details.");
-      }
-      setCampaignDetail(data);
-      console.log("[Campaign History UI] informational campaign detail loaded", {
+  const openCampaignDetailView = useCallback(
+    async (campaign: CampaignHistoryItem) => {
+      console.log("[Campaign History UI] campaign detail view opened", {
         campaignId: campaign.campaignId,
-        count: Array.isArray(data?.rows) ? data.rows.length : 0,
+        title: campaign.title,
       });
-    } catch (err) {
-      console.error("DEBUG: Campaign detail view error:", err);
-      if (shopify) shopify.toast.show(t("toast.failedLoadCampaignDetails"), { isError: true });
-      else console.error("BYPASS: Failed to load campaign details");
-      setCampaignDetailOpen(false);
-      setSelectedCampaignForDetail(null);
       setCampaignDetailPageSize(15);
       setCampaignDetailPage(1);
-    } finally {
-      setCampaignDetailLoading(false);
-    }
-  }, [shopify]);
-
-  const openCampaignRevertPreview = useCallback(async (campaign: CampaignHistoryItem, retryFailedOnly = false) => {
-    if (!campaign.revertable) return;
-    console.log("[Campaign Revert] preview opened", { campaignId: campaign.campaignId, title: campaign.title });
-    resetRevertPreviewViewState();
-    setSelectedCampaignForRevert(campaign);
-    setRevertPreviewRetryFailedOnly(retryFailedOnly);
-    setRevertPreviewOpen(true);
-    setRevertPreviewLoading(true);
-    setRevertPreview(null);
-    try {
-      const res = await fetch("/api/campaign-revert-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId: campaign.campaignId,
-          ...(campaign.latestBatchId ? { batchId: campaign.latestBatchId } : {}),
-          ...(retryFailedOnly ? { retryFailedOnly: true } : {}),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to load revert preview.");
-      }
-      setRevertPreview(data);
-      if (data?.terminal === true) {
-        console.log("[Campaign Revert] unrecoverable informational modal shown", {
-          campaignId: campaign.campaignId,
-          message: data?.message ?? null,
+      setSelectedCampaignForDetail(campaign);
+      setCampaignDetailOpen(true);
+      setCampaignDetailLoading(true);
+      setCampaignDetail(null);
+      try {
+        const res = await fetch("/api/campaign-revert-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId: campaign.campaignId,
+            ...(campaign.latestBatchId
+              ? { batchId: campaign.latestBatchId }
+              : {}),
+            includeAllStatuses: true,
+          }),
         });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load campaign details.");
+        }
+        setCampaignDetail(data);
+        console.log(
+          "[Campaign History UI] informational campaign detail loaded",
+          {
+            campaignId: campaign.campaignId,
+            count: Array.isArray(data?.rows) ? data.rows.length : 0,
+          },
+        );
+      } catch (err) {
+        console.error("DEBUG: Campaign detail view error:", err);
+        if (shopify)
+          shopify.toast.show(t("toast.failedLoadCampaignDetails"), {
+            isError: true,
+          });
+        else console.error("BYPASS: Failed to load campaign details");
+        setCampaignDetailOpen(false);
+        setSelectedCampaignForDetail(null);
+        setCampaignDetailPageSize(15);
+        setCampaignDetailPage(1);
+      } finally {
+        setCampaignDetailLoading(false);
       }
-    } catch (err) {
-      console.error("DEBUG: Campaign Revert Preview Error detail:", err);
-      if (shopify) shopify.toast.show(t("toast.failedLoadRevertPreview"), { isError: true });
-      else console.error("BYPASS: Failed to load revert preview");
-      setRevertPreviewOpen(false);
-      setSelectedCampaignForRevert(null);
+    },
+    [shopify],
+  );
+
+  const openCampaignRevertPreview = useCallback(
+    async (campaign: CampaignHistoryItem, retryFailedOnly = false) => {
+      if (!campaign.revertable) return;
+      console.log("[Campaign Revert] preview opened", {
+        campaignId: campaign.campaignId,
+        title: campaign.title,
+      });
       resetRevertPreviewViewState();
-    } finally {
-      setRevertPreviewLoading(false);
-    }
-  }, [resetRevertPreviewViewState, shopify]);
+      setSelectedCampaignForRevert(campaign);
+      setRevertPreviewRetryFailedOnly(retryFailedOnly);
+      setRevertPreviewOpen(true);
+      setRevertPreviewLoading(true);
+      setRevertPreview(null);
+      try {
+        const res = await fetch("/api/campaign-revert-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId: campaign.campaignId,
+            ...(campaign.latestBatchId
+              ? { batchId: campaign.latestBatchId }
+              : {}),
+            ...(retryFailedOnly ? { retryFailedOnly: true } : {}),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load revert preview.");
+        }
+        setRevertPreview(data);
+        if (data?.terminal === true) {
+          console.log(
+            "[Campaign Revert] unrecoverable informational modal shown",
+            {
+              campaignId: campaign.campaignId,
+              message: data?.message ?? null,
+            },
+          );
+        }
+      } catch (err) {
+        console.error("DEBUG: Campaign Revert Preview Error detail:", err);
+        if (shopify)
+          shopify.toast.show(t("toast.failedLoadRevertPreview"), {
+            isError: true,
+          });
+        else console.error("BYPASS: Failed to load revert preview");
+        setRevertPreviewOpen(false);
+        setSelectedCampaignForRevert(null);
+        resetRevertPreviewViewState();
+      } finally {
+        setRevertPreviewLoading(false);
+      }
+    },
+    [resetRevertPreviewViewState, shopify],
+  );
 
   const confirmCampaignRevert = useCallback(async () => {
     if (!selectedCampaignForRevert) return;
@@ -1522,16 +1872,22 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           campaignId: selectedCampaignForRevert.campaignId,
-          ...(selectedCampaignForRevert.latestBatchId ? { batchId: selectedCampaignForRevert.latestBatchId } : {}),
+          ...(selectedCampaignForRevert.latestBatchId
+            ? { batchId: selectedCampaignForRevert.latestBatchId }
+            : {}),
           ...(revertPreviewRetryFailedOnly ? { retryFailedOnly: true } : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         if (data.code === "BILLING_INACTIVE") {
-          throw new Error("Subscription inactive. Please reactivate billing to continue using Price Polish.");
+          throw new Error(
+            "Subscription inactive. Please reactivate billing to continue using Price Polish.",
+          );
         } else if (data.code === "BILLING_UNKNOWN") {
-          throw new Error("Billing status could not be verified. Please refresh the app and try again.");
+          throw new Error(
+            "Billing status could not be verified. Please refresh the app and try again.",
+          );
         } else {
           throw new Error(data.error || "Failed to revert campaign.");
         }
@@ -1540,7 +1896,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       if (data?.terminal === true) {
         const terminalMessage = terminalReason
           ? `This campaign can no longer be reverted because ${terminalReason.toLowerCase()}.`
-          : (data?.message || "This campaign can no longer be reverted.");
+          : data?.message || "This campaign can no longer be reverted.";
         if (shopify) shopify.toast.show(terminalMessage, { isError: true });
         else console.warn(`BYPASS: ${terminalMessage}`);
       } else if (data?.message) {
@@ -1550,7 +1906,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         if (shopify) shopify.toast.show(operationalMessage);
         else console.log(`BYPASS: ${operationalMessage}`);
       } else if (data?.restoredCount > 0) {
-        if (shopify) shopify.toast.show(`Restored ${data.restoredCount} products`);
+        if (shopify)
+          shopify.toast.show(`Restored ${data.restoredCount} products`);
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
       } else {
         const noRetryMessage = terminalReason
@@ -1568,156 +1925,209 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     } catch (err) {
       console.error("DEBUG: Campaign Revert Error detail:", err);
       const message = err instanceof Error ? err.message : String(err);
-      const isBillingError = message.includes("Subscription inactive") || message.includes("Billing status could not be verified");
+      const isBillingError =
+        message.includes("Subscription inactive") ||
+        message.includes("Billing status could not be verified");
       if (isBillingError) {
-        const code: BillingBlockModalCode = message.includes("Subscription inactive") ? "BILLING_INACTIVE" : "BILLING_UNKNOWN";
+        const code: BillingBlockModalCode = message.includes(
+          "Subscription inactive",
+        )
+          ? "BILLING_INACTIVE"
+          : "BILLING_UNKNOWN";
         // Close parent revert preview modal before showing billing modal
         setRevertPreviewOpen(false);
         setBillingBlockModalCode(code);
         setBillingBlockModalOpen(true);
       } else if (shopify) {
-        shopify.toast.show(message || "Failed to revert campaign", { isError: true });
+        shopify.toast.show(message || "Failed to revert campaign", {
+          isError: true,
+        });
       } else {
         console.error("BYPASS: Failed to revert campaign");
       }
     } finally {
       setIsProcessing(false);
     }
-  }, [handlePreview, resetRevertPreviewViewState, revertPreviewRetryFailedOnly, selectedCampaignForRevert, shopify]);
+  }, [
+    handlePreview,
+    resetRevertPreviewViewState,
+    revertPreviewRetryFailedOnly,
+    selectedCampaignForRevert,
+    shopify,
+  ]);
 
-  const handleRefreshCampaignHistory = useCallback(async (showLoading = true) => {
-    if (showLoading) setCampaignHistoryLoading(true);
-    console.log("[Campaign History UI] manual refresh started");
-    try {
-      const fetcher = await appFetch;
-      const campaignHistoryData = await fetcher("/api/campaign-history");
-      const campaigns = Array.isArray(campaignHistoryData?.campaigns) ? campaignHistoryData.campaigns : [];
-      setCampaignHistory(campaigns);
-      console.log("[Campaign History UI] manual refresh completed", { count: campaigns.length });
-      console.log("[Campaign History UI] operational metrics rendered", { count: campaigns.length });
-    } catch (error) {
-      console.error("DEBUG: Campaign History manual refresh failed:", error);
-      if (shopify) shopify.toast.show(t("toast.failedRefreshCampaignHistory"), { isError: true });
-      else console.error("BYPASS: Failed to refresh campaign history");
-    } finally {
-      if (showLoading) setCampaignHistoryLoading(false);
-    }
-  }, [appFetch, shopify]);
-
-  const handleWindowLifecycleAction = useCallback(async (
-    campaign: CampaignHistoryItem,
-    action: "cancel-schedule" | "stop-window"
-  ) => {
-    const actionLabel = action === "cancel-schedule" ? "cancel schedule" : "stop window";
-    setIsProcessing(true);
-    try {
-      const res = await fetch("/api/window-lifecycle-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId: campaign.campaignId,
-          action,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || `Unable to ${actionLabel}.`);
-      }
-      if (shopify) {
-        shopify.toast.show(
-          action === "cancel-schedule"
-            ? "Pricing window cancelled"
-            : "Original pricing restored and window stopped"
-        );
-      }
-      const nextStatus = action === "cancel-schedule" ? "cancelled-window" : data.status ?? "window-stopped";
-      setCampaignHistory((current) =>
-        current.map((item) =>
-          item.campaignId === campaign.campaignId
-            ? {
-                ...item,
-                status: nextStatus,
-                runtimeStatus: nextStatus,
-                revertable: false,
-                ...(action === "stop-window"
-                  ? {
-                      revertedCount: data.restoredCount ?? item.revertedCount,
-                      failedCount: data.failedCount ?? item.failedCount,
-                      unrecoverableCount: data.unrecoverableCount ?? item.unrecoverableCount,
-                    }
-                  : {}),
-              }
-            : item
-        )
-      );
-      if (selectedCampaignForDetail?.campaignId === campaign.campaignId) {
-        setSelectedCampaignForDetail({
-          ...campaign,
-          status: nextStatus,
-          runtimeStatus: nextStatus,
-          revertable: false,
+  const handleRefreshCampaignHistory = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) setCampaignHistoryLoading(true);
+      console.log("[Campaign History UI] manual refresh started");
+      try {
+        const fetcher = await appFetch;
+        const campaignHistoryData = await fetcher("/api/campaign-history");
+        const campaigns = Array.isArray(campaignHistoryData?.campaigns)
+          ? campaignHistoryData.campaigns
+          : [];
+        setCampaignHistory(campaigns);
+        console.log("[Campaign History UI] manual refresh completed", {
+          count: campaigns.length,
         });
-        setCampaignDetail((current) =>
-          current
-            ? {
-                ...current,
-                preActivation: false,
-                runtimeStatus: nextStatus,
-                revertedCount: action === "stop-window" ? data.restoredCount ?? current.revertedCount : current.revertedCount,
-                failedCount: action === "stop-window" ? data.failedCount ?? current.failedCount : current.failedCount,
-                unrecoverableCount:
-                  action === "stop-window" ? data.unrecoverableCount ?? current.unrecoverableCount : current.unrecoverableCount,
-              }
-            : current
-        );
+        console.log("[Campaign History UI] operational metrics rendered", {
+          count: campaigns.length,
+        });
+      } catch (error) {
+        console.error("DEBUG: Campaign History manual refresh failed:", error);
+        if (shopify)
+          shopify.toast.show(t("toast.failedRefreshCampaignHistory"), {
+            isError: true,
+          });
+        else console.error("BYPASS: Failed to refresh campaign history");
+      } finally {
+        if (showLoading) setCampaignHistoryLoading(false);
       }
-      await handlePreview();
-    } catch (error) {
-      console.error("[Window Lifecycle] action failed", error);
-      if (shopify) {
-        shopify.toast.show(
-          action === "cancel-schedule"
-            ? "Unable to cancel pricing window"
-            : "Unable to stop pricing window",
-          { isError: true }
-        );
-      }
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [handlePreview, selectedCampaignForDetail, shopify]);
+    },
+    [appFetch, shopify],
+  );
 
-  const handlePublishLifecycleAction = useCallback(async (campaign: CampaignHistoryItem) => {
-    setIsProcessing(true);
-    try {
-      const res = await fetch("/api/publish-lifecycle-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          campaignId: campaign.campaignId,
-          action: "cancel-publish",
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to cancel publish.");
+  const handleWindowLifecycleAction = useCallback(
+    async (
+      campaign: CampaignHistoryItem,
+      action: "cancel-schedule" | "stop-window",
+    ) => {
+      const actionLabel =
+        action === "cancel-schedule" ? "cancel schedule" : "stop window";
+      setIsProcessing(true);
+      try {
+        const res = await fetch("/api/window-lifecycle-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId: campaign.campaignId,
+            action,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `Unable to ${actionLabel}.`);
+        }
+        if (shopify) {
+          shopify.toast.show(
+            action === "cancel-schedule"
+              ? "Pricing window cancelled"
+              : "Original pricing restored and window stopped",
+          );
+        }
+        const nextStatus =
+          action === "cancel-schedule"
+            ? "cancelled-window"
+            : (data.status ?? "window-stopped");
+        setCampaignHistory((current) =>
+          current.map((item) =>
+            item.campaignId === campaign.campaignId
+              ? {
+                  ...item,
+                  status: nextStatus,
+                  runtimeStatus: nextStatus,
+                  revertable: false,
+                  ...(action === "stop-window"
+                    ? {
+                        revertedCount: data.restoredCount ?? item.revertedCount,
+                        failedCount: data.failedCount ?? item.failedCount,
+                        unrecoverableCount:
+                          data.unrecoverableCount ?? item.unrecoverableCount,
+                      }
+                    : {}),
+                }
+              : item,
+          ),
+        );
+        if (selectedCampaignForDetail?.campaignId === campaign.campaignId) {
+          setSelectedCampaignForDetail({
+            ...campaign,
+            status: nextStatus,
+            runtimeStatus: nextStatus,
+            revertable: false,
+          });
+          setCampaignDetail((current) =>
+            current
+              ? {
+                  ...current,
+                  preActivation: false,
+                  runtimeStatus: nextStatus,
+                  revertedCount:
+                    action === "stop-window"
+                      ? (data.restoredCount ?? current.revertedCount)
+                      : current.revertedCount,
+                  failedCount:
+                    action === "stop-window"
+                      ? (data.failedCount ?? current.failedCount)
+                      : current.failedCount,
+                  unrecoverableCount:
+                    action === "stop-window"
+                      ? (data.unrecoverableCount ?? current.unrecoverableCount)
+                      : current.unrecoverableCount,
+                }
+              : current,
+          );
+        }
+        await handlePreview();
+      } catch (error) {
+        console.error("[Window Lifecycle] action failed", error);
+        if (shopify) {
+          shopify.toast.show(
+            action === "cancel-schedule"
+              ? "Unable to cancel pricing window"
+              : "Unable to stop pricing window",
+            { isError: true },
+          );
+        }
+      } finally {
+        setIsProcessing(false);
       }
-      setCampaignHistory((current) =>
-        current.map((item) =>
-          item.campaignId === campaign.campaignId
-            ? { ...item, status: "cancelled-publish", runtimeStatus: "cancelled-publish", revertable: false }
-            : item
-        )
-      );
-      if (shopify) shopify.toast.show(t("toast.scheduledPublishCancelled"));
-      await handlePreview();
-    } catch (error) {
-      console.error("[Publish Lifecycle] action failed", error);
-      if (shopify) shopify.toast.show(t("toast.unableCancelScheduledPublish"), { isError: true });
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [handlePreview, shopify]);
+    },
+    [handlePreview, selectedCampaignForDetail, shopify],
+  );
+
+  const handlePublishLifecycleAction = useCallback(
+    async (campaign: CampaignHistoryItem) => {
+      setIsProcessing(true);
+      try {
+        const res = await fetch("/api/publish-lifecycle-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaignId: campaign.campaignId,
+            action: "cancel-publish",
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Unable to cancel publish.");
+        }
+        setCampaignHistory((current) =>
+          current.map((item) =>
+            item.campaignId === campaign.campaignId
+              ? {
+                  ...item,
+                  status: "cancelled-publish",
+                  runtimeStatus: "cancelled-publish",
+                  revertable: false,
+                }
+              : item,
+          ),
+        );
+        if (shopify) shopify.toast.show(t("toast.scheduledPublishCancelled"));
+        await handlePreview();
+      } catch (error) {
+        console.error("[Publish Lifecycle] action failed", error);
+        if (shopify)
+          shopify.toast.show(t("toast.unableCancelScheduledPublish"), {
+            isError: true,
+          });
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [handlePreview, shopify],
+  );
 
   const handlePriceChange = useCallback((variantId: string, value: string) => {
     if (value.length > 15) return;
@@ -1727,23 +2137,26 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       prev.map((item) =>
         item.variantId === variantId
           ? { ...item, overriddenPrice: value }
-          : item
-      )
+          : item,
+      ),
     );
   }, []);
 
   const handleDownloadReport = useCallback(() => {
     if (previews.length === 0) return;
 
-    let csv = "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain\n";
+    let csv =
+      "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain\n";
     let totalProfit = 0;
 
     const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
     const dec = isZeroDecimal ? 0 : 2;
 
-    previews.forEach(p => {
+    previews.forEach((p) => {
       const base = parseFloat(p.originalBasePrice);
-      const final = Number(p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice);
+      const final = Number(
+        p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice,
+      );
       const markupAdded = base * (activeMarkup / 100);
       const roundingAdj = final - (base + markupAdded);
       const netGain = final - base;
@@ -1755,10 +2168,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     csv += `,,,,,,,\n`;
     csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(dec)}\n`;
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = new Date().toISOString().split("T")[0];
 
     link.href = url;
     link.setAttribute("download", `PricePolish_Impact_Report_${dateStr}.csv`);
@@ -1772,8 +2185,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       prev.map((item) =>
         item.variantId === variantId
           ? { ...item, overriddenPrice: undefined }
-          : item
-      )
+          : item,
+      ),
     );
   }, []);
 
@@ -1789,112 +2202,142 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     setShowStopModal(true);
   }, [guardNoRules]);
 
-  const handlePushStorefront = useCallback(async (clear = false) => {
-    setIsProcessing(true);
-    setShowGoLiveModal(false);
-    setShowStopModal(false);
+  const handlePushStorefront = useCallback(
+    async (clear = false) => {
+      setIsProcessing(true);
+      setShowGoLiveModal(false);
+      setShowStopModal(false);
 
-    if (clear) {
-      // ── Stop Live (no progress tracking needed) ────────────────────────────
-      try {
-        const res = await fetch("/api/push-storefront", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clear: true }),
-        });
-        const data = await res.json();
-        if (res.ok) {
-          if (shopify) shopify.toast.show("Storefront prices restored successfully");
-          else console.log("BYPASS: Storefront prices restored successfully");
-          setMetrics(prev => ({ ...prev, isLive: false }));
-          await handlePreview();
-        } else {
-          throw new Error(data.error || "Failed to stop live pricing.");
+      if (clear) {
+        // ── Stop Live (no progress tracking needed) ────────────────────────────
+        try {
+          const res = await fetch("/api/push-storefront", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ clear: true }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            if (shopify)
+              shopify.toast.show("Storefront prices restored successfully");
+            else console.log("BYPASS: Storefront prices restored successfully");
+            setMetrics((prev) => ({ ...prev, isLive: false }));
+            await handlePreview();
+          } else {
+            throw new Error(data.error || "Failed to stop live pricing.");
+          }
+        } catch (err) {
+          const errorMessage =
+            err instanceof Error
+              ? err.message
+              : "Failed to update storefront pricing state.";
+          if (shopify) shopify.toast.show(errorMessage, { isError: true });
+          else console.error("BYPASS:", errorMessage);
+        } finally {
+          setIsProcessing(false);
         }
+        return;
+      }
+
+      // ── Publish with per-batch progress tracking ───────────────────────────────
+      // Total is read from current storefrontControl before the first batch fires.
+      const total = storefrontControl.stagedPendingCount;
+      setPublishTotal(total);
+      setProgress(0);
+
+      // One UUID groups all batch PushJobs into a single logical publish operation.
+      // Sent with every batch request so the server can persist it on each PushJob
+      // and use it to deduplicate the GO_LIVE activity log entry.
+      const operationId = crypto.randomUUID();
+
+      let processed = 0;
+
+      try {
+        while (true) {
+          const pushBody = {
+            clear: false,
+            limit: PUBLISH_BATCH_SIZE,
+            operationId,
+            ...(activeCampaignId ? { campaignId: activeCampaignId } : {}),
+          };
+
+          const res = await fetch("/api/push-storefront", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pushBody),
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.error || "Failed to publish prices.");
+          }
+
+          // Count this batch: successful + failed = processed in this pass
+          const batchProcessed = (data.applied ?? 0) + (data.failed ?? 0);
+          processed += batchProcessed;
+
+          const pct =
+            total > 0
+              ? Math.min(Math.round((processed / total) * 100), 99)
+              : 50;
+          setProgress(pct);
+
+          if (!data.remaining || data.remaining === 0) break;
+        }
+
+        setProgress(100);
+        if (shopify)
+          shopify.toast.show("Prices are now live on your storefront");
+        else console.log("BYPASS: Prices are now live on your storefront");
+        setMetrics((prev) => ({ ...prev, isLive: true }));
+        await handlePreview();
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to update storefront pricing state.";
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : "Failed to update storefront pricing state.";
         if (shopify) shopify.toast.show(errorMessage, { isError: true });
         else console.error("BYPASS:", errorMessage);
       } finally {
         setIsProcessing(false);
+        setProgress(0);
+        setPublishTotal(0);
       }
-      return;
-    }
-
-    // ── Publish with per-batch progress tracking ───────────────────────────────
-    // Total is read from current storefrontControl before the first batch fires.
-    const total = storefrontControl.stagedPendingCount;
-    setPublishTotal(total);
-    setProgress(0);
-
-    // One UUID groups all batch PushJobs into a single logical publish operation.
-    // Sent with every batch request so the server can persist it on each PushJob
-    // and use it to deduplicate the GO_LIVE activity log entry.
-    const operationId = crypto.randomUUID();
-
-    let processed = 0;
-
-    try {
-      while (true) {
-        const pushBody = {
-          clear: false,
-          limit: PUBLISH_BATCH_SIZE,
-          operationId,
-          ...(activeCampaignId ? { campaignId: activeCampaignId } : {}),
-        };
-
-        const res = await fetch("/api/push-storefront", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(pushBody),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.error || "Failed to publish prices.");
-        }
-
-        // Count this batch: successful + failed = processed in this pass
-        const batchProcessed = (data.applied ?? 0) + (data.failed ?? 0);
-        processed += batchProcessed;
-
-        const pct = total > 0 ? Math.min(Math.round((processed / total) * 100), 99) : 50;
-        setProgress(pct);
-
-        if (!data.remaining || data.remaining === 0) break;
-      }
-
-      setProgress(100);
-      if (shopify) shopify.toast.show("Prices are now live on your storefront");
-      else console.log("BYPASS: Prices are now live on your storefront");
-      setMetrics(prev => ({ ...prev, isLive: true }));
-      await handlePreview();
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to update storefront pricing state.";
-      if (shopify) shopify.toast.show(errorMessage, { isError: true });
-      else console.error("BYPASS:", errorMessage);
-    } finally {
-      setIsProcessing(false);
-      setProgress(0);
-      setPublishTotal(0);
-    }
-  }, [shopify, activeCampaignId, handlePreview, storefrontControl.stagedPendingCount]);
+    },
+    [
+      shopify,
+      activeCampaignId,
+      handlePreview,
+      storefrontControl.stagedPendingCount,
+    ],
+  );
 
   const campaignStatusTone = useCallback((status: string) => {
     const normalized = status.toLowerCase();
     if (normalized === "unrecoverable") return "critical" as const;
     if (normalized === "expired-window") return "warning" as const;
-    if (normalized === "active" || normalized === "active-window" || normalized === "done") return "success" as const;
+    if (
+      normalized === "active" ||
+      normalized === "active-window" ||
+      normalized === "done"
+    )
+      return "success" as const;
     if (
       normalized === "reverted" ||
       normalized === "auto-restored" ||
       normalized === "window-stopped" ||
       normalized === "cancelled-publish" ||
       normalized === "cancelled-window"
-    ) return "info" as const;
-    if (normalized === "scheduled" || normalized === "scheduled-window" || normalized === "scheduled-publish" || normalized === "pending") return "warning" as const;
+    )
+      return "info" as const;
+    if (
+      normalized === "scheduled" ||
+      normalized === "scheduled-window" ||
+      normalized === "scheduled-publish" ||
+      normalized === "pending"
+    )
+      return "warning" as const;
     if (normalized === "publishing") return "attention" as const;
     if (normalized === "published") return "success" as const;
     if (normalized === "failed") return "critical" as const;
@@ -1947,11 +2390,16 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     return parsed.toLocaleString();
   }, []);
 
-  const campaignOperationalTimeline = useMemo<CampaignTimelineMilestone[]>(() => {
+  const campaignOperationalTimeline = useMemo<
+    CampaignTimelineMilestone[]
+  >(() => {
     if (!selectedCampaignForDetail) return [];
 
-    const normalizedStatus = normalizeCampaignStatus(selectedCampaignForDetail.status);
-    const failedCount = campaignDetail?.failedCount ?? selectedCampaignForDetail.failedCount ?? 0;
+    const normalizedStatus = normalizeCampaignStatus(
+      selectedCampaignForDetail.status,
+    );
+    const failedCount =
+      campaignDetail?.failedCount ?? selectedCampaignForDetail.failedCount ?? 0;
     const revertCompletedTimestamp =
       normalizedStatus === "reverted"
         ? formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? null)
@@ -1974,12 +2422,17 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         label: "Window Scheduled",
         tone: "warning",
         badgeLabel: "Queued",
-        timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
+        timestamp: formatTimelineTimestamp(
+          selectedCampaignForDetail.runAt ?? null,
+        ),
         description: selectedCampaignForDetail.windowEndAt
           ? "Pricing will publish at the window start and automatically restore at the window end."
           : "Pricing window is queued for publishing and automatic restore.",
       });
-    } else if (normalizedStatus === "scheduled" || normalizedStatus === "pending") {
+    } else if (
+      normalizedStatus === "scheduled" ||
+      normalizedStatus === "pending"
+    ) {
       milestones.push({
         key: "scheduled",
         label: "Scheduled",
@@ -1995,12 +2448,22 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         label: "Window Activated",
         tone: "success",
         badgeLabel: "Active",
-        timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
+        timestamp: formatTimelineTimestamp(
+          selectedCampaignForDetail.runAt ?? null,
+        ),
         description: selectedCampaignForDetail.windowEndAt
           ? "Pricing is active now and will automatically restore at the scheduled end time."
           : "Pricing is active now and waiting for automatic restore.",
       });
-    } else if (["active", "partial", "reverted", "unrecoverable", "auto-restored"].includes(normalizedStatus)) {
+    } else if (
+      [
+        "active",
+        "partial",
+        "reverted",
+        "unrecoverable",
+        "auto-restored",
+      ].includes(normalizedStatus)
+    ) {
       milestones.push({
         key: "applied",
         label: "Applied",
@@ -2027,7 +2490,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         tone: "success",
         badgeLabel: "Completed",
         timestamp: revertCompletedTimestamp,
-        description: "Pricing successfully restored to original storefront values.",
+        description:
+          "Pricing successfully restored to original storefront values.",
       });
     }
 
@@ -2037,8 +2501,13 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         label: "Auto Restored",
         tone: "success",
         badgeLabel: "Completed",
-        timestamp: formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? selectedCampaignForDetail.windowEndAt ?? null),
-        description: "Original storefront pricing was automatically restored after the window ended.",
+        timestamp: formatTimelineTimestamp(
+          campaignDetail?.revertCompletedAt ??
+            selectedCampaignForDetail.windowEndAt ??
+            null,
+        ),
+        description:
+          "Original storefront pricing was automatically restored after the window ended.",
       });
     }
 
@@ -2072,44 +2541,68 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const campaignHistoryCounts = useMemo(() => {
     return campaignHistory.reduce(
       (acc, campaign) => {
-        const status = resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow);
-        if (status === "active" || status === "active-window" || status === "published") {
+        const status = resolveCampaignRuntimeStatus(
+          campaign,
+          campaignRuntimeNow,
+        );
+        if (
+          status === "active" ||
+          status === "active-window" ||
+          status === "published"
+        ) {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
-        } else if (status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending") {
+        } else if (
+          status === "scheduled" ||
+          status === "scheduled-window" ||
+          status === "scheduled-publish" ||
+          status === "publishing" ||
+          status === "pending"
+        ) {
           acc.scheduled += 1;
         } else if (isClosedCampaignStatus(status)) {
           acc.closed += 1;
         }
         return acc;
       },
-      { active: 0, partial: 0, scheduled: 0, closed: 0 }
+      { active: 0, partial: 0, scheduled: 0, closed: 0 },
     );
   }, [campaignHistory, campaignRuntimeNow]);
 
-  const handleCampaignHistoryStatusFilterChange = useCallback((value: string) => {
-    const nextValue = value as CampaignHistoryStatusFilter;
-    setCampaignHistoryStatusFilter(nextValue);
-    console.log("[Campaign History UI] campaign history filter changed", {
-      statusFilter: nextValue,
-    });
-  }, []);
+  const handleCampaignHistoryStatusFilterChange = useCallback(
+    (value: string) => {
+      const nextValue = value as CampaignHistoryStatusFilter;
+      setCampaignHistoryStatusFilter(nextValue);
+      console.log("[Campaign History UI] campaign history filter changed", {
+        statusFilter: nextValue,
+      });
+    },
+    [],
+  );
 
-  const handleCampaignHistorySourceFilterChange = useCallback((value: string) => {
-    const nextValue = value as CampaignHistorySourceFilter;
-    setCampaignHistorySourceFilter(nextValue);
-    console.log("[Campaign History UI] campaign history filter changed", {
-      sourceFilter: nextValue,
-    });
-  }, []);
+  const handleCampaignHistorySourceFilterChange = useCallback(
+    (value: string) => {
+      const nextValue = value as CampaignHistorySourceFilter;
+      setCampaignHistorySourceFilter(nextValue);
+      console.log("[Campaign History UI] campaign history filter changed", {
+        sourceFilter: nextValue,
+      });
+    },
+    [],
+  );
 
-  const handleCampaignHistoryTimeframeFilterChange = useCallback((value: string) => {
-    setCampaignHistoryTimeframeFilter(value as CampaignHistoryTimeframeFilter);
-    console.log("[Campaign History UI] campaign history timeframe changed", {
-      timeframe: value,
-    });
-  }, []);
+  const handleCampaignHistoryTimeframeFilterChange = useCallback(
+    (value: string) => {
+      setCampaignHistoryTimeframeFilter(
+        value as CampaignHistoryTimeframeFilter,
+      );
+      console.log("[Campaign History UI] campaign history timeframe changed", {
+        timeframe: value,
+      });
+    },
+    [],
+  );
 
   const handleCampaignHistorySearchChange = useCallback((value: string) => {
     if (value.length > 120) return;
@@ -2127,29 +2620,49 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       const source = normalizeCampaignSource(campaign.source);
       const title = campaign.title.toLowerCase();
       const campaignId = campaign.campaignId.toLowerCase();
-      const timeframeStart = getTimeframeStart(campaignHistoryTimeframeFilter, campaignRuntimeNow);
+      const timeframeStart = getTimeframeStart(
+        campaignHistoryTimeframeFilter,
+        campaignRuntimeNow,
+      );
       const campaignCreatedAt = new Date(campaign.createdAt).getTime();
       const matchesTimeframe =
         !timeframeStart ||
-        (!Number.isNaN(campaignCreatedAt) && campaignCreatedAt >= timeframeStart.getTime());
+        (!Number.isNaN(campaignCreatedAt) &&
+          campaignCreatedAt >= timeframeStart.getTime());
 
       const matchesStatus = (() => {
         if (campaignHistoryStatusFilter === "all") return true;
-        if (campaignHistoryStatusFilter === "active") return status === "active" || status === "active-window" || status === "published";
-        if (campaignHistoryStatusFilter === "partial") return status === "partial";
-        if (campaignHistoryStatusFilter === "scheduled") return status === "scheduled" || status === "scheduled-window" || status === "scheduled-publish" || status === "publishing" || status === "pending";
+        if (campaignHistoryStatusFilter === "active")
+          return (
+            status === "active" ||
+            status === "active-window" ||
+            status === "published"
+          );
+        if (campaignHistoryStatusFilter === "partial")
+          return status === "partial";
+        if (campaignHistoryStatusFilter === "scheduled")
+          return (
+            status === "scheduled" ||
+            status === "scheduled-window" ||
+            status === "scheduled-publish" ||
+            status === "publishing" ||
+            status === "pending"
+          );
         return isClosedCampaignStatus(status);
       })();
 
       const matchesSource =
-        campaignHistorySourceFilter === "all" || source === campaignHistorySourceFilter;
+        campaignHistorySourceFilter === "all" ||
+        source === campaignHistorySourceFilter;
 
       const matchesSearch =
         normalizedQuery.length === 0 ||
         title.includes(normalizedQuery) ||
         campaignId.includes(normalizedQuery);
 
-      return matchesTimeframe && matchesStatus && matchesSource && matchesSearch;
+      return (
+        matchesTimeframe && matchesStatus && matchesSource && matchesSearch
+      );
     });
   }, [
     campaignHistory,
@@ -2162,7 +2675,9 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
   const visibleCampaignHistory = useMemo(() => {
     if (!hideClosedCampaigns) return filteredCampaignHistory;
-    const visible = filteredCampaignHistory.filter((campaign) => !isClosedCampaignStatus(campaign.status));
+    const visible = filteredCampaignHistory.filter(
+      (campaign) => !isClosedCampaignStatus(campaign.status),
+    );
     console.log("[Campaign History UI] closed campaigns hidden", {
       hiddenCount: filteredCampaignHistory.length - visible.length,
       total: filteredCampaignHistory.length,
@@ -2173,8 +2688,15 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const campaignHistorySummary = useMemo(() => {
     return visibleCampaignHistory.reduce(
       (acc, campaign) => {
-        const status = resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow);
-        if (status === "active" || status === "active-window" || status === "published") {
+        const status = resolveCampaignRuntimeStatus(
+          campaign,
+          campaignRuntimeNow,
+        );
+        if (
+          status === "active" ||
+          status === "active-window" ||
+          status === "published"
+        ) {
           acc.active += 1;
         } else if (status === "partial") {
           acc.partial += 1;
@@ -2183,19 +2705,25 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         }
         return acc;
       },
-      { active: 0, partial: 0, closed: 0 }
+      { active: 0, partial: 0, closed: 0 },
     );
   }, [campaignRuntimeNow, visibleCampaignHistory]);
 
   const campaignHistoryStatusOptions = useMemo(
     () => [
       { label: `${SELECT_OPTION_PREFIX}All`, value: "all" },
-      { label: `${SELECT_OPTION_PREFIX}Active (${campaignHistoryCounts.active})`, value: "active" },
-      { label: `${SELECT_OPTION_PREFIX}Partial (${campaignHistoryCounts.partial})`, value: "partial" },
+      {
+        label: `${SELECT_OPTION_PREFIX}Active (${campaignHistoryCounts.active})`,
+        value: "active",
+      },
+      {
+        label: `${SELECT_OPTION_PREFIX}Partial (${campaignHistoryCounts.partial})`,
+        value: "partial",
+      },
       { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
       { label: `${SELECT_OPTION_PREFIX}Closed`, value: "closed" },
     ],
-    [campaignHistoryCounts.active, campaignHistoryCounts.partial]
+    [campaignHistoryCounts.active, campaignHistoryCounts.partial],
   );
 
   const campaignHistorySourceOptions = useMemo(
@@ -2205,7 +2733,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
       { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
     ],
-    []
+    [],
   );
 
   const campaignHistoryTimeframeOptions = useMemo(
@@ -2217,17 +2745,21 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
       { label: `${SELECT_OPTION_PREFIX}This Year`, value: "year" },
       { label: `${SELECT_OPTION_PREFIX}All Time`, value: "all" },
     ],
-    []
+    [],
   );
 
   const campaignHistoryEmptyStateMessage = useMemo(() => {
     if (campaignHistory.length === 0) return "No campaigns recorded yet.";
 
     if (filteredCampaignHistory.length === 0) {
-      if (campaignHistoryStatusFilter === "active") return "No active campaigns found.";
-      if (campaignHistoryStatusFilter === "partial") return "No partial campaigns found.";
-      if (campaignHistoryStatusFilter === "scheduled") return "No scheduled campaigns found.";
-      if (campaignHistoryStatusFilter === "closed") return "No closed campaigns found.";
+      if (campaignHistoryStatusFilter === "active")
+        return "No active campaigns found.";
+      if (campaignHistoryStatusFilter === "partial")
+        return "No partial campaigns found.";
+      if (campaignHistoryStatusFilter === "scheduled")
+        return "No scheduled campaigns found.";
+      if (campaignHistoryStatusFilter === "closed")
+        return "No closed campaigns found.";
       return "No campaigns match the current filters.";
     }
 
@@ -2252,13 +2784,15 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   const toggleCampaignHistoryExpanded = useCallback(() => {
     setCampaignHistoryExpanded((prev) => {
       const next = !prev;
-      console.log(next ? "campaign history expanded" : "campaign history collapsed");
+      console.log(
+        next ? "campaign history expanded" : "campaign history collapsed",
+      );
       return next;
     });
   }, []);
 
   const toggleSelection = (id: string) => {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -2267,10 +2801,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   };
 
   const selectAllVisible = () => {
-    const visibleIds = paginatedPreviews.map(p => p.variantId);
-    setSelectedItems(prev => {
+    const visibleIds = paginatedPreviews.map((p) => p.variantId);
+    setSelectedItems((prev) => {
       const next = new Set(prev);
-      visibleIds.forEach(id => next.add(id));
+      visibleIds.forEach((id) => next.add(id));
       return next;
     });
   };
@@ -2280,9 +2814,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     let totalNew = 0;
     let count = 0;
 
-    previews.forEach(p => {
+    previews.forEach((p) => {
       const oldP = parseFloat(p.oldPrice);
-      const newP = p.overriddenPrice !== undefined ? Number(p.overriddenPrice) || 0 : parseFloat(p.newPrice);
+      const newP =
+        p.overriddenPrice !== undefined
+          ? Number(p.overriddenPrice) || 0
+          : parseFloat(p.newPrice);
       if (oldP !== newP) {
         totalOld += oldP;
         totalNew += newP;
@@ -2295,9 +2832,9 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     return { lift, liftPercent, count };
   }, [previews]);
 
-  console.log(`DEBUG: Render Cycle - previews.length: ${previews.length}, loading: ${loading}`);
-
-
+  console.log(
+    `DEBUG: Render Cycle - previews.length: ${previews.length}, loading: ${loading}`,
+  );
 
   const handleMinPriceChange = useCallback((value: string) => {
     if (value.length > 15) return;
@@ -2317,14 +2854,17 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
   }, []);
 
   const totalPages = Math.ceil(filteredPreviews.length / PAGE_SIZE);
-  
+
   const paginatedPreviews = useMemo(() => {
     console.count("Preview Dataset Recompute");
     const start = (currentPage - 1) * PAGE_SIZE;
     return filteredPreviews.slice(start, start + PAGE_SIZE);
   }, [filteredPreviews, currentPage]);
 
-  const totalBatches = useMemo(() => Math.ceil(previews.length / BATCH_SIZE), [previews]);
+  const totalBatches = useMemo(
+    () => Math.ceil(previews.length / BATCH_SIZE),
+    [previews],
+  );
 
   const timeAgo = (dateStr: string) => {
     const diff = new Date().getTime() - new Date(dateStr).getTime();
@@ -2334,7 +2874,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     const days = Math.floor(hours / 24);
     const remainingHours = hours % 24;
     const remainingMinutes = minutes % 60;
-    const pad = (num: number) => num.toString().padStart(2, '0');
+    const pad = (num: number) => num.toString().padStart(2, "0");
     return `${days}d ${pad(remainingHours)}:${pad(remainingMinutes)} ago`;
   };
 
@@ -2348,17 +2888,22 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
     return showDashboardLoader ? (
       <DashboardLoader />
     ) : (
-      <div style={{ minHeight: "70vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{
+          minHeight: "70vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <Spinner size="large" />
       </div>
     );
   }
 
-  
-
   return (
-    <div style={{ backgroundColor: "#f9fafb", minHeight: "100vh" }}>
-      {/* ADDED: Global styles including pulse animation for live indicator */}
+    <>
+      {/* ADDED: Global styles */}
       <style>{`
         :root {
           --pp-primary: #008060;
@@ -2378,74 +2923,85 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
         .Polaris-Button--toneSuccess.Polaris-Button--variantPrimary { background: var(--pp-success) !important; }
         .Polaris-Button--toneCritical.Polaris-Button--variantPrimary { background: var(--pp-danger) !important; }
 
-        /* ADDED: Live status pulse animation */
-        @keyframes pp-live-pulse {
-          0%, 100% { transform: scale(1);   opacity: 1; }
-          50%       { transform: scale(1.5); opacity: 0.5; }
-        }
-
-        .pp-live-dot {
-          width: 10px;
-          height: 10px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-
-        .pp-live-dot--active {
-          background-color: #16a34a;
-          animation: pp-live-pulse 1.6s ease-in-out infinite;
-        }
-
-        .pp-live-dot--inactive {
-          background-color: #dc2626;
-        }
       `}</style>
 
-      <Page title="Price Polish Dashboard" fullWidth>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
-          <BlockStack gap="400">
-
+      <Page title="Dashboard" fullWidth>
+        <div style={{ width: "100%" }}>
+          <BlockStack gap="300">
             {/* Debug Tools */}
             {SHOW_DEBUG_TOOLS && (
               <>
                 <Card>
                   <BlockStack gap="300">
-                    <Text as="h3" variant="headingSm">System Health & Diagnostics</Text>
+                    <Text as="h3" variant="headingSm">
+                      System Health & Diagnostics
+                    </Text>
                     <Divider />
                     <BlockStack gap="200">
                       <InlineStack gap="300" align="space-between">
-                        <Text as="span" variant="bodyMd">Is Embedded in Iframe:</Text>
-                        <Badge tone={typeof window !== "undefined" && window.top !== window.self ? "success" : "critical"}>
-                          {typeof window !== "undefined" && window.top !== window.self ? "YES (Safe)" : "NO (Warning: App Domain Context)"}
+                        <Text as="span" variant="bodyMd">
+                          Is Embedded in Iframe:
+                        </Text>
+                        <Badge
+                          tone={
+                            typeof window !== "undefined" &&
+                            window.top !== window.self
+                              ? "success"
+                              : "critical"
+                          }
+                        >
+                          {typeof window !== "undefined" &&
+                          window.top !== window.self
+                            ? "YES (Safe)"
+                            : "NO (Warning: App Domain Context)"}
                         </Badge>
                       </InlineStack>
                       <InlineStack gap="300" align="space-between">
-                        <Text as="span" variant="bodyMd">App Bridge Handshake:</Text>
+                        <Text as="span" variant="bodyMd">
+                          App Bridge Handshake:
+                        </Text>
                         <Badge tone={currencyCode ? "success" : "attention"}>
                           {currencyCode ? "Connected" : "Initializing..."}
                         </Badge>
                       </InlineStack>
                       <InlineStack gap="300" align="space-between">
-                        <Text as="span" variant="bodyMd">Detected Shop Context:</Text>
+                        <Text as="span" variant="bodyMd">
+                          Detected Shop Context:
+                        </Text>
                         <Text as="span" variant="bodyMd">
                           {shop || "Unknown"}
                         </Text>
                       </InlineStack>
                     </BlockStack>
                     <Banner tone="info">
-                      <p>If <strong>Is Embedded</strong> is NO, the app is running on its own domain instead of <code>admin.shopify.com</code>. This will cause App Bridge origin mismatches.</p>
+                      <p>
+                        If <strong>Is Embedded</strong> is NO, the app is
+                        running on its own domain instead of{" "}
+                        <code>admin.shopify.com</code>. This will cause App
+                        Bridge origin mismatches.
+                      </p>
                     </Banner>
                   </BlockStack>
                 </Card>
 
                 <Card>
                   <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">System Status (Debug)</Text>
+                    <Text as="h3" variant="headingSm">
+                      System Status (Debug)
+                    </Text>
                     <InlineStack gap="300">
-                      <Text as="p">Previews: <strong>{previews.length}</strong></Text>
-                      <Text as="p">Filtered: <strong>{filteredPreviews.length}</strong></Text>
-                      <Text as="p">Loading: <strong>{loading ? "YES" : "NO"}</strong></Text>
-                      <Text as="p">Currency: <strong>{currencyCode}</strong></Text>
+                      <Text as="p">
+                        Previews: <strong>{previews.length}</strong>
+                      </Text>
+                      <Text as="p">
+                        Filtered: <strong>{filteredPreviews.length}</strong>
+                      </Text>
+                      <Text as="p">
+                        Loading: <strong>{loading ? "YES" : "NO"}</strong>
+                      </Text>
+                      <Text as="p">
+                        Currency: <strong>{currencyCode}</strong>
+                      </Text>
                     </InlineStack>
                   </BlockStack>
                 </Card>
@@ -2456,16 +3012,29 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             {!hasActivePlan && (
               <Card>
                 <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">Start Your 7-Day Free Trial</Text>
-                  <Text as="p">Apply smart pricing, increase profits, and manage bulk updates safely.</Text>
+                  <Text as="h3" variant="headingMd">
+                    Start Your 7-Day Free Trial
+                  </Text>
+                  <Text as="p">
+                    Apply smart pricing, increase profits, and manage bulk
+                    updates safely.
+                  </Text>
                   <InlineStack gap="200">
                     <Badge tone="success">Bulk Pricing</Badge>
                     <Badge tone="success">Undo Anytime</Badge>
                     <Badge tone="success">Live Store Sync</Badge>
                   </InlineStack>
                   {/* UPDATED: variant="primary" — Task 5 hierarchy */}
-                  <Button variant="primary" tone="success" onClick={handleUpgrade}>Start Free Trial</Button>
-                  <Text as="p" variant="bodySm" tone="subdued">No charge today • Cancel anytime</Text>
+                  <Button
+                    variant="primary"
+                    tone="success"
+                    onClick={handleUpgrade}
+                  >
+                    Start Free Trial
+                  </Button>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    No charge today • Cancel anytime
+                  </Text>
                 </BlockStack>
               </Card>
             )}
@@ -2477,26 +3046,90 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
               pendingRetryCount={storefrontControl.pendingRetryCount}
               scheduledRunsCount={metrics.scheduledRunsCount}
               latestInfluenceAt={storefrontControl.latestInfluenceAt}
-              isProcessing={isProcessing}
-              onRetry={handlePushStorefront}
             />
 
-            {/* Operational Info Banner */}
-            <Banner tone="info">
-              <Text as="p" variant="bodyMd">
-                Original storefront prices are preserved securely and can be restored at any time.
-              </Text>
-            </Banner>
+            {/* Needs Attention */}
+            {/* {(storefrontControl.pendingRetryCount > 0 ||
+              storefrontControl.retryableRevertCount > 0 ||
+              storefrontControl.unrecoverableCount > 0) && (
+             <Card>
+                <div
+                  style={{
+                    padding: "20px 24px",
+                    borderRadius: "12px",
+                    background:
+                      "linear-gradient(135deg, var(--p-color-bg-surface-warning, #FFF6E0) 0%, var(--p-color-bg-surface, #FFFFFF) 100%)",
+                    border: "1px solid var(--p-color-border-warning, #E0A800)",
+                  }}
+                >
+                  { <BlockStack gap="400">
+                    <InlineStack align="space-between" blockAlign="center" gap="200">
+                      <InlineStack gap="200" blockAlign="center">
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "50%",
+                            background: "var(--p-color-bg-surface-warning, #FFE8C0)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Icon source={InfoIcon} tone="caution" />
+                        </div>
+                        <BlockStack gap="025">
+                          <Text as="h2" variant="headingSm" fontWeight="semibold">
+                          ⚠ Ready to Publish
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            {storefrontControl.pendingRetryCount > 0
+                              ? `${storefrontControl.pendingRetryCount} product${storefrontControl.pendingRetryCount === 1 ? "" : "s"} waiting to publish`
+                              : storefrontControl.retryableRevertCount > 0
+                                ? `${storefrontControl.retryableRevertCount} recoverable issue${storefrontControl.retryableRevertCount === 1 ? "" : "s"}`
+                                : `${storefrontControl.unrecoverableCount} product${storefrontControl.unrecoverableCount === 1 ? "" : "s"}` }
+                          </Text>
+                        </BlockStack>
+                      </InlineStack>
+                      {storefrontControl.pendingRetryCount > 0 && (
+                        <Button
+                          variant="primary"
+                          onClick={handlePushStorefront}
+                          loading={isProcessing}
+                          disabled={isProcessing}
+                        >
+                          Publish Changes →
+                        </Button>
+                      )}
+                    </InlineStack>
+                  </BlockStack> }
+                </div>
+              </Card>
+            )} */}
 
             {/* Live Mode Warning */}
             {metrics.isLive && (
-              <Banner tone="warning">
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodyMd">
-                    <strong>Live Pricing is on.</strong> Applied prices update your Shopify catalog. With live rules active, the storefront may layer rules on top of those prices. Stop Live Pricing or adjust rules if you need the applied amount to be final.
-                  </Text>
-                </BlockStack>
-              </Banner>
+              <div
+                style={{
+                  background:
+                    "linear-gradient(90deg, #FFF3CD 0%, #FFD966 100%)", // soft yellow gradient
+                  borderRadius: "8px",
+                  padding: "12px",
+                }}
+              >
+                <Banner tone="warning">
+                  <BlockStack gap="100">
+                    <Text as="p" variant="bodyMd">
+                      <strong>Live Pricing is on.</strong> Applied prices update
+                      your Shopify catalog. With live rules active, the
+                      storefront may layer rules on top of those prices. Stop
+                      Live Pricing or adjust rules if you need the applied
+                      amount to be final.
+                    </Text>
+                  </BlockStack>
+                </Banner>
+              </div>
             )}
 
             {/* Error / Success Message */}
@@ -2506,80 +3139,136 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                 tone={message.type}
                 onDismiss={() => setMessage(null)}
               >
-                {message.details && <p>{message.details}</p>}
+                <div
+                  style={{
+                    background:
+                      message.type === "warning"
+                        ? "linear-gradient(90deg, #FFF3CD 0%, #FFD966 100%)" // warm yellow gradient
+                        : message.type === "info"
+                          ? "linear-gradient(90deg, #E0F7FA 0%, #80DEEA 100%)" // soft blue gradient
+                          : message.type === "critical"
+                            ? "linear-gradient(90deg, #FDECEA 0%, #F5C6CB 100%)" // pale red gradient
+                            : "linear-gradient(90deg, #E8F5E9 0%, #A5D6A7 100%)", // green for success
+                    borderRadius: "8px",
+                    padding: "12px",
+                  }}
+                >
+                  {message.details && <p>{message.details}</p>}
+                </div>
               </Banner>
             )}
 
             {/* Storefront Operations Overview */}
-            {/* Keep metrics visible during preview refresh to avoid layout jump */}
             {previews.length > 0 && (
-              <Box paddingBlockEnd="300">
+              <Box paddingBlockEnd="200">
                 <Grid>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
+                  {/* Card 1: Adjusted columnSpan to 4 on sm and up */}
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
                     <Card>
-                      <Box padding="300" background={previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "bg-surface-success" : "bg-surface-critical"} borderRadius="200">
-                        <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Estimated Pricing Impact</Text>
-                          <Text as="p" variant="headingLg" tone={previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0) >= 0 ? "success" : "critical"}>
+                      <Box
+                        padding="300"
+                        background={
+                          previews.reduce(
+                            (sum, p) =>
+                              sum +
+                              (Number(p.overriddenPrice || p.newPrice) -
+                                parseFloat(p.originalBasePrice)),
+                            0,
+                          ) >= 0
+                            ? "bg-surface-success"
+                            : "bg-surface-critical"
+                        }
+                        borderRadius="200"
+                      >
+                        <BlockStack gap="050" align="start">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Pricing Impact
+                          </Text>
+                          <Text
+                            as="p"
+                            variant="headingLg"
+                            fontWeight="semibold"
+                            tone={
+                              previews.reduce(
+                                (sum, p) =>
+                                  sum +
+                                  (Number(p.overriddenPrice || p.newPrice) -
+                                    parseFloat(p.originalBasePrice)),
+                                0,
+                              ) >= 0
+                                ? "success"
+                                : "critical"
+                            }
+                          >
                             {(() => {
-                              const lift = previews.reduce((sum, p) => sum + ((Number(p.overriddenPrice || p.newPrice)) - parseFloat(p.originalBasePrice)), 0);
+                              const lift = previews.reduce(
+                                (sum, p) =>
+                                  sum +
+                                  (Number(p.overriddenPrice || p.newPrice) -
+                                    parseFloat(p.originalBasePrice)),
+                                0,
+                              );
                               const sign = lift > 0 ? "+" : lift < 0 ? "-" : "";
                               return `${sign}${formatMoney(Math.abs(lift), currencyCode)}`;
                             })()}
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Projected storefront pricing delta</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Projected delta
+                          </Text>
                         </BlockStack>
                       </Box>
                     </Card>
                   </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
+
+                  {/* Card 2: Adjusted columnSpan to 4 on sm and up */}
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
                     <Card>
-                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Active Campaigns</Text>
-                          <Text as="p" variant="headingLg">
+                      <Box
+                        padding="300"
+                        background="bg-surface-secondary"
+                        borderRadius="200"
+                      >
+                        <BlockStack gap="050" align="start">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Active Campaigns
+                          </Text>
+                          <Text
+                            as="p"
+                            variant="headingLg"
+                            fontWeight="semibold"
+                          >
                             {metrics.activeCampaignsCount}
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Currently affecting storefront pricing</Text>
-                        </BlockStack>
-                      </Box>
-                    </Card>
-                  </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 2, xl: 2 }}>
-                    <Card>
-                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Scheduled Runs</Text>
-                          <Text as="p" variant="headingLg">
-                            {metrics.scheduledRunsCount}
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Affecting storefront
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Queued pricing operations</Text>
                         </BlockStack>
                       </Box>
                     </Card>
                   </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 3, xl: 3 }}>
+
+                  {/* Card 3: Adjusted columnSpan to 4 on sm and up */}
+                  <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 4, lg: 4, xl: 4 }}>
                     <Card>
-                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Live Pricing Rules</Text>
-                          <Text as="p" variant="headingLg">
-                            {metrics.livePricingRulesCount}
+                      <Box
+                        padding="300"
+                        background="bg-surface-secondary"
+                        borderRadius="200"
+                      >
+                        <BlockStack gap="050" align="start">
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Products Automated
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Active storefront automation rules</Text>
-                        </BlockStack>
-                      </Box>
-                    </Card>
-                  </Grid.Cell>
-                  <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 3, xl: 3 }}>
-                    <Card>
-                      <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                        <BlockStack gap="100" align="start">
-                          <Text as="p" variant="bodySm" tone="subdued">Products Under Automation</Text>
-                          <Text as="p" variant="headingLg">
+                          <Text
+                            as="p"
+                            variant="headingLg"
+                            fontWeight="semibold"
+                          >
                             {metrics.productsUnderAutomationCount}
                           </Text>
-                          <Text as="p" variant="bodySm" tone="subdued">Products managed by pricing workflows</Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Under workflows
+                          </Text>
                         </BlockStack>
                       </Box>
                     </Card>
@@ -2588,95 +3277,286 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
               </Box>
             )}
 
-            <Card>
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="center" wrap>
-                  <Text as="h3" variant="headingMd">Campaign History</Text>
-                  <Button
-                    size="slim"
-                    variant="tertiary"
-                    onClick={() => navigate("/app/campaign-history")}
-                  >
-                    View Full History
-                  </Button>
-                </InlineStack>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Operational history is now available on the dedicated Campaign History page.
-                </Text>
-              </BlockStack>
-            </Card>
-
-            {/* UPDATED TASK 2: No Rules Warning Banner — shows when ruleExists is definitively false */}
-            {!hasRules && ruleExists !== null && (
-              <Box paddingBlockStart="100" paddingBlockEnd="400">
-                <Banner tone="warning" title="No Pricing Rules Found">
-                  <Box paddingBlockStart="100" paddingBlockEnd="100">
+            <BlockStack gap="500">
+              {/* Dashboard Top Row */}
+              <Grid>
+                {/* 1. RECENT ACTIVITY CARD */}
+                <Grid.Cell columnSpan={{ xs: 12, sm: 12, md: 8, lg: 8, xl: 8 }}>
+                  <Card>
                     <BlockStack gap="200">
-                      <p>
-                        You must configure at least one pricing rule before applying changes or going live.
-                      </p>
-                      <InlineStack>
-                        {/* UPDATED Task 5: Configure Rules → primary (default) */}
-                        <Button variant="primary" tone="success" size="large" onClick={() => navigate("/app/rules")}>
-                          Configure Pricing Rules
+                      <InlineStack align="space-between" blockAlign="center">
+                        <div
+                          style={{
+                            height: "28px",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text
+                            as="h3"
+                            variant="headingSm"
+                            fontWeight="semibold"
+                          >
+                            Recent Activity
+                          </Text>
+                        </div>
+                        <Button
+                          size="slim"
+                          variant="tertiary"
+                          onClick={() => navigate("/app/campaign-history")}
+                        >
+                          View All
                         </Button>
                       </InlineStack>
-                    </BlockStack>
-                  </Box>
-                </Banner>
-              </Box>
-            )}
 
-            {/* ── TASK 3: Storefront Control Panel with Live Status Indicator ── */}
-            {/* UPDATED Task 6: Opacity dimming when no rules */}
-            <Box paddingBlockEnd="300">
-              <div style={{
-                opacity: !hasRules ? 0.6 : 1,
-                transition: "opacity 0.2s ease",
-                pointerEvents: !hasRules ? "none" : "auto",  // ADDED: block clicks at wrapper level too
-              }}>
+                      {/* Forced uniform height using an explicit height value */}
+                      <div
+                        style={{
+                          backgroundColor: "rgba(0, 82, 124, 0.03)",
+                          border: "1px solid rgba(0, 82, 124, 0.15)",
+                          borderRadius: "8px",
+                          padding: "10px 16px",
+                          height: "142px", // Fixed height to guarantee symmetry
+                          overflowY: "auto", // Handles fallback if your list grows longer
+                        }}
+                      >
+                        {campaignHistory.length === 0 ? (
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            No campaigns recorded yet.
+                          </Text>
+                        ) : (
+                          <BlockStack gap="150">
+                            {campaignHistory.slice(0, 4).map((c, index) => {
+                              const tone =
+                                c.status === "active"
+                                  ? "success"
+                                  : c.status === "scheduled"
+                                    ? "info"
+                                    : c.status === "partial"
+                                      ? "attention"
+                                      : c.status === "closed"
+                                        ? "subdued"
+                                        : "info";
+                              return (
+                                <div key={c.campaignId}>
+                                  <InlineStack
+                                    align="space-between"
+                                    blockAlign="center"
+                                    gap="300"
+                                  >
+                                    <InlineStack gap="200" blockAlign="center">
+                                      <Text
+                                        as="span"
+                                        variant="bodySm"
+                                        fontWeight="medium"
+                                      >
+                                        {c.title}
+                                      </Text>
+                                      <Text
+                                        as="span"
+                                        tone="subdued"
+                                        variant="bodyXs"
+                                      >
+                                        •
+                                      </Text>
+                                      <Text
+                                        as="span"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                      >
+                                        {`${c.productCount} products • ${c.createdAt ? timeAgo(c.createdAt) : "—"}`}
+                                      </Text>
+                                    </InlineStack>
+                                    <Badge tone={tone} size="small">
+                                      {c.status}
+                                    </Badge>
+                                  </InlineStack>
+
+                                  {index <
+                                    campaignHistory.slice(0, 4).length - 1 && (
+                                    <div
+                                      style={{
+                                        marginBlockStart: "6px",
+                                        marginBlockEnd: "6px",
+                                        borderTop:
+                                          "1px solid rgba(0, 82, 124, 0.06)",
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </BlockStack>
+                        )}
+                      </div>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+
+                {/* 2. QUICK ACTIONS CARD */}
+                <Grid.Cell columnSpan={{ xs: 12, sm: 12, md: 4, lg: 4, xl: 4 }}>
+                  <Card>
+                    <BlockStack gap="200">
+                      <div
+                        style={{
+                          height: "28px",
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text as="h3" variant="headingSm" fontWeight="semibold">
+                          Quick Actions
+                        </Text>
+                      </div>
+
+                      {/* Matches the left container's background style and height perfectly */}
+                      <div
+                        style={{
+                          backgroundColor: "rgba(0, 82, 124, 0.03)",
+                          border: "1px solid rgba(0, 82, 124, 0.15)",
+                          borderRadius: "8px",
+                          padding: "10px 16px",
+                          height: "142px", // Exactly matches Recent Activity's height
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "center", // Vertically centers buttons within the frame
+                        }}
+                      >
+                        <BlockStack gap="150">
+                          <Button
+                            variant="primary"
+                            size="slim"
+                            onClick={() => navigate("/app/rules")}
+                            fullWidth
+                          >
+                            Configure Rules
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="slim"
+                            onClick={() => navigate("/app/preview")}
+                            fullWidth
+                          >
+                            Preview Prices
+                          </Button>
+                          <Button
+                            variant="tertiary"
+                            size="slim"
+                            onClick={() => navigate("/app/campaign-history")}
+                            fullWidth
+                          >
+                            Campaign History
+                          </Button>
+                        </BlockStack>
+                      </div>
+                    </BlockStack>
+                  </Card>
+                </Grid.Cell>
+              </Grid>
+
+              {/* Warning Banner Row */}
+              {!hasRules && ruleExists !== null && (
+                <Banner tone="warning" title="No Pricing Rules Found">
+                  <BlockStack gap="200">
+                    <p>
+                      You must configure at least one pricing rule before
+                      applying changes or going live.
+                    </p>
+                    <InlineStack>
+                      <Button
+                        variant="primary"
+                        tone="success"
+                        size="slim"
+                        onClick={() => navigate("/app/rules")}
+                      >
+                        Configure Pricing Rules
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Banner>
+              )}
+
+              {/* Storefront Control Panel Row */}
+              <div
+                style={{
+                  opacity: !hasRules ? 0.6 : 1,
+                  transition: "opacity 0.2s ease",
+                  pointerEvents: !hasRules ? "none" : "auto",
+                }}
+              >
                 <Card padding="0">
-                  <Box
-                    padding="400"
-                    background="bg-surface-secondary"
-                    borderWidth="025"
-                    borderColor="border"
-                    borderRadius="300"
+                  <div
+                    style={{
+                      /* Soft status-driven background tint mimicking the premium store health look */
+                      backgroundColor: metrics.isLive
+                        ? "rgba(10, 128, 93, 0.04)"
+                        : "rgba(181, 137, 0, 0.05)",
+                      border: metrics.isLive
+                        ? "1px solid rgba(10, 128, 93, 0.15)"
+                        : "1px solid rgba(181, 137, 0, 0.2)",
+                      borderRadius: "12px",
+                      padding: "16px 20px",
+                    }}
                   >
-                    <BlockStack gap="300">
-                      <InlineStack align="space-between" blockAlign="start" gap="300" wrap>
-                        <div style={{ flex: "1 1 460px" }}>
-                          <BlockStack gap="100">
-                            <InlineStack gap="200" blockAlign="center">
-                              <Text as="h3" variant="headingMd">Storefront Control Panel</Text>
+                    <BlockStack gap="250">
+                      {/* Top Info Header Line */}
+                      <InlineStack
+                        align="space-between"
+                        blockAlign="center"
+                        gap="300"
+                        wrap
+                      >
+                        <div style={{ flex: "1 1 500px" }}>
+                          <BlockStack gap="050">
+                            <InlineStack gap="100" blockAlign="center">
+                              <Text
+                                as="h3"
+                                variant="headingSm"
+                                fontWeight="semibold"
+                              >
+                                Storefront Control Panel
+                              </Text>
                               <Tooltip content="Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.">
-                                <span style={{ cursor: "pointer", display: "inline-flex" }}>
+                                <span
+                                  style={{
+                                    cursor: "pointer",
+                                    display: "inline-flex",
+                                  }}
+                                >
                                   <Icon source={InfoIcon} tone="subdued" />
                                 </span>
                               </Tooltip>
                             </InlineStack>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Manage storefront pricing visibility for shoppers. Admin catalog prices remain unchanged until updates are applied in this app.
+                              Manage storefront pricing visibility for shoppers.
+                              Admin catalog prices remain unchanged until
+                              updates are applied in this app.
                             </Text>
                           </BlockStack>
                         </div>
 
-                        <InlineStack gap="200" blockAlign="center" wrap>
-                          <InlineStack gap="150" blockAlign="center" wrap={false}>
-                            <span
-                              className={`pp-live-dot ${metrics.isLive ? "pp-live-dot--active" : "pp-live-dot--inactive"}`}
-                              aria-hidden="true"
-                            />
-                            <Text as="span" variant="headingSm" fontWeight="semibold">
-                              {metrics.isLive ? "Live pricing is active" : "Live pricing is paused"}
-                            </Text>
-                          </InlineStack>
-                          <Badge tone={metrics.isLive ? "success" : "attention"}>
-                            {metrics.isLive ? "Storefront active" : "Storefront paused"}
+                        {/* Status Badge Group */}
+                        <InlineStack gap="150" blockAlign="center">
+                          <Badge
+                            tone={metrics.isLive ? "success" : "attention"}
+                            size="small"
+                          >
+                            {metrics.isLive ? "Live" : "Paused"}
                           </Badge>
+                          <Text
+                            as="span"
+                            variant="bodySm"
+                            fontWeight="medium"
+                            tone={metrics.isLive ? "success" : "subdued"}
+                          >
+                            {metrics.isLive
+                              ? "Live pricing is active"
+                              : "Live pricing is paused"}
+                          </Text>
                         </InlineStack>
                       </InlineStack>
 
+                      {/* Action Button Strip */}
                       <InlineStack gap="200" blockAlign="center" wrap>
                         {metrics.isLive ? (
                           <Button
@@ -2684,6 +3564,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                             disabled={isProcessing || !hasRules}
                             tone="critical"
                             variant="secondary"
+                            size="slim"
                           >
                             Pause Live Pricing
                           </Button>
@@ -2692,7 +3573,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                             variant="primary"
                             onClick={handleGoLiveClick}
                             loading={isProcessing}
-                            disabled={isProcessing || !hasRules || !storefrontControl.canGoLive}
+                            disabled={
+                              isProcessing ||
+                              !hasRules ||
+                              !storefrontControl.canGoLive
+                            }
+                            size="slim"
                           >
                             Publish Pricing
                           </Button>
@@ -2701,99 +3587,471 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           {storefrontControl.goLiveMessage}
                         </Text>
                       </InlineStack>
-
-                      <BlockStack gap="150">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Operational attention
-                        </Text>
-                        <InlineStack gap="200" wrap>
-                          <Badge tone={storefrontControl.stagedPendingCount > 0 ? "warning" : "info"}>
-                            {`Ready to publish: ${storefrontControl.stagedPendingCount}`}
-                          </Badge>
-                          <Badge tone={storefrontControl.retryableRevertCount > 0 ? "attention" : "success"}>
-                            {`Recoverable issues: ${storefrontControl.retryableRevertCount}`}
-                          </Badge>
-                          <Badge tone={storefrontControl.unrecoverableCount > 0 ? "critical" : "success"}>
-                            {`Attention needed: ${storefrontControl.unrecoverableCount}`}
-                          </Badge>
-                        </InlineStack>
-                      </BlockStack>
-
-                      <BlockStack gap="150">
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Operational details
-                        </Text>
-                        <InlineStack gap="200" wrap>
-                          <Badge tone={storefrontControl.influencedVariantCount > 0 ? "info" : "success"}>
-                            {`Active pricing rules: ${storefrontControl.influencedVariantCount}`}
-                          </Badge>
-                          {(storefrontControl.openCampaignCount > 0 || storefrontControl.closedCampaignCount > 0) && (
-                            <Badge tone="info">
-                              {`Open campaigns: ${storefrontControl.openCampaignCount} • Closed campaigns: ${storefrontControl.closedCampaignCount}`}
-                            </Badge>
-                          )}
-                          {storefrontControl.latestInfluenceAt && (
-                            <Badge tone="info">
-                              {`Last storefront update: ${timeAgo(storefrontControl.latestInfluenceAt)}`}
-                            </Badge>
-                          )}
-                        </InlineStack>
-                      </BlockStack>
                     </BlockStack>
-                  </Box>
+                  </div>
                 </Card>
               </div>
-            </Box>
 
-            {/* Empty products state */}
-            {!loading && previews.length === 0 && (
-              <Card>
-                <Box padding="500">
-                  <BlockStack gap="200" align="center">
-                    <Text as="h2" variant="headingMd">No preview products yet</Text>
-                    <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-                      Refresh previews after configuring rules, or check that this app can access products in your catalog.
-                    </Text>
-                    <Button variant="primary" tone="success" onClick={handlePreview}>Refresh previews</Button>
-                  </BlockStack>
-                </Box>
-              </Card>
-            )}
+              {/* Empty Products State Row */}
+              {!loading && previews.length === 0 && (
+                <Card>
+                  <div
+                    style={{
+                      backgroundColor: "rgba(0, 82, 124, 0.03)",
+                      border: "1px solid rgba(0, 82, 124, 0.12)",
+                      borderRadius: "12px",
+                      padding: "24px",
+                    }}
+                  >
+                    <BlockStack gap="200" align="center">
+                      <Text as="h2" variant="headingSm" fontWeight="semibold">
+                        No preview products yet
+                      </Text>
+                      <Text
+                        as="p"
+                        variant="bodySm"
+                        tone="subdued"
+                        alignment="center"
+                      >
+                        Refresh previews after configuring rules, or check that
+                        this app can access products in your catalog.
+                      </Text>
+                      <Button
+                        variant="primary"
+                        size="slim"
+                        onClick={handlePreview}
+                      >
+                        Refresh previews
+                      </Button>
+                    </BlockStack>
+                  </div>
+                </Card>
+              )}
+            </BlockStack>
 
             {/* ── TASK 1 + 6: Apply / Batch panel — opacity-dimmed and disabled when no rules ── */}
             {/* UPDATED: pointer-events blocked at wrapper level as an extra safety layer */}
-            <div style={{
-              opacity: !hasRules ? 0.6 : 1,
-              transition: "opacity 0.2s ease",
-              pointerEvents: !hasRules ? "none" : "auto",
-            }}>
+            <div
+              style={{
+                opacity: !hasRules ? 0.6 : 1,
+                transition: "opacity 0.2s ease",
+                pointerEvents: !hasRules ? "none" : "auto",
+              }}
+            >
               <Box paddingBlockEnd="300">
                 <BlockStack gap="200">
-                      {/* 🔹 1. ACTION BAR CARD */}
-                      <Card>
-                        <BlockStack gap="200">
-                          <InlineStack gap="400" align="start" blockAlign="center" wrap>
-                            {/* Operations: refresh + apply */}
-                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
-                              <div style={{ pointerEvents: "auto" }}>
-                                <Button
-                                  variant="plain"
-                                  icon={RefreshIcon}
-                                  onClick={handlePreview}
-                                  loading={loading}
-                                  disabled={loading || isProcessing}
-                                >
-                                  Refresh Previews
-                                </Button>
-                              </div>
-                            </InlineStack>
+                  {/* 🔹 2. FILTER CARD */}
+                  <Card padding="300">
+                    <BlockStack gap="200">
+                      {/* Clean, low-profile header row */}
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="h3" variant="headingSm" fontWeight="semibold">
+                          Filters & Smart Segments
+                        </Text>
+                      </InlineStack>
 
-                            {/* Workflow: immediate and scheduled operations */}
-                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
+                      {/* Ultra-compact combined filter & query row */}
+                      <InlineStack
+                        align="space-between"
+                        blockAlign="center"
+                        gap="300"
+                        wrap
+                      >
+                        {/* Left side: Tabbed Quick Segments (styled to look like a premium segmented control) */}
+                        <InlineStack gap="100" blockAlign="center">
+                          <Button
+                            size="slim"
+                            variant={
+                              activeFilter === "all" ? "secondary" : "tertiary"
+                            }
+                            pressed={activeFilter === "all"}
+                            onClick={() => setActiveFilter("all")}
+                          >
+                            All
+                          </Button>
+                          <Button
+                            size="slim"
+                            variant={
+                              activeFilter === "increase"
+                                ? "secondary"
+                                : "tertiary"
+                            }
+                            pressed={activeFilter === "increase"}
+                            onClick={() => setActiveFilter("increase")}
+                          >
+                            Price Increase
+                          </Button>
+                          <Button
+                            size="slim"
+                            variant={
+                              activeFilter === "decrease"
+                                ? "secondary"
+                                : "tertiary"
+                            }
+                            pressed={activeFilter === "decrease"}
+                            onClick={() => setActiveFilter("decrease")}
+                          >
+                            Price Decrease
+                          </Button>
+                          <Button
+                            size="slim"
+                            variant={
+                              activeFilter === "high_impact"
+                                ? "secondary"
+                                : "tertiary"
+                            }
+                            pressed={activeFilter === "high_impact"}
+                            onClick={() => setActiveFilter("high_impact")}
+                          >
+                            {"High Impact (>10%)"}
+                          </Button>
+                        </InlineStack>
+
+                        {/* Right side: Inline Search, Sort & Numeric Range Inputs */}
+                        <div style={{ flexGrow: 1, maxWidth: "680px" }}>
+                          <InlineStack
+                            gap="150"
+                            align="end"
+                            blockAlign="center"
+                            wrap
+                          >
+                            {/* Search Input */}
+                            <div
+                              style={{ flex: "2 1 180px", minWidth: "150px" }}
+                            >
+                              <TextField
+                                label="Search Products"
+                                labelHidden // Hides the top layout row to dramatically shave off card height
+                                value={searchQuery}
+                                onChange={handleSearchChange}
+                                autoComplete="off"
+                                placeholder="Search product title..."
+                                maxLength={100}
+                              />
+                            </div>
+
+                            {/* Sort Menu Selector */}
+                            <div
+                              style={{ flex: "1.5 1 140px", minWidth: "130px" }}
+                            >
+                              <Select
+                                label="Sort by"
+                                labelHidden // Removes the label height spacing layout
+                                options={[
+                                  {
+                                    label: "Sort: A–Z",
+                                    value: "alphabetical_az",
+                                  },
+                                  {
+                                    label: "Sort: Z–A",
+                                    value: "alphabetical_za",
+                                  },
+                                  {
+                                    label: "Sort: Highest Increase",
+                                    value: "highest_increase",
+                                  },
+                                  {
+                                    label: "Sort: Highest Decrease",
+                                    value: "highest_decrease",
+                                  },
+                                  {
+                                    label: "Sort: Highest Final Price",
+                                    value: "highest_final_price",
+                                  },
+                                  {
+                                    label: "Sort: Lowest Final Price",
+                                    value: "lowest_final_price",
+                                  },
+                                ]}
+                                value={sortOrder}
+                                onChange={(value) =>
+                                  setSortOrder(value as PreviewSortOrder)
+                                }
+                              />
+                            </div>
+
+                            {/* Min Price Field */}
+                            <div style={{ flex: "1 1 90px", minWidth: "90px" }}>
+                              <TextField
+                                label="Min Price"
+                                labelHidden
+                                type="text"
+                                inputMode="decimal"
+                                value={minPrice}
+                                onChange={handleMinPriceChange}
+                                autoComplete="off"
+                                prefix={currencySymbol}
+                                placeholder="Min"
+                                maxLength={15}
+                              />
+                            </div>
+
+                            {/* Max Price Field */}
+                            <div style={{ flex: "1 1 90px", minWidth: "90px" }}>
+                              <TextField
+                                label="Max Price"
+                                labelHidden
+                                type="text"
+                                inputMode="decimal"
+                                value={maxPrice}
+                                onChange={handleMaxPriceChange}
+                                autoComplete="off"
+                                prefix={currencySymbol}
+                                placeholder="Max"
+                                maxLength={15}
+                              />
+                            </div>
+                          </InlineStack>
+                        </div>
+                      </InlineStack>
+                    </BlockStack>
+                  </Card>
+
+                  {previews.length > 0 && (
+                    <Card>
+  <Box padding="400">
+    <BlockStack gap="300">
+      
+      {/* Header Summary Metadata Row */}
+      <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
+        <Text as="h3" variant="headingSm" fontWeight="semibold">
+          Preview Summary
+        </Text>
+        <Text as="p" variant="bodySm" tone="subdued">
+          {(() => {
+            const productCount = Number(previewImpactSummary.totalCount ?? 0);
+            const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
+            
+            if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
+              return `Based on ${productCount} products • ${variantCount} variants in your current view`;
+            }
+            return `Based on ${productCount} products in your current view`;
+          })()}
+        </Text>
+      </InlineStack>
+
+      <Divider />
+
+      {/* Empty State vs Metrics Dashboard View */}
+      {previewImpactSummary.affectedCount === 0 ? (
+        <Box
+          padding="300"
+          background="bg-surface-secondary"
+          borderRadius="200"
+          textAlign="center"
+        >
+          <Text as="p" variant="bodySm" tone="subdued">
+            No pricing changes detected in the current view.
+          </Text>
+        </Box>
+      ) : (
+        /* Pure Flexbox Grid: 100% immune to Polaris appendChild lifecycle errors */
+        <div style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: '12px',
+          width: '100%' 
+        }}>
+          
+          {/* Card 1: Products Affected */}
+          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
+            <Box
+              padding="300"
+              background="bg-surface-secondary"
+              borderRadius="200"
+              borderStyle="solid"
+              borderWidth="025"
+              borderColor="border-secondary"
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
+                  Products affected
+                </Text>
+                <Text as="p" variant="headingMd" fontWeight="bold">
+                  {previewImpactSummary.affectedCount}
+                </Text>
+              </BlockStack>
+            </Box>
+          </div>
+
+          {/* Card 2: Average Change */}
+          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
+            <Box
+              padding="300"
+              background={previewImpactSummary.averageDelta >= 0 ? "bg-surface-success-subdued" : "bg-surface-critical-subdued"}
+              borderRadius="200"
+              borderStyle="solid"
+              borderWidth="025"
+              borderColor={previewImpactSummary.averageDelta >= 0 ? "border-success-subdued" : "border-critical-subdued"}
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
+                  Average change
+                </Text>
+                <Text 
+                  as="p" 
+                  variant="headingMd" 
+                  fontWeight="bold"
+                  tone={previewImpactSummary.averageDelta >= 0 ? "success" : "critical"}
+                >
+                  {`${previewImpactSummary.averageDelta >= 0 ? "+" : ""}${formatMoney(previewImpactSummary.averageDelta, currencyCode)}`}
+                </Text>
+              </BlockStack>
+            </Box>
+          </div>
+
+          {/* Card 3: Largest Increase */}
+          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
+            <Box
+              padding="300"
+              background={previewImpactSummary.hasIncrease ? "bg-surface-success-subdued" : "bg-surface-secondary"}
+              borderRadius="200"
+              borderStyle="solid"
+              borderWidth="025"
+              borderColor={previewImpactSummary.hasIncrease ? "border-success-subdued" : "border-secondary"}
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
+                  Largest increase
+                </Text>
+                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasIncrease ? "success" : "default"}>
+                  {previewImpactSummary.hasIncrease 
+                    ? `+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`
+                    : "—"
+                  }
+                </Text>
+              </BlockStack>
+            </Box>
+          </div>
+
+          {/* Card 4: Largest Decrease */}
+          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
+            <Box
+              padding="300"
+              background={previewImpactSummary.hasDecrease ? "bg-surface-critical-subdued" : "bg-surface-secondary"}
+              borderRadius="200"
+              borderStyle="solid"
+              borderWidth="025"
+              borderColor={previewImpactSummary.hasDecrease ? "border-critical-subdued" : "border-secondary"}
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
+                  Largest decrease
+                </Text>
+                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasDecrease ? "critical" : "default"}>
+                  {previewImpactSummary.hasDecrease 
+                    ? formatMoney(previewImpactSummary.maxDecreaseDelta, currencyCode)
+                    : "—"
+                  }
+                </Text>
+              </BlockStack>
+            </Box>
+          </div>
+
+          {/* Card 5: Avg Final Price & Safeguards */}
+          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
+            <Box
+              padding="300"
+              background="bg-surface-secondary"
+              borderRadius="200"
+              borderStyle="solid"
+              borderWidth="025"
+              borderColor="border-secondary"
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
+                  Avg price / Safeguards
+                </Text>
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="p" variant="headingMd" fontWeight="bold">
+                    {formatMoney(previewImpactSummary.averageFinalPrice, currencyCode)}
+                  </Text>
+                  {previewImpactSummary.safeguardAdjustedCount > 0 && (
+                    <Box 
+                      background="bg-surface-warning-subdued" 
+                      paddingInline="150" 
+                      paddingBlock="050" 
+                      borderRadius="100"
+                    >
+                      <Text as="span" variant="bodyXs" fontWeight="semibold" tone="warning">
+                        {previewImpactSummary.safeguardAdjustedCount} locked
+                      </Text>
+                    </Box>
+                  )}
+                </InlineStack>
+              </BlockStack>
+            </Box>
+          </div>
+
+        </div>
+      )}
+    </BlockStack>
+  </Box>
+</Card>
+                  )}
+
+                  {/* 🔹 1. ACTION BAR CARD */}
+                  <Card padding="0">
+                    <div
+                      style={{
+                        backgroundColor: "rgba(0, 82, 124, 0.02)",
+                        border: "1px solid rgba(0, 82, 124, 0.12)",
+                        borderRadius: "12px",
+                        padding: "10px 16px",
+                      }}
+                    >
+                      <BlockStack gap="200">
+                        <InlineStack
+                          align="space-between"
+                          blockAlign="center"
+                          gap="400"
+                          wrap
+                        >
+                          {/* Left Side Group: Core Execution Actions */}
+                          <InlineStack gap="150" blockAlign="center" wrap>
+                            {/* Refresh Previews */}
+                            <div style={{ pointerEvents: "auto" }}>
                               <Button
-                                variant="primary"
-                                tone="success"
-                                onClick={() => openImmediateApplyModal("selected")}
+                                variant="secondary"
+                                icon={RefreshIcon}
+                                size="slim"
+                                onClick={handlePreview}
+                                loading={loading}
+                                disabled={loading || isProcessing}
+                              >
+                                Refresh Previews
+                              </Button>
+                            </div>
+
+                            {/* Premium High-Contrast Apply Selected Button */}
+                            <div
+                              style={{
+                                /* Safely wraps the native component with a professional theme without breaking DOM rendering */
+                                backgroundColor:
+                                  selectedPreviewItems.length > 0
+                                    ? "rgba(10, 128, 93, 0.12)"
+                                    : "transparent",
+                                borderRadius: "8px",
+                                padding: "2px",
+                                display: "inline-flex",
+                                transition: "background-color 0.2s ease",
+                              }}
+                            >
+                              <Button
+                                size="slim"
+                                variant={
+                                  selectedPreviewItems.length > 0
+                                    ? "mono"
+                                    : "secondary"
+                                }
+                                icon={
+                                  typeof CheckIcon !== "undefined"
+                                    ? CheckIcon
+                                    : undefined
+                                }
+                                onClick={() =>
+                                  openImmediateApplyModal("selected")
+                                }
                                 disabled={
                                   !hasActivePlan ||
                                   isProcessing ||
@@ -2801,659 +4059,779 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                                   selectedPreviewItems.length === 0
                                 }
                               >
-                                {`Apply Selected (${selectedPreviewItems.length})`}
-                              </Button>
-                              <Button
-                                variant="primary"
-                                onClick={() => openImmediateApplyModal("all")}
-                                disabled={!hasActivePlan || isProcessing || previews.length === 0 || !hasRules}
-                              >
-                                {`Apply All (${previews.length})`}
-                              </Button>
-
-                              <Button
-                                variant="secondary"
-                                icon={CalendarTimeIcon}
-                                onClick={() => setScheduleHistoryModalOpen(true)}
-                              >
-                                Schedule Center
-                              </Button>
-                            </InlineStack>
-
-                            {/* Utility: report + undo */}
-                            <InlineStack gap="200" align="start" blockAlign="center" wrap>
-                              {previews.length === 0 ? (
-                                <Tooltip content="Please refresh previews to generate the latest report.">
-                                  <span style={{ display: "inline-block" }}>
-                                    <Button variant="plain" icon={ArrowDownIcon} disabled>
-                                      Download Impact Report
-                                    </Button>
-                                  </span>
-                                </Tooltip>
-                              ) : (
-                                <Button
-                                  variant="plain"
-                                  icon={ArrowDownIcon}
-                                  onClick={handleDownloadReport}
+                                <span
+                                  style={{
+                                    color:
+                                      selectedPreviewItems.length > 0
+                                        ? "#0a805d"
+                                        : "inherit",
+                                    fontWeight:
+                                      selectedPreviewItems.length > 0
+                                        ? "600"
+                                        : "400",
+                                  }}
                                 >
-                                  Download Impact Report
-                                </Button>
-                              )}
+                                  {`Apply Selected (${selectedPreviewItems.length})`}
+                                </span>
+                              </Button>
+                            </div>
 
-                              {lastUpdate && (
-                                <Button
-                                  variant="secondary"
-                                  tone="critical"
-                                  icon={UndoIcon}
-                                  onClick={handleUndo}
-                                  loading={isProcessing}
-                                  disabled={isProcessing || !lastUpdate.batchId}
-                                >
-                                  Undo Last Update
-                                </Button>
-                              )}
-                            </InlineStack>
+                            {/* Apply All (Lightning / Instant Icon) */}
+                            {/* Apply All Button */}
+                            <Button
+                              variant="primary"
+                              size="slim"
+                              /* Safely checks for standard icons or falls back to undefined if not imported */
+                              icon={
+                                typeof PlayIcon !== "undefined"
+                                  ? PlayIcon
+                                  : typeof ExportIcon !== "undefined"
+                                    ? ExportIcon
+                                    : undefined
+                              }
+                              onClick={() => openImmediateApplyModal("all")}
+                              disabled={
+                                !hasActivePlan ||
+                                isProcessing ||
+                                previews.length === 0 ||
+                                !hasRules
+                              }
+                            >
+                              {`Apply All (${previews.length})`}
+                            </Button>
+
+                            {/* Schedule Center */}
+                            <Button
+                              variant="secondary"
+                              size="slim"
+                              icon={CalendarTimeIcon}
+                              onClick={() => setScheduleHistoryModalOpen(true)}
+                            >
+                              Schedule Center
+                            </Button>
                           </InlineStack>
 
-                          {/* Processing progress */}
-                          {isProcessing && (
-                            <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                              <BlockStack gap="200" align="center">
-                                {publishTotal > 0 ? (
-                                  <>
-                                    <Text as="p" variant="bodyMd" fontWeight="medium">Publishing Prices...</Text>
-                                    <Text as="p" tone="subdued" variant="bodySm">
-                                      {Math.min(Math.round((progress / 100) * publishTotal), publishTotal)} / {publishTotal} products
-                                    </Text>
-                                    <ProgressBar progress={progress} tone="primary" />
-                                    <Text as="p" tone="subdued" variant="bodySm">{Math.round(progress)}%</Text>
-                                  </>
-                                ) : (
-                                  <>
-                                    <InlineStack gap="300" blockAlign="center" align="center">
-                                      <Spinner size="small" />
-                                      <Text as="p" variant="bodyMd" fontWeight="medium">Processing price updates…</Text>
-                                    </InlineStack>
-                                    <Text as="p" tone="subdued" variant="bodySm">Keep this page open until processing finishes.</Text>
-                                    <ProgressBar progress={progress === 0 ? 10 : progress} tone="primary" />
-                                  </>
-                                )}
-                              </BlockStack>
-                            </Box>
-                          )}
-                        </BlockStack>
-                      </Card>
-
-                      {/* 🔹 2. FILTER CARD */}
-                      <Card>
-                        <BlockStack gap="200">
-                          <Text as="h3" variant="headingMd">Filters & Smart Segments</Text>
-
-                          <InlineStack gap="200" wrap>
-                            <Button pressed={activeFilter === "all"} onClick={() => setActiveFilter("all")}>All</Button>
-                            <Button pressed={activeFilter === "increase"} onClick={() => setActiveFilter("increase")}>Price Increase</Button>
-                            <Button pressed={activeFilter === "decrease"} onClick={() => setActiveFilter("decrease")}>Price Decrease</Button>
-                            <Button pressed={activeFilter === "high_impact"} onClick={() => setActiveFilter("high_impact")}>High Impact (&gt;10%)</Button>
+                          {/* Right Side Group: Utilities / Reports */}
+                          <InlineStack gap="150" blockAlign="center">
+                            {previews.length === 0 ? (
+                              <Tooltip content="Please refresh previews to generate the latest report.">
+                                <span style={{ display: "inline-block" }}>
+                                  <Button
+                                    variant="tertiary"
+                                    size="slim"
+                                    icon={ArrowDownIcon}
+                                    disabled
+                                  >
+                                    Download Impact Report
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            ) : (
+                              <Button
+                                variant="tertiary"
+                                size="slim"
+                                icon={ArrowDownIcon}
+                                onClick={handleDownloadReport}
+                              >
+                                Download Impact Report
+                              </Button>
+                            )}
                           </InlineStack>
+                        </InlineStack>
 
-                          <InlineStack gap="300" wrap align="start">
-                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
-                              <TextField
-                                label="Search Products"
-                                value={searchQuery}
-                                onChange={handleSearchChange}
-                                autoComplete="off"
-                                placeholder="Product title..."
-                                maxLength={100}
-                              />
-                            </div>
-                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
-                              <Select
-                                label="Sort by"
-                                options={[
-                                  { label: `${SORT_OPTION_PREFIX}Alphabetical (A–Z)`, value: "alphabetical_az" },
-                                  { label: `${SORT_OPTION_PREFIX}Alphabetical (Z–A)`, value: "alphabetical_za" },
-                                  { label: `${SORT_OPTION_PREFIX}Highest Increase`, value: "highest_increase" },
-                                  { label: `${SORT_OPTION_PREFIX}Highest Decrease`, value: "highest_decrease" },
-                                  { label: `${SORT_OPTION_PREFIX}Highest Final Price`, value: "highest_final_price" },
-                                  { label: `${SORT_OPTION_PREFIX}Lowest Final Price`, value: "lowest_final_price" },
-                                ]}
-                                value={sortOrder}
-                                onChange={(value) => setSortOrder(value as PreviewSortOrder)}
-                              />
-                            </div>
-                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
-                              <TextField
-                                label="Min Price"
-                                type="text"
-                                inputMode="decimal"
-                                value={minPrice}
-                                onChange={handleMinPriceChange}
-                                autoComplete="off"
-                                prefix={currencySymbol}
-                                maxLength={15}
-                              />
-                            </div>
-                            <div style={{ flex: "1 1 160px", minWidth: "160px" }}>
-                              <TextField
-                                label="Max Price"
-                                type="text"
-                                inputMode="decimal"
-                                value={maxPrice}
-                                onChange={handleMaxPriceChange}
-                                autoComplete="off"
-                                prefix={currencySymbol}
-                                maxLength={15}
-                              />
-                            </div>
-                          </InlineStack>
-                        </BlockStack>
-                      </Card>
-
-                      {previews.length > 0 && (
-                        <Card>
-                          <Box padding="300">
-                            <BlockStack gap="200">
-                              <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
-                                <Text as="h3" variant="headingMd">Preview Summary</Text>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  {(() => {
-                                    const productCount = Number(previewImpactSummary.totalCount ?? 0);
-                                    const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
-                                    if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
-                                      return `Based on ${productCount} products • ${variantCount} variants in your current view`;
-                                    }
-                                    return `Based on ${productCount} products in your current view`;
-                                  })()}
-                                </Text>
-                              </InlineStack>
-                              <Divider />
-                              {previewImpactSummary.affectedCount === 0 ? (
-                                <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                  <Text as="p" variant="bodySm" tone="subdued">
-                                    No pricing changes detected in the current view.
+                        {/* Processing Progress Panel */}
+                        {isProcessing && (
+                          <Box
+                            padding="300"
+                            background="bg-surface-secondary"
+                            borderRadius="200"
+                          >
+                            <BlockStack gap="150" align="center">
+                              {publishTotal > 0 ? (
+                                <>
+                                  <Text
+                                    as="p"
+                                    variant="bodySm"
+                                    fontWeight="medium"
+                                  >
+                                    Publishing Prices...
                                   </Text>
-                                </Box>
+                                  <Text as="p" tone="subdued" variant="bodyXs">
+                                    {Math.min(
+                                      Math.round(
+                                        (progress / 100) * publishTotal,
+                                      ),
+                                      publishTotal,
+                                    )}{" "}
+                                    / {publishTotal} products
+                                  </Text>
+                                  <ProgressBar
+                                    progress={progress}
+                                    tone="primary"
+                                  />
+                                  <Text as="p" tone="subdued" variant="bodyXs">
+                                    {Math.round(progress)}%
+                                  </Text>
+                                </>
                               ) : (
-                                <Grid>
-                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                    <BlockStack gap="050">
-                                      <Text as="p" variant="bodySm" tone="subdued">Products affected</Text>
-                                      <Text as="p" variant="headingLg">
-                                        {previewImpactSummary.affectedCount}
-                                      </Text>
-                                    </BlockStack>
-                                  </Box>
-                                </Grid.Cell>
-                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                    <BlockStack gap="050">
-                                      <Text as="p" variant="bodySm" tone="subdued">Average change</Text>
-                                      <Text as="p" variant="headingLg" tone={previewImpactSummary.averageDelta >= 0 ? "success" : "critical"}>
-                                        {`${previewImpactSummary.averageDelta >= 0 ? "+" : ""}${formatMoney(previewImpactSummary.averageDelta, currencyCode)}`}
-                                      </Text>
-                                    </BlockStack>
-                                  </Box>
-                                </Grid.Cell>
-                                {previewImpactSummary.hasIncrease && (
-                                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                    <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                      <BlockStack gap="050">
-                                        <Text as="p" variant="bodySm" tone="subdued">Largest increase</Text>
-                                        <Text as="p" variant="headingLg" tone="success">
-                                          {`+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`}
-                                        </Text>
-                                      </BlockStack>
-                                    </Box>
-                                  </Grid.Cell>
-                                )}
-                                {previewImpactSummary.hasDecrease && (
-                                  <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                    <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                      <BlockStack gap="050">
-                                        <Text as="p" variant="bodySm" tone="subdued">Largest decrease</Text>
-                                        <Text as="p" variant="headingLg" tone="critical">
-                                          {formatMoney(previewImpactSummary.maxDecreaseDelta, currencyCode)}
-                                        </Text>
-                                      </BlockStack>
-                                    </Box>
-                                  </Grid.Cell>
-                                )}
-                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                    <BlockStack gap="050">
-                                      <Text as="p" variant="bodySm" tone="subdued">Avg final price</Text>
-                                      <Text as="p" variant="headingLg">
-                                        {formatMoney(previewImpactSummary.averageFinalPrice, currencyCode)}
-                                      </Text>
-                                    </BlockStack>
-                                  </Box>
-                                </Grid.Cell>
-                                <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3, lg: 3, xl: 3 }}>
-                                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
-                                    <BlockStack gap="050">
-                                      <Text as="p" variant="bodySm" tone="subdued">Safeguard adjustments</Text>
-                                      <Text as="p" variant="headingLg">
-                                        {previewImpactSummary.safeguardAdjustedCount}
-                                      </Text>
-                                    </BlockStack>
-                                  </Box>
-                                </Grid.Cell>
-                              </Grid>
+                                <>
+                                  <InlineStack
+                                    gap="200"
+                                    blockAlign="center"
+                                    align="center"
+                                  >
+                                    <Spinner size="small" />
+                                    <Text
+                                      as="p"
+                                      variant="bodySm"
+                                      fontWeight="medium"
+                                    >
+                                      Processing price updates…
+                                    </Text>
+                                  </InlineStack>
+                                  <Text as="p" tone="subdued" variant="bodyXs">
+                                    Keep this page open until processing
+                                    finishes.
+                                  </Text>
+                                  <ProgressBar
+                                    progress={progress === 0 ? 10 : progress}
+                                    tone="primary"
+                                  />
+                                </>
                               )}
                             </BlockStack>
                           </Box>
-                        </Card>
-                      )}
+                        )}
+                      </BlockStack>
+                    </div>
+                  </Card>
 
-                      {/* 🔹 3. PRODUCT GRID CARD */}
-                      <Card>
-                        <BlockStack gap="200">
-                          <InlineStack align="space-between" blockAlign="center" gap="300" wrap>
-                            <InlineStack gap="300" blockAlign="center" wrap>
-                              <Text as="h3" variant="headingMd">Products</Text>
-                              <Button size="slim" onClick={selectAllVisible}>Select All on Page</Button>
-                              <Button size="slim" onClick={() => setSelectedItems(new Set())}>Clear Selection</Button>
-                            </InlineStack>
-                            <Pagination
-                              hasPrevious={currentPage > 1}
-                              onPrevious={() => setCurrentPage(prev => prev - 1)}
-                              hasNext={currentPage < totalPages}
-                              onNext={() => setCurrentPage(prev => prev + 1)}
-                              label={`Page ${currentPage} of ${totalPages || 1}`}
-                            />
-                          </InlineStack>
+                  {/* 🔹 3. PRODUCT GRID CARD */}
+                  <Card>
+                    <BlockStack gap="200">
+                      <InlineStack
+                        align="space-between"
+                        blockAlign="center"
+                        gap="300"
+                        wrap
+                      >
+                        <InlineStack gap="300" blockAlign="center" wrap>
+                          <Text as="h3" variant="headingMd">
+                            Products
+                          </Text>
+                          <Button size="slim" onClick={selectAllVisible}>
+                            Select All on Page
+                          </Button>
+                          <Button
+                            size="slim"
+                            onClick={() => setSelectedItems(new Set())}
+                          >
+                            Clear Selection
+                          </Button>
+                        </InlineStack>
+                        <Pagination
+                          hasPrevious={currentPage > 1}
+                          onPrevious={() => setCurrentPage((prev) => prev - 1)}
+                          hasNext={currentPage < totalPages}
+                          onNext={() => setCurrentPage((prev) => prev + 1)}
+                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                        />
+                      </InlineStack>
 
-                          {/* Product rows */}
-                          <BlockStack gap="0">
-                            {previews.length > 0 && filteredPreviews.length === 0 && (
-                              <Box paddingBlockEnd="400">
-                                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                                  <BlockStack gap="100">
-                                    <Text as="p" variant="bodyMd" fontWeight="medium">
-                                      No products match your filters
-                                    </Text>
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      Adjust search, price range, or smart segment filters. Clear filters to see all preview products again.
-                                    </Text>
-                                  </BlockStack>
-                                </Box>
-                              </Box>
-                            )}
-
-                            {paginatedPreviews.length > 0 && previewPricingRule && (
-                              <Box paddingBlockEnd="400" paddingInline="300">
-                                <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                                  <InlineStack gap="200" blockAlign="center" wrap>
-                                    <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Preview Context:</Text>
-                                    <Text as="span" variant="bodySm" tone="subdued">
-                                      {previewPricingRule.adjustmentDirection === "decrease" ? "Decrease" : "Increase"}{" "}
-                                      {previewPricingRule.adjustmentType === "fixed" ? formatMoney(previewPricingRule.adjustmentValue ?? 0, currencyCode) : `${previewPricingRule.adjustmentValue}%`}
-                                      {previewPricingRule.endingOption && previewPricingRule.endingOption !== "none" ? ` • Rounded to ${previewPricingRule.endingOption}` : ""}
-                                    </Text>
-                                  </InlineStack>
-                                </Box>
-                              </Box>
-                            )}
-
-                            {paginatedPreviews.length > 0 && (
+                      {/* Product rows */}
+                      <BlockStack gap="0">
+                        {previews.length > 0 &&
+                          filteredPreviews.length === 0 && (
+                            <Box paddingBlockEnd="400">
                               <Box
-                                paddingBlockEnd="200"
-                                paddingInline="300"
-                                borderBlockEndWidth="025"
-                                borderColor="border-secondary"
+                                padding="400"
+                                background="bg-surface-secondary"
+                                borderRadius="200"
                               >
-                                <div style={{
+                                <BlockStack gap="100">
+                                  <Text
+                                    as="p"
+                                    variant="bodyMd"
+                                    fontWeight="medium"
+                                  >
+                                    No products match your filters
+                                  </Text>
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    Adjust search, price range, or smart segment
+                                    filters. Clear filters to see all preview
+                                    products again.
+                                  </Text>
+                                </BlockStack>
+                              </Box>
+                            </Box>
+                          )}
+
+                        {paginatedPreviews.length > 0 && previewPricingRule && (
+                          <Box paddingBlockEnd="400" paddingInline="300">
+                            <Box
+                              padding="300"
+                              background="bg-surface-secondary"
+                              borderRadius="200"
+                            >
+                              <InlineStack gap="200" blockAlign="center" wrap>
+                                <Text
+                                  as="span"
+                                  variant="bodySm"
+                                  tone="subdued"
+                                  fontWeight="medium"
+                                >
+                                  Preview Context:
+                                </Text>
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  {previewPricingRule.adjustmentDirection ===
+                                  "decrease"
+                                    ? "Decrease"
+                                    : "Increase"}{" "}
+                                  {previewPricingRule.adjustmentType === "fixed"
+                                    ? formatMoney(
+                                        previewPricingRule.adjustmentValue ?? 0,
+                                        currencyCode,
+                                      )
+                                    : `${previewPricingRule.adjustmentValue}%`}
+                                  {previewPricingRule.endingOption &&
+                                  previewPricingRule.endingOption !== "none"
+                                    ? ` • Rounded to ${previewPricingRule.endingOption}`
+                                    : ""}
+                                </Text>
+                              </InlineStack>
+                            </Box>
+                          </Box>
+                        )}
+
+                        {paginatedPreviews.length > 0 && (
+                          <Box
+                            paddingBlockEnd="200"
+                            paddingInline="300"
+                            borderBlockEndWidth="025"
+                            borderColor="border-secondary"
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                gap: "16px",
+                                width: "100%",
+                              }}
+                            >
+                              <div style={{ flex: 1, paddingLeft: "76px" }}>
+                                <Text
+                                  as="span"
+                                  variant="bodySm"
+                                  tone="subdued"
+                                  fontWeight="medium"
+                                >
+                                  Product
+                                </Text>
+                              </div>
+                              <div
+                                style={{
                                   display: "flex",
-                                  justifyContent: "space-between",
-                                  gap: "16px",
-                                  width: "100%",
-                                }}>
-                                  <div style={{ flex: 1, paddingLeft: "76px" }}>
-                                    <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Product</Text>
+                                  alignItems: "center",
+                                  gap: "24px",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: "24px",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  <Box minWidth="80px" paddingInlineEnd="100">
+                                    <div style={{ textAlign: "right" }}>
+                                      <Text
+                                        as="span"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                        fontWeight="medium"
+                                      >
+                                        Original Catalog
+                                      </Text>
+                                    </div>
+                                  </Box>
+                                  <Box minWidth="80px" paddingInlineEnd="100">
+                                    <div style={{ textAlign: "right" }}>
+                                      <Text
+                                        as="span"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                        fontWeight="medium"
+                                      >
+                                        Live Storefront
+                                      </Text>
+                                    </div>
+                                  </Box>
+                                  <Box width="100px">
+                                    <div style={{ textAlign: "left" }}>
+                                      <Text
+                                        as="span"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                        fontWeight="medium"
+                                      >
+                                        New Preview
+                                      </Text>
+                                    </div>
+                                  </Box>
+                                </div>
+                                <div style={{ minWidth: "140px" }} />
+                              </div>
+                            </div>
+                          </Box>
+                        )}
+
+                        {paginatedPreviews.map((p) => {
+                          const currentPrice = parseFloat(p.oldPrice);
+                          const originalPrice = parseFloat(p.originalBasePrice);
+                          const isManual = p.overriddenPrice !== undefined;
+                          const targetPrice = isManual
+                            ? Number(p.overriddenPrice!) || 0
+                            : parseFloat(p.newPrice);
+                          const isPolished = currentPrice !== originalPrice;
+                          const isChanged = currentPrice !== targetPrice;
+                          const diffFromOriginal =
+                            originalPrice !== 0
+                              ? ((targetPrice - originalPrice) /
+                                  originalPrice) *
+                                100
+                              : 0;
+                          const isSelected = selectedItems.has(p.variantId);
+                          const rowSafeguardNotices: string[] = [];
+
+                          if (
+                            !isManual &&
+                            previewPricingRule &&
+                            isFinite(originalPrice)
+                          ) {
+                            const minPrice =
+                              typeof previewPricingRule.minPrice === "number" &&
+                              isFinite(previewPricingRule.minPrice)
+                                ? previewPricingRule.minPrice
+                                : null;
+                            const maxPrice =
+                              typeof previewPricingRule.maxPrice === "number" &&
+                              isFinite(previewPricingRule.maxPrice)
+                                ? previewPricingRule.maxPrice
+                                : null;
+
+                            if (minPrice != null) {
+                              const withoutMin = calculatePrice(originalPrice, {
+                                ...previewPricingRule,
+                                minPrice: null,
+                              });
+                              if (
+                                withoutMin + 0.01 < minPrice &&
+                                Math.abs(targetPrice - minPrice) < 0.01
+                              ) {
+                                rowSafeguardNotices.push(
+                                  "Adjusted to minimum allowed price.",
+                                );
+                              }
+                            }
+
+                            if (maxPrice != null) {
+                              const withoutMax = calculatePrice(originalPrice, {
+                                ...previewPricingRule,
+                                maxPrice: null,
+                              });
+                              if (
+                                withoutMax - 0.01 > maxPrice &&
+                                Math.abs(targetPrice - maxPrice) < 0.01
+                              ) {
+                                rowSafeguardNotices.push(
+                                  "Adjusted to maximum allowed price.",
+                                );
+                              }
+                            }
+
+                            const roundingPrecision = String(
+                              previewPricingRule.roundingPrecision ??
+                                "standard",
+                            )
+                              .trim()
+                              .toLowerCase();
+                            if (
+                              roundingPrecision !== "" &&
+                              roundingPrecision !== "standard"
+                            ) {
+                              const standardRoundedFinal = calculatePrice(
+                                originalPrice,
+                                {
+                                  ...previewPricingRule,
+                                  roundingPrecision: "standard",
+                                },
+                              );
+
+                              if (
+                                Math.abs(targetPrice - standardRoundedFinal) >
+                                0.01
+                              ) {
+                                if (roundingPrecision === "nearest-0.05") {
+                                  rowSafeguardNotices.push(
+                                    "Rounded to nearest 0.05.",
+                                  );
+                                } else if (roundingPrecision === "whole") {
+                                  rowSafeguardNotices.push(
+                                    "Rounded to whole amount.",
+                                  );
+                                } else {
+                                  rowSafeguardNotices.push(
+                                    "Rounded for storefront consistency.",
+                                  );
+                                }
+                              }
+                            }
+                          }
+
+                          return (
+                            <Box
+                              key={p.variantId}
+                              paddingBlockStart="400"
+                              paddingBlockEnd="400"
+                              paddingInline="300"
+                              borderBlockEndWidth="025"
+                              borderColor="border-secondary"
+                            >
+                              <Box
+                                background={
+                                  isManual ? "bg-surface-caution" : undefined
+                                }
+                                padding="200"
+                                borderRadius="200"
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    gap: "16px",
+                                    width: "100%",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  {/* LEFT SIDE */}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: "12px",
+                                      minWidth: 0,
+                                      flex: 1,
+                                      overflowX: "hidden",
+                                    }}
+                                  >
+                                    <div style={{ paddingTop: "2px" }}>
+                                      <Checkbox
+                                        label=""
+                                        labelHidden
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          toggleSelection(p.variantId)
+                                        }
+                                      />
+                                    </div>
+
+                                    <Thumbnail
+                                      source={p.image || ""}
+                                      alt={p.title}
+                                      size="small"
+                                    />
+
+                                    <BlockStack gap="100">
+                                      <Text
+                                        as="span"
+                                        variant="bodyMd"
+                                        fontWeight="medium"
+                                      >
+                                        {p.title}
+                                      </Text>
+
+                                      {(() => {
+                                        const subtitle = buildVariantSubtitle({
+                                          productTitle: p.title,
+                                          variantTitle: p.variantTitle ?? null,
+                                          sku: p.sku ?? null,
+                                        });
+
+                                        if (!subtitle) return null;
+
+                                        return (
+                                          <div
+                                            style={{
+                                              whiteSpace: "nowrap",
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
+                                              maxWidth: "100%",
+                                            }}
+                                          >
+                                            <Text
+                                              as="span"
+                                              variant="bodySm"
+                                              tone="subdued"
+                                            >
+                                              {subtitle}
+                                            </Text>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {rowSafeguardNotices.length > 0 && (
+                                        <Text
+                                          as="span"
+                                          variant="bodySm"
+                                          tone="subdued"
+                                        >
+                                          {rowSafeguardNotices.join(" • ")}
+                                        </Text>
+                                      )}
+
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          gap: "6px",
+                                          flexWrap: "wrap",
+                                          opacity: 0.92,
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        {isManual && (
+                                          <Badge tone="attention">
+                                            Manual override
+                                          </Badge>
+                                        )}
+
+                                        {Math.abs(diffFromOriginal) >= 20 && (
+                                          <Badge tone="warning">
+                                            High impact
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </BlockStack>
                                   </div>
+
+                                  {/* RIGHT SIDE */}
                                   <div
                                     style={{
                                       display: "flex",
                                       alignItems: "center",
                                       gap: "24px",
                                       flexShrink: 0,
-                                    }}
-                                  >
-                                    <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
-                                      <Box minWidth="80px" paddingInlineEnd="100">
-                                        <div style={{ textAlign: "right" }}>
-                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Original Catalog</Text>
-                                        </div>
-                                      </Box>
-                                      <Box minWidth="80px" paddingInlineEnd="100">
-                                        <div style={{ textAlign: "right" }}>
-                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">Live Storefront</Text>
-                                        </div>
-                                      </Box>
-                                      <Box width="100px">
-                                        <div style={{ textAlign: "left" }}>
-                                          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">New Preview</Text>
-                                        </div>
-                                      </Box>
-                                    </div>
-                                    <div style={{ minWidth: "140px" }} />
-                                  </div>
-                                </div>
-                              </Box>
-                            )}
-
-                            
-
-                            {paginatedPreviews.map((p) => {
-                              const currentPrice = parseFloat(p.oldPrice);
-                              const originalPrice = parseFloat(p.originalBasePrice);
-                              const isManual = p.overriddenPrice !== undefined;
-                              const targetPrice = isManual ? Number(p.overriddenPrice!) || 0 : parseFloat(p.newPrice);
-                              const isPolished = currentPrice !== originalPrice;
-                              const isChanged = currentPrice !== targetPrice;
-                              const diffFromOriginal = originalPrice !== 0 ? ((targetPrice - originalPrice) / originalPrice) * 100 : 0;
-                              const isSelected = selectedItems.has(p.variantId);
-                              const rowSafeguardNotices: string[] = [];
-
-                              if (!isManual && previewPricingRule && isFinite(originalPrice)) {
-                                const minPrice = typeof previewPricingRule.minPrice === "number" && isFinite(previewPricingRule.minPrice)
-                                  ? previewPricingRule.minPrice
-                                  : null;
-                                const maxPrice = typeof previewPricingRule.maxPrice === "number" && isFinite(previewPricingRule.maxPrice)
-                                  ? previewPricingRule.maxPrice
-                                  : null;
-
-                                if (minPrice != null) {
-                                  const withoutMin = calculatePrice(originalPrice, { ...previewPricingRule, minPrice: null });
-                                  if (withoutMin + 0.01 < minPrice && Math.abs(targetPrice - minPrice) < 0.01) {
-                                    rowSafeguardNotices.push("Adjusted to minimum allowed price.");
-                                  }
-                                }
-
-                                if (maxPrice != null) {
-                                  const withoutMax = calculatePrice(originalPrice, { ...previewPricingRule, maxPrice: null });
-                                  if (withoutMax - 0.01 > maxPrice && Math.abs(targetPrice - maxPrice) < 0.01) {
-                                    rowSafeguardNotices.push("Adjusted to maximum allowed price.");
-                                  }
-                                }
-
-                                const roundingPrecision = String(previewPricingRule.roundingPrecision ?? "standard").trim().toLowerCase();
-                                if (roundingPrecision !== "" && roundingPrecision !== "standard") {
-                                  const standardRoundedFinal = calculatePrice(originalPrice, {
-                                    ...previewPricingRule,
-                                    roundingPrecision: "standard",
-                                  });
-
-                                  if (Math.abs(targetPrice - standardRoundedFinal) > 0.01) {
-                                    if (roundingPrecision === "nearest-0.05") {
-                                      rowSafeguardNotices.push("Rounded to nearest 0.05.");
-                                    } else if (roundingPrecision === "whole") {
-                                      rowSafeguardNotices.push("Rounded to whole amount.");
-                                    } else {
-                                      rowSafeguardNotices.push("Rounded for storefront consistency.");
-                                    }
-                                  }
-                                }
-
-                              }
-
-                              return (
-                                <Box
-                                  key={p.variantId}
-                                  paddingBlockStart="400"
-                                  paddingBlockEnd="400"
-                                  paddingInline="300"
-                                  borderBlockEndWidth="025"
-                                  borderColor="border-secondary"
-                                >
-                                  <Box
-                                    background={isManual ? "bg-surface-caution" : undefined}
-                                    padding="200"
-                                    borderRadius="200"
-                                  >
-
-                                    <div style={{
-                                      display: "flex",
-                                      justifyContent: "space-between",
-                                      alignItems: "flex-start",
-                                      gap: "16px",
-                                      width: "100%",
                                       flexWrap: "wrap",
+                                      justifyContent: "flex-end",
+                                      fontVariantNumeric: "tabular-nums",
                                     }}
+                                  >
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        gap: "24px",
+                                        alignItems: "center",
+                                      }}
                                     >
-                                      {/* LEFT SIDE */}
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "flex-start",
-                                          gap: "12px",
-                                          minWidth: 0,
-                                          flex: 1, overflowX: "hidden"
-                                        }}
+                                      <Box
+                                        minWidth="80px"
+                                        paddingInlineEnd="100"
                                       >
-                                        <div style={{ paddingTop: "2px" }}>
-                                          <Checkbox
+                                        <BlockStack gap="0" inlineAlign="end">
+                                          <Text
+                                            as="span"
+                                            variant="bodyMd"
+                                            tone="subdued"
+                                          >
+                                            {formatMoney(
+                                              parseFloat(p.originalBasePrice),
+                                              currencyCode,
+                                            )}
+                                          </Text>
+                                        </BlockStack>
+                                      </Box>
+
+                                      <Box
+                                        minWidth="80px"
+                                        paddingInlineEnd="100"
+                                      >
+                                        <BlockStack gap="0" inlineAlign="end">
+                                          <Text
+                                            as="span"
+                                            variant="bodyMd"
+                                            tone={
+                                              isPolished || isChanged
+                                                ? "subdued"
+                                                : "base"
+                                            }
+                                            textDecorationLine={
+                                              isPolished || isChanged
+                                                ? "line-through"
+                                                : undefined
+                                            }
+                                          >
+                                            {formatMoney(
+                                              parseFloat(p.oldPrice),
+                                              currencyCode,
+                                            )}
+                                          </Text>
+                                        </BlockStack>
+                                      </Box>
+
+                                      <Box width="100px">
+                                        <BlockStack gap="0" inlineAlign="start">
+                                          <TextField
                                             label=""
                                             labelHidden
-                                            checked={isSelected}
-                                            onChange={() => toggleSelection(p.variantId)}
+                                            value={String(
+                                              p.overriddenPrice !== undefined
+                                                ? p.overriddenPrice
+                                                : p.newPrice,
+                                            )}
+                                            onChange={(val) =>
+                                              handlePriceChange(
+                                                p.variantId,
+                                                val,
+                                              )
+                                            }
+                                            autoComplete="off"
+                                            prefix={currencySymbol}
+                                            size="slim"
+                                            maxLength={15}
                                           />
-                                        </div>
-
-                                        <Thumbnail source={p.image || ""} alt={p.title} size="small" />
-
-                                        <BlockStack gap="100">
-                                          <Text as="span" variant="bodyMd" fontWeight="medium">
-                                            {p.title}
-                                          </Text>
-                                          
-                                          {(() => {
-                                            const subtitle = buildVariantSubtitle({
-                                              productTitle: p.title,
-                                              variantTitle: p.variantTitle ?? null,
-                                              sku: p.sku ?? null,
-                                            });
-
-                                            if (!subtitle) return null;
-
-                                            return (
-                                              <div
-                                                style={{
-                                                  whiteSpace: "nowrap",
-                                                  overflow: "hidden",
-                                                  textOverflow: "ellipsis",
-                                                  maxWidth: "100%",
-                                                }}
-                                              >
-                                                <Text as="span" variant="bodySm" tone="subdued">
-                                                  {subtitle}
-                                                </Text>
-                                              </div>
-                                            );
-                                          })()}
-
-                                          {rowSafeguardNotices.length > 0 && (
-                                            <Text as="span" variant="bodySm" tone="subdued">
-                                              {rowSafeguardNotices.join(" • ")}
-                                            </Text>
-                                          )}
-
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "6px",
-                                              flexWrap: "wrap",
-                                              opacity: 0.92,
-                                              marginTop: "4px"
-                                            }}
-                                          >
-                                            {isManual && (
-                                              <Badge tone="attention">Manual override</Badge>
-                                            )}
-
-                                            {Math.abs(diffFromOriginal) >= 20 && (
-                                              <Badge tone="warning">High impact</Badge>
-                                            )}
-                                          </div>
                                         </BlockStack>
-                                      </div>
+                                      </Box>
+                                    </div>
 
-                                      {/* RIGHT SIDE */}
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: "24px",
-                                          flexShrink: 0,
-                                          flexWrap: "wrap",
-                                          justifyContent: "flex-end",
-                                          fontVariantNumeric: "tabular-nums",
-                                        }}
-                                      >
-                                        <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
-                                          <Box minWidth="80px" paddingInlineEnd="100">
-                                            <BlockStack gap="0" inlineAlign="end">
-                                              <Text as="span" variant="bodyMd" tone="subdued">
-                                                {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
-                                              </Text>
-                                            </BlockStack>
-                                          </Box>
-
-                                          <Box minWidth="80px" paddingInlineEnd="100">
-                                            <BlockStack gap="0" inlineAlign="end">
-                                              <Text
-                                                as="span"
-                                                variant="bodyMd"
-                                                tone={isPolished || isChanged ? "subdued" : "base"}
-                                                textDecorationLine={
-                                                  isPolished || isChanged ? "line-through" : undefined
-                                                }
-                                              >
-                                                {formatMoney(parseFloat(p.oldPrice), currencyCode)}
-                                              </Text>
-                                            </BlockStack>
-                                          </Box>
-
-                                          <Box width="100px">
-                                            <BlockStack gap="0" inlineAlign="start">
-                                              <TextField
-                                                label=""
-                                                labelHidden
-                                                value={String(
-                                                  p.overriddenPrice !== undefined
-                                                    ? p.overriddenPrice
-                                                    : p.newPrice
-                                                )}
-                                                onChange={(val) => handlePriceChange(p.variantId, val)}
-                                                autoComplete="off"
-                                                prefix={currencySymbol}
-                                                size="slim"
-                                                maxLength={15}
-                                              />
-                                            </BlockStack>
-                                          </Box>
-                                        </div>
-
-                                        <div style={{ display: "flex", alignItems: "center", gap: "16px", minWidth: "140px", justifyContent: "flex-end" }}>
-                                          {(isPolished || isChanged) && Math.abs(diffFromOriginal) > 0.01 && (
-                                            <InlineStack gap="100" blockAlign="center">
-                                              <Icon
-                                                source={targetPrice > originalPrice ? ChevronUpIcon : ChevronDownIcon}
-                                                tone={targetPrice > originalPrice ? "success" : "critical"}
-                                              />
-                                              <Text
-                                                as="span"
-                                                variant="bodySm"
-                                                tone={targetPrice > originalPrice ? "success" : "critical"}
-                                                fontWeight="medium"
-                                              >
-                                                {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
-                                              </Text>
-                                            </InlineStack>
-                                          )}
-
-                                          {isManual && (
-                                            <Button
-                                              size="slim"
-                                              variant="tertiary"
-                                              onClick={() => resetOverride(p.variantId)}
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "16px",
+                                        minWidth: "140px",
+                                        justifyContent: "flex-end",
+                                      }}
+                                    >
+                                      {(isPolished || isChanged) &&
+                                        Math.abs(diffFromOriginal) > 0.01 && (
+                                          <InlineStack
+                                            gap="100"
+                                            blockAlign="center"
+                                          >
+                                            <Icon
+                                              source={
+                                                targetPrice > originalPrice
+                                                  ? ChevronUpIcon
+                                                  : ChevronDownIcon
+                                              }
+                                              tone={
+                                                targetPrice > originalPrice
+                                                  ? "success"
+                                                  : "critical"
+                                              }
+                                            />
+                                            <Text
+                                              as="span"
+                                              variant="bodySm"
+                                              tone={
+                                                targetPrice > originalPrice
+                                                  ? "success"
+                                                  : "critical"
+                                              }
+                                              fontWeight="medium"
                                             >
-                                              Reset
-                                            </Button>
-                                          )}
+                                              {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
+                                            </Text>
+                                          </InlineStack>
+                                        )}
 
-                                          {isChanged ? (
+                                      {isManual && (
+                                        <Button
+                                          size="slim"
+                                          variant="tertiary"
+                                          onClick={() =>
+                                            resetOverride(p.variantId)
+                                          }
+                                        >
+                                          Reset
+                                        </Button>
+                                      )}
+
+                                      {isChanged ? (
+                                        <Button
+                                          size="slim"
+                                          onClick={() => handleApplySingle(p)}
+                                          loading={updatingItem === p.variantId}
+                                          disabled={
+                                            !hasActivePlan ||
+                                            !!updatingItem ||
+                                            isProcessing ||
+                                            (isManual &&
+                                              p.overriddenPrice === "") ||
+                                            !hasRules
+                                          }
+                                          tone="success"
+                                        >
+                                          Apply
+                                        </Button>
+                                      ) : (
+                                        <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                                          <span
+                                            style={{ display: "inline-block" }}
+                                          >
                                             <Button
                                               size="slim"
-                                              onClick={() => handleApplySingle(p)}
-                                              loading={updatingItem === p.variantId}
+                                              onClick={() =>
+                                                handleApplySingle(p)
+                                              }
+                                              loading={
+                                                updatingItem === p.variantId
+                                              }
                                               disabled={
                                                 !hasActivePlan ||
                                                 !!updatingItem ||
                                                 isProcessing ||
-                                                (isManual && p.overriddenPrice === "") ||
+                                                (isManual &&
+                                                  p.overriddenPrice === "") ||
                                                 !hasRules
                                               }
-                                              tone="success"
                                             >
                                               Apply
                                             </Button>
-                                          ) : (
-                                            <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
-                                              <span style={{ display: "inline-block" }}>
-                                                <Button
-                                                  size="slim"
-                                                  onClick={() => handleApplySingle(p)}
-                                                  loading={updatingItem === p.variantId}
-                                                  disabled={
-                                                    !hasActivePlan ||
-                                                    !!updatingItem ||
-                                                    isProcessing ||
-                                                    (isManual && p.overriddenPrice === "") ||
-                                                    !hasRules
-                                                  }
-                                                >
-                                                  Apply
-                                                </Button>
-                                              </span>
-                                            </Tooltip>
-                                          )}
-                                        </div>
-                                      </div>
+                                          </span>
+                                        </Tooltip>
+                                      )}
                                     </div>
+                                  </div>
+                                </div>
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </BlockStack>
 
+                      <InlineStack align="center">
+                        <Pagination
+                          hasPrevious={currentPage > 1}
+                          onPrevious={() => setCurrentPage((prev) => prev - 1)}
+                          hasNext={currentPage < totalPages}
+                          onNext={() => setCurrentPage((prev) => prev + 1)}
+                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                        />
+                      </InlineStack>
 
-                                  </Box>
-                                </Box>
-
-                              );
-                            })}
-                          </BlockStack>
-
-
-                          <InlineStack align="center">
-                            <Pagination
-                              hasPrevious={currentPage > 1}
-                              onPrevious={() => setCurrentPage(prev => prev - 1)}
-                              hasNext={currentPage < totalPages}
-                              onNext={() => setCurrentPage(prev => prev + 1)}
-                              label={`Page ${currentPage} of ${totalPages || 1}`}
-                            />
-                          </InlineStack>
-
-                          {!hasActivePlan && (
-                            <Text as="p" variant="bodySm" tone="critical">
-                              Start your free trial to apply pricing changes from this dashboard.
-                            </Text>
-                          )}
-                        </BlockStack>
-                      </Card>
+                      {!hasActivePlan && (
+                        <Text as="p" variant="bodySm" tone="critical">
+                          Start your free trial to apply pricing changes from
+                          this dashboard.
+                        </Text>
+                      )}
+                    </BlockStack>
+                  </Card>
                 </BlockStack>
               </Box>
             </div>
-
           </BlockStack>
         </div>
 
@@ -3471,7 +4849,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             initialCampaignTitle=""
             validateCampaignTitle={validateCampaignTitle}
             onConfirm={async (campaignTitle) => {
-              const ok = await handleApplyBatch(immediateApplyContextItems, campaignTitle);
+              const ok = await handleApplyBatch(
+                immediateApplyContextItems,
+                campaignTitle,
+              );
               if (ok) {
                 setApplyCampaignTitle(campaignTitle);
               }
@@ -3508,16 +4889,18 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             setCampaignDetailPage(1);
           }}
           title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
-          secondaryActions={[{
-            content: "Close",
-            onAction: () => {
-              setCampaignDetailOpen(false);
-              setCampaignDetail(null);
-              setSelectedCampaignForDetail(null);
-              setCampaignDetailPageSize(15);
-              setCampaignDetailPage(1);
+          secondaryActions={[
+            {
+              content: "Close",
+              onAction: () => {
+                setCampaignDetailOpen(false);
+                setCampaignDetail(null);
+                setSelectedCampaignForDetail(null);
+                setCampaignDetailPageSize(15);
+                setCampaignDetailPage(1);
+              },
             },
-          }]}
+          ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
@@ -3532,14 +4915,29 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                       <strong>Campaign:</strong> {campaignDetail.title}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
-                      <strong>{campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Scheduled products" : "Tracked items"}:</strong>{" "}
+                      <strong>
+                        {campaignDetail.preActivation ||
+                        campaignDetail.prePublish ||
+                        campaignDetail.staged
+                          ? "Scheduled products"
+                          : "Tracked items"}
+                        :
+                      </strong>{" "}
                       {(() => {
-                        const fallbackCount = campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged
-                          ? campaignDetail.productCount
-                          : campaignDetail.totalTrackedCount ?? campaignDetail.rows.length;
-                        const counts = campaignDetailCounts.productCount > 0
-                          ? campaignDetailCounts
-                          : { productCount: fallbackCount, variantCount: fallbackCount };
+                        const fallbackCount =
+                          campaignDetail.preActivation ||
+                          campaignDetail.prePublish ||
+                          campaignDetail.staged
+                            ? campaignDetail.productCount
+                            : (campaignDetail.totalTrackedCount ??
+                              campaignDetail.rows.length);
+                        const counts =
+                          campaignDetailCounts.productCount > 0
+                            ? campaignDetailCounts
+                            : {
+                                productCount: fallbackCount,
+                                variantCount: fallbackCount,
+                              };
                         if (counts.variantCount !== counts.productCount) {
                           return `${counts.productCount} products • ${counts.variantCount} variants`;
                         }
@@ -3548,23 +4946,35 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                     </Text>
                   </InlineStack>
 
-                  {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? (
-                    <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                  {campaignDetail.preActivation ||
+                  campaignDetail.prePublish ||
+                  campaignDetail.staged ? (
+                    <Box
+                      padding="300"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                    >
                       <BlockStack gap="200">
                         <InlineStack gap="200" wrap>
-                          <Badge tone={
-                            campaignDetail.staged
-                              ? "info"
-                              : campaignDetail.schedule?.status === "cancelled-window" ||
-                                campaignDetail.schedule?.status === "cancelled-publish"
+                          <Badge
+                            tone={
+                              campaignDetail.staged
                                 ? "info"
-                                : "warning"
-                          }>
+                                : campaignDetail.schedule?.status ===
+                                      "cancelled-window" ||
+                                    campaignDetail.schedule?.status ===
+                                      "cancelled-publish"
+                                  ? "info"
+                                  : "warning"
+                            }
+                          >
                             {campaignDetail.staged
                               ? "Draft Campaign"
-                              : campaignDetail.schedule?.status === "cancelled-window"
+                              : campaignDetail.schedule?.status ===
+                                  "cancelled-window"
                                 ? "Cancelled Window"
-                                : campaignDetail.schedule?.status === "cancelled-publish"
+                                : campaignDetail.schedule?.status ===
+                                    "cancelled-publish"
                                   ? "Cancelled"
                                   : campaignDetail.prePublish
                                     ? "Publish Scheduled"
@@ -3572,16 +4982,20 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           </Badge>
                           {!campaignDetail.staged && (
                             <Badge tone="attention">
-                              {formatDetailScheduleType(campaignDetail.schedule?.type)}
+                              {formatDetailScheduleType(
+                                campaignDetail.schedule?.type,
+                              )}
                             </Badge>
                           )}
                         </InlineStack>
                         <Text as="p" variant="bodySm">
                           {campaignDetail.staged
                             ? "These prices have been staged but not yet published to Shopify."
-                            : campaignDetail.schedule?.status === "cancelled-window"
+                            : campaignDetail.schedule?.status ===
+                                "cancelled-window"
                               ? "This pricing window was cancelled before it started."
-                              : campaignDetail.schedule?.status === "cancelled-publish"
+                              : campaignDetail.schedule?.status ===
+                                  "cancelled-publish"
                                 ? "This scheduled publish was cancelled before it started."
                                 : campaignDetail.prePublish
                                   ? "This pricing publish is scheduled and has not started yet."
@@ -3590,8 +5004,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                         <Text as="p" variant="bodySm" tone="subdued">
                           {campaignDetail.staged
                             ? "Use Publish Pricing to apply these changes to your storefront."
-                            : campaignDetail.schedule?.status === "cancelled-window" ||
-                              campaignDetail.schedule?.status === "cancelled-publish"
+                            : campaignDetail.schedule?.status ===
+                                  "cancelled-window" ||
+                                campaignDetail.schedule?.status ===
+                                  "cancelled-publish"
                               ? "No storefront pricing was changed for this cancelled schedule."
                               : campaignDetail.prePublish
                                 ? "Applied storefront details will appear after publishing completes."
@@ -3600,19 +5016,29 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                         <InlineStack gap="400" wrap>
                           {campaignDetail.schedule?.runAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Publish start: {new Date(campaignDetail.schedule.runAt).toLocaleString()}
+                              Publish start:{" "}
+                              {new Date(
+                                campaignDetail.schedule.runAt,
+                              ).toLocaleString()}
                             </Text>
                           )}
                           {campaignDetail.schedule?.windowEndAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Automatic restore: {new Date(campaignDetail.schedule.windowEndAt).toLocaleString()}
+                              Automatic restore:{" "}
+                              {new Date(
+                                campaignDetail.schedule.windowEndAt,
+                              ).toLocaleString()}
                             </Text>
                           )}
                           <Text as="p" variant="bodySm" tone="subdued">
                             {(() => {
-                              const counts = campaignDetailCounts.productCount > 0
-                                ? campaignDetailCounts
-                                : { productCount: campaignDetail.productCount, variantCount: campaignDetail.productCount };
+                              const counts =
+                                campaignDetailCounts.productCount > 0
+                                  ? campaignDetailCounts
+                                  : {
+                                      productCount: campaignDetail.productCount,
+                                      variantCount: campaignDetail.productCount,
+                                    };
                               if (counts.variantCount !== counts.productCount) {
                                 return `Intended pricing scope: ${counts.productCount} products • ${counts.variantCount} variants`;
                               }
@@ -3621,7 +5047,10 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           </Text>
                           {campaignDetail.schedule?.createdAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Created: {new Date(campaignDetail.schedule.createdAt).toLocaleString()}
+                              Created:{" "}
+                              {new Date(
+                                campaignDetail.schedule.createdAt,
+                              ).toLocaleString()}
                             </Text>
                           )}
                         </InlineStack>
@@ -3630,30 +5059,50 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                   ) : (
                     <BlockStack gap="200">
                       {selectedCampaignForDetail &&
-                        resolveCampaignRuntimeStatus(selectedCampaignForDetail, campaignRuntimeNow) === "active-window" && (
-                          <Box padding="300" background="bg-surface-secondary" borderRadius="200">
+                        resolveCampaignRuntimeStatus(
+                          selectedCampaignForDetail,
+                          campaignRuntimeNow,
+                        ) === "active-window" && (
+                          <Box
+                            padding="300"
+                            background="bg-surface-secondary"
+                            borderRadius="200"
+                          >
                             <BlockStack gap="150">
                               <InlineStack gap="200" wrap>
-                                <Badge tone="success">Pricing Currently Active</Badge>
+                                <Badge tone="success">
+                                  Pricing Currently Active
+                                </Badge>
                                 <Badge tone="attention">Time Window</Badge>
                               </InlineStack>
                               <InlineStack gap="400" wrap>
                                 {selectedCampaignForDetail.runAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Active since: {new Date(selectedCampaignForDetail.runAt).toLocaleString()}
+                                    Active since:{" "}
+                                    {new Date(
+                                      selectedCampaignForDetail.runAt,
+                                    ).toLocaleString()}
                                   </Text>
                                 )}
                                 {selectedCampaignForDetail.windowEndAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Restore time: {new Date(selectedCampaignForDetail.windowEndAt).toLocaleString()}
+                                    Restore time:{" "}
+                                    {new Date(
+                                      selectedCampaignForDetail.windowEndAt,
+                                    ).toLocaleString()}
                                   </Text>
                                 )}
                               </InlineStack>
                               {selectedCampaignForDetail.windowEndAt && (
-                                <Text as="p" variant="bodySm" fontWeight="medium">
+                                <Text
+                                  as="p"
+                                  variant="bodySm"
+                                  fontWeight="medium"
+                                >
                                   {`Remaining duration: ${formatDurationParts(
-                                    new Date(selectedCampaignForDetail.windowEndAt).getTime() -
-                                      campaignRuntimeNow.getTime()
+                                    new Date(
+                                      selectedCampaignForDetail.windowEndAt,
+                                    ).getTime() - campaignRuntimeNow.getTime(),
                                   )}`}
                                 </Text>
                               )}
@@ -3669,96 +5118,133 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                   )}
 
                   {campaignOperationalTimeline.length > 0 && (
-                    <Box padding="300" background="bg-surface" borderRadius="200">
+                    <Box
+                      padding="300"
+                      background="bg-surface"
+                      borderRadius="200"
+                    >
                       <BlockStack gap="200">
                         <Text as="h3" variant="headingSm">
                           Operational timeline
                         </Text>
                         <div
                           style={{
-                            borderLeft: "2px solid var(--p-color-border-secondary)",
+                            borderLeft:
+                              "2px solid var(--p-color-border-secondary)",
                             paddingLeft: 12,
                           }}
                         >
                           <BlockStack gap="200">
-                            {campaignOperationalTimeline.map((milestone, index) => (
-                              <div
-                                key={milestone.key}
-                                style={{
-                                  position: "relative",
-                                  paddingLeft: 10,
-                                  paddingBottom: index === campaignOperationalTimeline.length - 1 ? 0 : 2,
-                                }}
-                              >
-                                <span
-                                  aria-hidden
+                            {campaignOperationalTimeline.map(
+                              (milestone, index) => (
+                                <div
+                                  key={milestone.key}
                                   style={{
-                                    position: "absolute",
-                                    left: -18,
-                                    top: 5,
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: "50%",
-                                    background:
-                                      milestone.tone === "critical"
-                                        ? "var(--p-color-bg-fill-critical)"
-                                        : milestone.tone === "warning"
-                                          ? "var(--p-color-bg-fill-warning)"
-                                          : milestone.tone === "success"
-                                            ? "var(--p-color-bg-fill-success)"
-                                            : "var(--p-color-bg-fill-info)",
+                                    position: "relative",
+                                    paddingLeft: 10,
+                                    paddingBottom:
+                                      index ===
+                                      campaignOperationalTimeline.length - 1
+                                        ? 0
+                                        : 2,
                                   }}
-                                />
-                                <InlineStack align="space-between" blockAlign="start" wrap={false}>
-                                  <InlineStack gap="200" blockAlign="center">
-                                    <Text as="p" variant="bodySm" fontWeight="medium">
-                                      {milestone.label}
-                                    </Text>
-                                    <Badge tone={milestone.tone}>
-                                      {milestone.badgeLabel ?? "Milestone"}
-                                    </Badge>
+                                >
+                                  <span
+                                    aria-hidden
+                                    style={{
+                                      position: "absolute",
+                                      left: -18,
+                                      top: 5,
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: "50%",
+                                      background:
+                                        milestone.tone === "critical"
+                                          ? "var(--p-color-bg-fill-critical)"
+                                          : milestone.tone === "warning"
+                                            ? "var(--p-color-bg-fill-warning)"
+                                            : milestone.tone === "success"
+                                              ? "var(--p-color-bg-fill-success)"
+                                              : "var(--p-color-bg-fill-info)",
+                                    }}
+                                  />
+                                  <InlineStack
+                                    align="space-between"
+                                    blockAlign="start"
+                                    wrap={false}
+                                  >
+                                    <InlineStack gap="200" blockAlign="center">
+                                      <Text
+                                        as="p"
+                                        variant="bodySm"
+                                        fontWeight="medium"
+                                      >
+                                        {milestone.label}
+                                      </Text>
+                                      <Badge tone={milestone.tone}>
+                                        {milestone.badgeLabel ?? "Milestone"}
+                                      </Badge>
+                                    </InlineStack>
+                                    {milestone.timestamp ? (
+                                      <Text
+                                        as="p"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                      >
+                                        {milestone.timestamp}
+                                      </Text>
+                                    ) : null}
                                   </InlineStack>
-                                  {milestone.timestamp ? (
-                                    <Text as="p" variant="bodySm" tone="subdued">
-                                      {milestone.timestamp}
-                                    </Text>
-                                  ) : null}
-                                </InlineStack>
-                                <Text as="p" variant="bodySm" tone="subdued">
-                                  {milestone.description}
-                                </Text>
-                              </div>
-                            ))}
+                                  <Text as="p" variant="bodySm" tone="subdued">
+                                    {milestone.description}
+                                  </Text>
+                                </div>
+                              ),
+                            )}
                           </BlockStack>
                         </div>
                       </BlockStack>
                     </Box>
                   )}
 
-                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                  <Box
+                    padding="200"
+                    background="bg-surface-secondary"
+                    borderRadius="200"
+                  >
                     <BlockStack gap="300">
                       <InlineStack align="space-between" blockAlign="end">
                         <Text as="p" variant="bodySm" tone="subdued">
                           {`Showing ${
                             campaignDetailPaginatedRows.length === 0
                               ? 0
-                              : (campaignDetailPage - 1) * campaignDetailPageSize + 1
+                              : (campaignDetailPage - 1) *
+                                  campaignDetailPageSize +
+                                1
                           }-${
                             (campaignDetailPage - 1) * campaignDetailPageSize +
                             campaignDetailPaginatedRows.length
                           } of ${campaignDetailRows.length} ${
-                            campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "scheduled products" : "tracked items"
+                            campaignDetail.preActivation ||
+                            campaignDetail.prePublish ||
+                            campaignDetail.staged
+                              ? "scheduled products"
+                              : "tracked items"
                           }`}
                         </Text>
                         <div style={{ minWidth: 140 }}>
                           <Select
                             label="Rows per page"
-                            options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
-                              label: `${SELECT_OPTION_PREFIX}${size}`,
-                              value: String(size),
-                            }))}
+                            options={OPERATIONAL_PAGE_SIZE_OPTIONS.map(
+                              (size) => ({
+                                label: `${SELECT_OPTION_PREFIX}${size}`,
+                                value: String(size),
+                              }),
+                            )}
                             value={String(campaignDetailPageSize)}
-                            onChange={(value) => setCampaignDetailPageSize(Number(value))}
+                            onChange={(value) =>
+                              setCampaignDetailPageSize(Number(value))
+                            }
                           />
                         </div>
                       </InlineStack>
@@ -3766,13 +5252,16 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                         <div
                           style={{
                             display: "grid",
-                            gridTemplateColumns: CAMPAIGN_DETAIL_COMPARISON_GRID,
+                            gridTemplateColumns:
+                              CAMPAIGN_DETAIL_COMPARISON_GRID,
                             gap: "12px",
                             alignItems: "center",
                             paddingInline: "2px",
                           }}
                         >
-                          <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">
+                            Product
+                          </Text>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
                             <Text
                               as="p"
@@ -3780,7 +5269,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                               fontWeight="medium"
                               alignment="end"
                             >
-                              {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Original Price" : "Reverted From"}
+                              {campaignDetail.preActivation ||
+                              campaignDetail.prePublish ||
+                              campaignDetail.staged
+                                ? "Original Price"
+                                : "Reverted From"}
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -3790,11 +5283,17 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                               fontWeight="medium"
                               alignment="end"
                             >
-                              {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Staged Price" : "Restored To"}
+                              {campaignDetail.preActivation ||
+                              campaignDetail.prePublish ||
+                              campaignDetail.staged
+                                ? "Staged Price"
+                                : "Restored To"}
                             </Text>
                           </div>
                           <InlineStack align="start">
-                            <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
+                            <Text as="p" variant="bodySm" fontWeight="medium">
+                              Status
+                            </Text>
                           </InlineStack>
                         </div>
                         {campaignDetailPaginatedRows.map((row) => (
@@ -3802,11 +5301,13 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                             key={`${row.variantId}-${row.revertTargetPrice}-${row.status ?? "pending"}`}
                             style={{
                               display: "grid",
-                              gridTemplateColumns: CAMPAIGN_DETAIL_COMPARISON_GRID,
+                              gridTemplateColumns:
+                                CAMPAIGN_DETAIL_COMPARISON_GRID,
                               gap: "12px",
                               alignItems: "start",
                               padding: "12px 2px",
-                              borderTop: "1px solid var(--p-color-border-secondary)",
+                              borderTop:
+                                "1px solid var(--p-color-border-secondary)",
                             }}
                           >
                             <div style={{ minWidth: 0 }}>
@@ -3832,7 +5333,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
                                   return (
                                     <div style={{ overflowWrap: "anywhere" }}>
-                                      <Text as="p" variant="bodySm" tone="subdued">
+                                      <Text
+                                        as="p"
+                                        variant="bodySm"
+                                        tone="subdued"
+                                      >
                                         {subtitle}
                                       </Text>
                                     </div>
@@ -3840,36 +5345,66 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                                 })()}
                                 {row.revertFailureReason && (
                                   <div style={{ overflowWrap: "anywhere" }}>
-                                    <Text as="p" variant="bodySm" tone="subdued">
+                                    <Text
+                                      as="p"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
                                       {row.revertFailureReason}
                                     </Text>
                                   </div>
                                 )}
                               </BlockStack>
                             </div>
-                            <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                            <div
+                              style={{
+                                fontVariantNumeric: "tabular-nums",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               <Text
                                 as="p"
                                 variant="bodySm"
                                 alignment="end"
                                 tone="subdued"
                               >
-                                {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
+                                {row.currentPrice == null
+                                  ? "-"
+                                  : formatMoney(row.currentPrice, currencyCode)}
                               </Text>
                             </div>
-                            <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                            <div
+                              style={{
+                                fontVariantNumeric: "tabular-nums",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
                               <Text
                                 as="p"
                                 variant="bodySm"
                                 fontWeight="medium"
                                 alignment="end"
-                                tone={campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? undefined : "success"}
+                                tone={
+                                  campaignDetail.preActivation ||
+                                  campaignDetail.prePublish ||
+                                  campaignDetail.staged
+                                    ? undefined
+                                    : "success"
+                                }
                               >
-                                {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged
+                                {campaignDetail.preActivation ||
+                                campaignDetail.prePublish ||
+                                campaignDetail.staged
                                   ? row.scheduledPrice == null
                                     ? "-"
-                                    : formatMoney(row.scheduledPrice, currencyCode)
-                                  : formatMoney(row.revertTargetPrice, currencyCode)}
+                                    : formatMoney(
+                                        row.scheduledPrice,
+                                        currencyCode,
+                                      )
+                                  : formatMoney(
+                                      row.revertTargetPrice,
+                                      currencyCode,
+                                    )}
                               </Text>
                             </div>
                             <InlineStack align="start" blockAlign="center">
@@ -3879,19 +5414,27 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                             </InlineStack>
                           </div>
                         ))}
-                        {(campaignDetail.missingHistoricalRevertedFromCount ?? 0) > 0 && (
+                        {(campaignDetail.missingHistoricalRevertedFromCount ??
+                          0) > 0 && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Some historical pre-revert values are unavailable. Restored values remain accurate.
+                            Some historical pre-revert values are unavailable.
+                            Restored values remain accurate.
                           </Text>
                         )}
                         <InlineStack align="end">
                           <Pagination
                             hasPrevious={campaignDetailPage > 1}
-                            onPrevious={() => setCampaignDetailPage((prev) => Math.max(1, prev - 1))}
-                            hasNext={campaignDetailPage < campaignDetailTotalPages}
+                            onPrevious={() =>
+                              setCampaignDetailPage((prev) =>
+                                Math.max(1, prev - 1),
+                              )
+                            }
+                            hasNext={
+                              campaignDetailPage < campaignDetailTotalPages
+                            }
                             onNext={() =>
                               setCampaignDetailPage((prev) =>
-                                Math.min(campaignDetailTotalPages, prev + 1)
+                                Math.min(campaignDetailTotalPages, prev + 1),
                               )
                             }
                             label={`Page ${campaignDetailPage} of ${campaignDetailTotalPages}`}
@@ -3925,23 +5468,32 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
             revertPreview?.terminal
               ? undefined
               : {
-                content: revertPreviewRetryFailedOnly ? "Confirm Retry" : "Confirm Revert",
-                onAction: () => { void confirmCampaignRevert(); },
-                destructive: true,
-                loading: isProcessing,
-                disabled: isProcessing || revertPreviewLoading || !selectedCampaignForRevert,
-              }
+                  content: revertPreviewRetryFailedOnly
+                    ? "Confirm Retry"
+                    : "Confirm Revert",
+                  onAction: () => {
+                    void confirmCampaignRevert();
+                  },
+                  destructive: true,
+                  loading: isProcessing,
+                  disabled:
+                    isProcessing ||
+                    revertPreviewLoading ||
+                    !selectedCampaignForRevert,
+                }
           }
-          secondaryActions={[{
-            content: "Cancel",
-            onAction: () => {
-              setRevertPreviewOpen(false);
-              setSelectedCampaignForRevert(null);
-              setRevertPreview(null);
-              setRevertPreviewRetryFailedOnly(false);
-              resetRevertPreviewViewState();
+          secondaryActions={[
+            {
+              content: "Cancel",
+              onAction: () => {
+                setRevertPreviewOpen(false);
+                setSelectedCampaignForRevert(null);
+                setRevertPreview(null);
+                setRevertPreviewRetryFailedOnly(false);
+                resetRevertPreviewViewState();
+              },
             },
-          }]}
+          ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
@@ -3957,7 +5509,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                     </Banner>
                   )}
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Review the current storefront prices against revert target prices before confirming.
+                    Review the current storefront prices against revert target
+                    prices before confirming.
                   </Text>
                   <InlineStack gap="300" wrap>
                     <Text as="p" variant="bodySm">
@@ -3965,7 +5518,8 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                     </Text>
                     <Text as="p" variant="bodySm">
                       <strong>Affected products:</strong>{" "}
-                      {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
+                      {revertPreviewCounts.variantCount !==
+                      revertPreviewCounts.productCount
                         ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
                         : revertPreviewCounts.productCount}
                     </Text>
@@ -3973,12 +5527,14 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                   <InlineStack gap="200" wrap>
                     <Badge
                       tone={
-                        revertPreview.productCount >= VERY_LARGE_OPERATION_THRESHOLD
+                        revertPreview.productCount >=
+                        VERY_LARGE_OPERATION_THRESHOLD
                           ? "warning"
                           : "info"
                       }
                     >
-                      {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
+                      {revertPreviewCounts.variantCount !==
+                      revertPreviewCounts.productCount
                         ? `Affected products: ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
                         : `Affected products: ${revertPreviewCounts.productCount}`}
                     </Badge>
@@ -3995,14 +5551,20 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                       borderWidth="025"
                     >
                       <BlockStack gap="200">
-                        <InlineStack align="space-between" blockAlign="center" wrap>
+                        <InlineStack
+                          align="space-between"
+                          blockAlign="center"
+                          wrap
+                        >
                           <Text as="p" variant="bodySm" fontWeight="medium">
                             Operational safeguards
                           </Text>
                           <InlineStack gap="100" wrap>
                             <Badge tone="warning">
                               {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} Warning${
-                                revertSafeguardNotices.filter((notice) => notice.severity === "warning").length === 1
+                                revertSafeguardNotices.filter(
+                                  (notice) => notice.severity === "warning",
+                                ).length === 1
                                   ? ""
                                   : "s"
                               }`}
@@ -4014,9 +5576,21 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                         </InlineStack>
                         <BlockStack gap="150">
                           {revertSafeguardNotices.map((notice) => (
-                            <InlineStack key={notice.id} gap="200" blockAlign="center">
-                              <Badge tone={notice.severity === "warning" ? "warning" : "info"}>
-                                {notice.severity === "warning" ? "Warning" : "Info"}
+                            <InlineStack
+                              key={notice.id}
+                              gap="200"
+                              blockAlign="center"
+                            >
+                              <Badge
+                                tone={
+                                  notice.severity === "warning"
+                                    ? "warning"
+                                    : "info"
+                                }
+                              >
+                                {notice.severity === "warning"
+                                  ? "Warning"
+                                  : "Info"}
                               </Badge>
                               <Text as="p" variant="bodySm" tone="subdued">
                                 {notice.message}
@@ -4039,7 +5613,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                     borderColor="border"
                     borderWidth="025"
                   >
-                    <InlineStack gap="200" wrap align="space-between" blockAlign="end">
+                    <InlineStack
+                      gap="200"
+                      wrap
+                      align="space-between"
+                      blockAlign="end"
+                    >
                       <div style={{ minWidth: 220, flex: "1 1 320px" }}>
                         <TextField
                           label="Search product"
@@ -4054,14 +5633,28 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                         <Select
                           label="Movement filter"
                           options={[
-                            { label: `${SELECT_OPTION_PREFIX}All products`, value: "all" },
-                            { label: `${SELECT_OPTION_PREFIX}Price increases`, value: "increase" },
-                            { label: `${SELECT_OPTION_PREFIX}Price decreases`, value: "decrease" },
-                            { label: `${SELECT_OPTION_PREFIX}Large movements`, value: "large_movement" },
+                            {
+                              label: `${SELECT_OPTION_PREFIX}All products`,
+                              value: "all",
+                            },
+                            {
+                              label: `${SELECT_OPTION_PREFIX}Price increases`,
+                              value: "increase",
+                            },
+                            {
+                              label: `${SELECT_OPTION_PREFIX}Price decreases`,
+                              value: "decrease",
+                            },
+                            {
+                              label: `${SELECT_OPTION_PREFIX}Large movements`,
+                              value: "large_movement",
+                            },
                           ]}
                           value={revertPreviewMovementFilter}
                           onChange={(value) =>
-                            setRevertPreviewMovementFilter(value as RevertPreviewMovementFilter)
+                            setRevertPreviewMovementFilter(
+                              value as RevertPreviewMovementFilter,
+                            )
                           }
                           disabled={isProcessing}
                         />
@@ -4069,18 +5662,26 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                       <div style={{ minWidth: 130 }}>
                         <Select
                           label="Rows per page"
-                          options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
-                            label: `${SELECT_OPTION_PREFIX}${size}`,
-                            value: String(size),
-                          }))}
+                          options={OPERATIONAL_PAGE_SIZE_OPTIONS.map(
+                            (size) => ({
+                              label: `${SELECT_OPTION_PREFIX}${size}`,
+                              value: String(size),
+                            }),
+                          )}
                           value={String(revertPreviewPageSize)}
-                          onChange={(value) => setRevertPreviewPageSize(Number(value))}
+                          onChange={(value) =>
+                            setRevertPreviewPageSize(Number(value))
+                          }
                           disabled={isProcessing}
                         />
                       </div>
                     </InlineStack>
                   </Box>
-                  <Box padding="200" background="bg-surface-secondary" borderRadius="200">
+                  <Box
+                    padding="200"
+                    background="bg-surface-secondary"
+                    borderRadius="200"
+                  >
                     <BlockStack gap="150">
                       <div
                         style={{
@@ -4091,14 +5692,36 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           paddingInline: "2px",
                         }}
                       >
-                        <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
-                        <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                          <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
+                        <Text as="p" variant="bodySm" fontWeight="medium">
+                          Product
+                        </Text>
+                        <div
+                          style={{
+                            fontVariantNumeric: "tabular-nums",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <Text
+                            as="p"
+                            variant="bodySm"
+                            fontWeight="medium"
+                            alignment="end"
+                          >
                             Current
                           </Text>
                         </div>
-                        <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                          <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
+                        <div
+                          style={{
+                            fontVariantNumeric: "tabular-nums",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <Text
+                            as="p"
+                            variant="bodySm"
+                            fontWeight="medium"
+                            alignment="end"
+                          >
                             Revert Target
                           </Text>
                         </div>
@@ -4112,13 +5735,16 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                             gap: "12px",
                             alignItems: "start",
                             padding: "12px 2px",
-                            borderTop: "1px solid var(--p-color-border-secondary)",
+                            borderTop:
+                              "1px solid var(--p-color-border-secondary)",
                           }}
                         >
                           <div style={{ minWidth: 0 }}>
                             <BlockStack gap="0">
                               <div style={{ overflowWrap: "anywhere" }}>
-                                <Text as="p" variant="bodySm">{row.productTitle}</Text>
+                                <Text as="p" variant="bodySm">
+                                  {row.productTitle}
+                                </Text>
                               </div>
                               <div style={{ overflowWrap: "anywhere" }}>
                                 <Text as="p" variant="bodySm" tone="subdued">
@@ -4136,7 +5762,11 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
 
                                 return (
                                   <div style={{ overflowWrap: "anywhere" }}>
-                                    <Text as="p" variant="bodySm" tone="subdued">
+                                    <Text
+                                      as="p"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                    >
                                       {subtitle}
                                     </Text>
                                   </div>
@@ -4144,13 +5774,35 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                               })()}
                             </BlockStack>
                           </div>
-                          <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                            <Text as="p" variant="bodySm" alignment="end" tone="subdued">
-                              {row.currentPrice == null ? "-" : formatMoney(row.currentPrice, currencyCode)}
+                          <div
+                            style={{
+                              fontVariantNumeric: "tabular-nums",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <Text
+                              as="p"
+                              variant="bodySm"
+                              alignment="end"
+                              tone="subdued"
+                            >
+                              {row.currentPrice == null
+                                ? "-"
+                                : formatMoney(row.currentPrice, currencyCode)}
                             </Text>
                           </div>
-                          <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                            <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
+                          <div
+                            style={{
+                              fontVariantNumeric: "tabular-nums",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <Text
+                              as="p"
+                              variant="bodySm"
+                              fontWeight="medium"
+                              alignment="end"
+                            >
                               {formatMoney(row.revertTargetPrice, currencyCode)}
                             </Text>
                           </div>
@@ -4161,9 +5813,12 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           No products match the current revert preview filters.
                         </Text>
                       ) : null}
-                      {revertPreview.rows.some((row) => Boolean(row.revertFailureReason)) && (
+                      {revertPreview.rows.some((row) =>
+                        Boolean(row.revertFailureReason),
+                      ) && (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Some items include recovery notes from previous Shopify failures.
+                          Some items include recovery notes from previous
+                          Shopify failures.
                         </Text>
                       )}
                       <InlineStack align="space-between" blockAlign="center">
@@ -4171,21 +5826,25 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
                           {`Showing ${
                             revertPreviewFilteredRows.length === 0
                               ? 0
-                              : (revertPreviewPage - 1) * revertPreviewPageSize + 1
-                          }-${
-                            Math.min(
-                              revertPreviewPage * revertPreviewPageSize,
-                              revertPreviewFilteredRows.length
-                            )
-                          } of ${revertPreviewFilteredRows.length} matching products`}
+                              : (revertPreviewPage - 1) *
+                                  revertPreviewPageSize +
+                                1
+                          }-${Math.min(
+                            revertPreviewPage * revertPreviewPageSize,
+                            revertPreviewFilteredRows.length,
+                          )} of ${revertPreviewFilteredRows.length} matching products`}
                         </Text>
                         <Pagination
                           hasPrevious={revertPreviewPage > 1}
-                          onPrevious={() => setRevertPreviewPage((prev) => Math.max(1, prev - 1))}
+                          onPrevious={() =>
+                            setRevertPreviewPage((prev) =>
+                              Math.max(1, prev - 1),
+                            )
+                          }
                           hasNext={revertPreviewPage < revertPreviewTotalPages}
                           onNext={() =>
                             setRevertPreviewPage((prev) =>
-                              Math.min(revertPreviewTotalPages, prev + 1)
+                              Math.min(revertPreviewTotalPages, prev + 1),
                             )
                           }
                           label={`Page ${revertPreviewPage} of ${revertPreviewTotalPages}`}
@@ -4209,13 +5868,15 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           onClose={() => setShowGoLiveModal(false)}
           title="Go Live with Pricing Rules?"
           primaryAction={{
-            content: 'Go Live',
+            content: "Go Live",
             // UPDATED: wraps existing handler — no logic change
             onAction: () => handlePushStorefront(false),
             loading: isProcessing,
-            disabled: isProcessing
+            disabled: isProcessing,
           }}
-          secondaryActions={[{ content: 'Cancel', onAction: () => setShowGoLiveModal(false) }]}
+          secondaryActions={[
+            { content: "Cancel", onAction: () => setShowGoLiveModal(false) },
+          ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
@@ -4237,21 +5898,27 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           onClose={() => setShowStopModal(false)}
           title="Stop Live Pricing?"
           primaryAction={{
-            content: 'Stop Live',
+            content: "Stop Live",
             // UPDATED: wraps existing handler — no logic change
             onAction: () => handlePushStorefront(true),
             loading: isProcessing,
             disabled: isProcessing,
-            destructive: true
+            destructive: true,
           }}
-          secondaryActions={[{ content: 'Cancel', onAction: () => setShowStopModal(false) }]}
+          secondaryActions={[
+            { content: "Cancel", onAction: () => setShowStopModal(false) },
+          ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
-              <Text as="p">This will disable dynamic pricing on your storefront.</Text>
+              <Text as="p">
+                This will disable dynamic pricing on your storefront.
+              </Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
-                  <Text as="p">✔️ This will remove all live pricing changes</Text>
+                  <Text as="p">
+                    ✔️ This will remove all live pricing changes
+                  </Text>
                   <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
                 </BlockStack>
               </Box>
@@ -4266,8 +5933,7 @@ function DashboardContent({ shopify, isBypass, currencyCode, shop, host }: { sho
           host={host}
           onClose={() => setBillingBlockModalOpen(false)}
         />
-
       </Page>
-    </div>
+    </>
   );
 }
