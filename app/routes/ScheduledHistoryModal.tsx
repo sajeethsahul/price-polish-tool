@@ -19,9 +19,9 @@ import { CampaignConflictExplorerModal } from "./CampaignConflictExplorerModal";
 import { ExpandableList } from "./ExpandableList";
 import { ModalScrollableSection } from "./ModalScrollableSection";
 import { BillingBlockModal, type BillingBlockModalCode } from "./BillingBlockModal";
-import { DiscardChangesModal } from "./DiscardChangesModal";
 import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
 import { t } from "../utils/i18n";
+import { DiscardChangesModal } from "./DiscardChangesModal";
 import type {
   OperationalSafeguardNotice,
   OperationalSafeguardSeverity,
@@ -106,7 +106,6 @@ export interface ScheduledHistoryModalProps {
   hasActivePlan: boolean;
   hasRules: boolean;
   existingCampaignTitles?: string[];
-  onDirtyChange?: (isDirty: boolean) => void; // <--- ADD THIS
   shopify: {
     toast: {
       show: (message: string, options?: { isError?: boolean }) => void;
@@ -127,7 +126,6 @@ export function ScheduledHistoryModal({
   hasActivePlan,
   hasRules,
   existingCampaignTitles = [],
-  onDirtyChange,
   shopify,
 }: ScheduledHistoryModalProps) {
   const scheduleDefaultedScopeRef = useRef(false);
@@ -150,37 +148,7 @@ export function ScheduledHistoryModal({
   const [scheduleTimeError, setScheduleTimeError] = useState<string | undefined>();
   const [windowEndTimeError, setWindowEndTimeError] = useState<string | undefined>();
   const [scheduleConfirmOpen, setScheduleConfirmOpen] = useState(false);
-
-  // Unsaved-change guard for the Create Schedule form.
-  // `discardOpen` shows the DiscardChangesModal; `pendingActionRef` holds the close or
-  // tab-switch the user attempted while the create form had unsaved edits, replayed on
-  // confirm. Dirty is derived ONLY from the create-form inputs (title / start / window
-  // end) against their empty-on-open baseline — never from loading, polling, history
-  // refresh, or the read-only Schedule History tab.
-  const [discardOpen, setDiscardOpen] = useState(false);
-  const pendingActionRef = useRef<(() => void) | null>(null);
-
-  const isCreateFormDirty = useMemo(() => {
-    // Only the Create Schedule tab holds editable values; guard it only when visible.
-    if (selectedTab !== "create") return false;
-    return (
-      scheduleTitle.trim() !== "" ||
-      scheduleTime.trim() !== "" ||
-      windowEndTime.trim() !== ""
-    );
-  }, [selectedTab, scheduleTitle, scheduleTime, windowEndTime]);
-
-  const runOrConfirm = useCallback(
-    (action: () => void) => {
-      if (isCreateFormDirty) {
-        pendingActionRef.current = action;
-        setDiscardOpen(true);
-      } else {
-        action();
-      }
-    },
-    [isCreateFormDirty],
-  );
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   // Billing block modal state
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
@@ -248,8 +216,6 @@ export function ScheduledHistoryModal({
       setHistoryPage(1);
       setSelectedJobPageSize(15);
       setSelectedJobPage(1);
-      setDiscardOpen(false);
-      pendingActionRef.current = null;
       return;
     }
 
@@ -774,11 +740,6 @@ export function ScheduledHistoryModal({
     }
   }, [selectedJobPage, selectedJobTotalPages]);
 
-  // Sync dirty status with Dashboard navigation guard
-  useEffect(() => {
-    onDirtyChange?.(open && isCreateFormDirty);
-  }, [open, isCreateFormDirty, onDirtyChange]);
-
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
@@ -1106,7 +1067,6 @@ export function ScheduledHistoryModal({
       );
       setScheduleTime("");
       setWindowEndTime("");
-      setScheduleTitle("");
       setSelectedTab("history");
       setLoading(true);
       await loadScheduleHistory();
@@ -1117,19 +1077,43 @@ export function ScheduledHistoryModal({
     }
   };
 
+  // Dirty: user has typed a title or start time on the Create tab
+  // (scope defaulting to "selected" is not considered a user edit)
+  const isCreateDirty =
+    selectedTab === "create" &&
+    (scheduleTitle.trim() !== "" ||
+      scheduleTime.trim() !== "" ||
+      (scheduleMode === "time-window" && windowEndTime.trim() !== ""));
+
+  const handleRequestClose = () => {
+    if (isCreateDirty) {
+      setDiscardConfirmOpen(true);
+    } else {
+      setSelectedJob(null);
+      setOverlapWarningOpen(false);
+      overlapWarningBypassRef.current = false;
+      setOverlapDetailTab("windows");
+      onClose();
+    }
+  };
+
   return (
     <>
+      <DiscardChangesModal
+        open={discardConfirmOpen}
+        onDiscard={() => {
+          setDiscardConfirmOpen(false);
+          setSelectedJob(null);
+          setOverlapWarningOpen(false);
+          overlapWarningBypassRef.current = false;
+          setOverlapDetailTab("windows");
+          onClose();
+        }}
+        onKeepEditing={() => setDiscardConfirmOpen(false)}
+      />
       <Modal
         open={open}
-        onClose={() => {
-          runOrConfirm(() => {
-            setSelectedJob(null);
-            setOverlapWarningOpen(false);
-            overlapWarningBypassRef.current = false;
-            setOverlapDetailTab("windows");
-            onClose();
-          });
-        }}
+        onClose={handleRequestClose}
         title="Schedule Center"
         size="large"
       >
@@ -1164,7 +1148,7 @@ export function ScheduledHistoryModal({
                       fullWidth
                       pressed={selectedTab === "create"}
                       variant={selectedTab === "create" ? "primary" : "tertiary"}
-                      onClick={() => runOrConfirm(() => setSelectedTab("create"))}
+                      onClick={() => setSelectedTab("create")}
                     >
                       Create Schedule
                     </Button>
@@ -1173,7 +1157,7 @@ export function ScheduledHistoryModal({
                       fullWidth
                       pressed={selectedTab === "history"}
                       variant={selectedTab === "history" ? "primary" : "tertiary"}
-                      onClick={() => runOrConfirm(() => setSelectedTab("history"))}
+                      onClick={() => setSelectedTab("history")}
                     >
                       Schedule History
                     </Button>
@@ -1503,10 +1487,7 @@ export function ScheduledHistoryModal({
                   paddingInlineEnd="100"
                 >
                   <InlineStack align="end" gap="200">
-                    <Button
-                      onClick={() => runOrConfirm(onClose)}
-                      disabled={isScheduling}
-                    >
+                    <Button onClick={onClose} disabled={isScheduling}>
                       Cancel
                     </Button>
                     <Button
@@ -1803,20 +1784,6 @@ export function ScheduledHistoryModal({
         shop={shop}
         host={host}
         onClose={() => setBillingBlockModalOpen(false)}
-      />
-
-      <DiscardChangesModal
-        open={discardOpen}
-        onDiscard={() => {
-          const action = pendingActionRef.current;
-          pendingActionRef.current = null;
-          setDiscardOpen(false);
-          if (typeof action === "function") action();
-        }}
-        onKeepEditing={() => {
-          pendingActionRef.current = null;
-          setDiscardOpen(false);
-        }}
       />
     </>
   );

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, BlockStack, Text, TextField, Badge, InlineStack, Box } from "@shopify/polaris";
+import { DiscardChangesModal } from "./DiscardChangesModal";
 import type { OperationalSafeguardNotice } from "../types/pricing";
 
 export interface ImmediateApplyImpactSummary {
@@ -22,6 +23,8 @@ export interface ImmediateApplyConfirmationModalProps {
   validateCampaignTitle?: (campaignTitle: string) => string | undefined;
   onClose: () => void;
   onConfirm: (campaignTitle: string) => Promise<boolean>;
+  /** Notified whenever the unsaved-edit state of the campaign-title field changes. */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export function ImmediateApplyConfirmationModal({
@@ -35,6 +38,7 @@ export function ImmediateApplyConfirmationModal({
   validateCampaignTitle,
   onClose,
   onConfirm,
+  onDirtyChange,
 }: ImmediateApplyConfirmationModalProps) {
   const [campaignTitle, setCampaignTitle] = useState(initialCampaignTitle);
   const [titleError, setTitleError] = useState<string | undefined>();
@@ -45,6 +49,33 @@ export function ImmediateApplyConfirmationModal({
       setTitleError(undefined);
     }
   }, [open, initialCampaignTitle]);
+
+  // Unsaved-change protection for the Campaign Title field. Dirty is derived ONLY from
+  // the user-entered title vs. its empty baseline (initialCampaignTitle) — never from
+  // loading, processing, or validation state. Guards modal close; the parent can also
+  // subscribe via onDirtyChange to block page navigation.
+  const isTitleDirty = useMemo(
+    () => campaignTitle.trim() !== "" && campaignTitle.trim() !== initialCampaignTitle.trim(),
+    [campaignTitle, initialCampaignTitle],
+  );
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    onDirtyChange?.(open ? isTitleDirty : false);
+  }, [open, isTitleDirty, onDirtyChange]);
+
+  const runOrConfirm = useCallback(
+    (action: () => void) => {
+      if (open && isTitleDirty && !isProcessing) {
+        pendingActionRef.current = action;
+        setDiscardOpen(true);
+      } else {
+        action();
+      }
+    },
+    [open, isTitleDirty, isProcessing],
+  );
 
   const handleSubmit = async () => {
     const normalizedTitle = campaignTitle.trim();
@@ -86,14 +117,15 @@ export function ImmediateApplyConfirmationModal({
   const safeguardInfoCount = safeguardNotices.length - safeguardWarningCount;
 
   return (
+    <>
     <Modal
       open={open}
       onClose={() => {
-        if (!isProcessing) onClose();
+        if (!isProcessing) runOrConfirm(onClose);
       }}
       title="Confirm Immediate Apply"
       primaryAction={{
-        content: "Apply",        
+        content: "Apply",
         loading: isProcessing,
         disabled: isProcessing || itemCount === 0,
         onAction: () => {
@@ -104,7 +136,7 @@ export function ImmediateApplyConfirmationModal({
         {
           content: "Cancel",
           disabled: isProcessing,
-          onAction: onClose,
+          onAction: () => runOrConfirm(onClose),
         },
       ]}
     >
@@ -201,5 +233,20 @@ export function ImmediateApplyConfirmationModal({
         </BlockStack>
       </Modal.Section>
     </Modal>
+
+    <DiscardChangesModal
+      open={discardOpen}
+      onDiscard={() => {
+        const action = pendingActionRef.current;
+        pendingActionRef.current = null;
+        setDiscardOpen(false);
+        if (typeof action === "function") action();
+      }}
+      onKeepEditing={() => {
+        pendingActionRef.current = null;
+        setDiscardOpen(false);
+      }}
+    />
+    </>
   );
 }

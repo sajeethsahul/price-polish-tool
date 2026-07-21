@@ -57,6 +57,8 @@ import {
   BillingBlockModal,
   type BillingBlockModalCode,
 } from "../components/BillingBlockModal";
+import { DiscardChangesModal } from "../components/DiscardChangesModal";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import type {
   OperationalSafeguardNotice,
   PricingPreviewItem,
@@ -761,6 +763,8 @@ function DashboardContent({
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
   const [billingBlockModalCode, setBillingBlockModalCode] =
     useState<BillingBlockModalCode | null>(null);
+
+
 
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
@@ -2246,6 +2250,24 @@ const filteredPreviews = useMemo(() => {
       ),
     );
   }, []);
+
+  // Unsaved-change protection for inline manual price overrides.
+  // `overriddenPrice` is set ONLY by the user (handlePriceChange / resetOverride),
+  // never by loading, polling, metrics refresh, or preview re-fetch — so this flag
+  // reflects real user edits and becomes false again after any apply (which re-fetches
+  // fresh previews via handlePreview). Does NOT affect fetch/submission flows such as
+  // Preview, Apply, Publish, Stop Live, or Retry — those are not router navigations.
+  const hasManualOverrides = useMemo(
+    () => previews.some((p) => p.overriddenPrice !== undefined),
+    [previews],
+  );
+  const [isImmediateApplyDirty, setIsImmediateApplyDirty] = useState(false);
+  const [isScheduleDirty, setIsScheduleDirty] = useState(false);
+  const {
+    blocker: overrideBlocker,
+    discardChanges: discardOverrides,
+    keepEditing: keepOverrides,
+  } = useUnsavedChangesGuard(hasManualOverrides || isImmediateApplyDirty || isScheduleDirty);
 
   // UPDATED: Wrapped with guardNoRules — does NOT change existing handler logic
   const handleGoLiveClick = useCallback(() => {
@@ -4841,27 +4863,29 @@ const filteredPreviews = useMemo(() => {
         {/* ── TASK 4: Confirmation Modals ── */}
 
         {shopify && (
-          <ImmediateApplyConfirmationModal
-            open={immediateApplyModalOpen}
-            onClose={closeImmediateApplyModal}
-            scopeLabel={immediateApplyScopeLabel}
-            itemCount={immediateApplyContextItems.length}
-            impactSummary={immediateApplyImpactSummary}
-            safeguardNotices={immediateApplySafeguardNotices}
-            isProcessing={isProcessing}
-            initialCampaignTitle=""
-            validateCampaignTitle={validateCampaignTitle}
-            onConfirm={async (campaignTitle) => {
-              const ok = await handleApplyBatch(
-                immediateApplyContextItems,
-                campaignTitle,
-              );
-              if (ok) {
-                setApplyCampaignTitle(campaignTitle);
-              }
-              return ok;
-            }}
-          />
+         <ImmediateApplyConfirmationModal
+         open={immediateApplyModalOpen}
+         onClose={closeImmediateApplyModal}
+         scopeLabel={immediateApplyScopeLabel}
+         itemCount={immediateApplyContextItems.length}
+         impactSummary={immediateApplyImpactSummary}
+         safeguardNotices={immediateApplySafeguardNotices}
+         isProcessing={isProcessing}
+         initialCampaignTitle=""
+         validateCampaignTitle={validateCampaignTitle}
+         onConfirm={async (campaignTitle) => {
+           const ok = await handleApplyBatch(
+             immediateApplyContextItems,
+             campaignTitle,
+           );
+           if (ok) {
+             setApplyCampaignTitle(campaignTitle);
+           }
+           return ok;
+         }}
+         onDirtyChange={setIsImmediateApplyDirty}
+       />
+       
         )}
 
         {shopify && (
@@ -4879,6 +4903,7 @@ const filteredPreviews = useMemo(() => {
             hasRules={hasRules}
             existingCampaignTitles={campaignHistoryTitles}
             shopify={shopify}
+            onDirtyChange={setIsScheduleDirty}
           />
         )}
 
@@ -5935,6 +5960,12 @@ const filteredPreviews = useMemo(() => {
           shop={shop}
           host={host}
           onClose={() => setBillingBlockModalOpen(false)}
+        />
+
+        <DiscardChangesModal
+          open={overrideBlocker.state === "blocked"}
+          onDiscard={discardOverrides}
+          onKeepEditing={keepOverrides}
         />
       </Page>
     </>

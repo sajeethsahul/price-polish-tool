@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import {
     useLoaderData,
@@ -32,6 +32,8 @@ import prisma from "../db.server";
 import { calculatePrice } from "../utils/pricing";
 import { requireActiveBilling } from "../utils/billing-protection.server";
 import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
+import { DiscardChangesModal } from "../components/DiscardChangesModal";
+import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
 import { t } from "../utils/i18n";
 
 // ================= LOADER =================
@@ -270,6 +272,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
     const initialType = String(loaderData.adjustmentType ?? "percentage").toLowerCase();
     const derivedDirection = (Number(loaderData.markupPercent ?? 0) < 0) ? "decrease" : "increase";
+    
     const [adjustmentType, setAdjustmentType] = useState(initialType);
     const [adjustmentDirection, setAdjustmentDirection] = useState(
         initialType === "percentage" ? derivedDirection : String(loaderData.adjustmentDirection ?? "increase").toLowerCase()
@@ -283,17 +286,69 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     const [roundingPrecision, setRoundingPrecision] = useState(String(loaderData.roundingPrecision ?? "standard").toLowerCase());
     const [minPrice, setMinPrice] = useState(loaderData.minPrice === null ? "" : String(loaderData.minPrice));
     const [maxPrice, setMaxPrice] = useState(loaderData.maxPrice === null ? "" : String(loaderData.maxPrice));
+    
     const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
     const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
+
+    // Baseline saved state
+    const baseline = useMemo(() => {
+        const type = String(actionData?.adjustmentType ?? loaderData.adjustmentType ?? "percentage").toLowerCase();
+        const dir = actionData
+            ? String(actionData.adjustmentDirection ?? "increase").toLowerCase()
+            : (type === "percentage" ? derivedDirection : String(loaderData.adjustmentDirection ?? "increase").toLowerCase());
+        const val = actionData
+            ? String(actionData.adjustmentValue ?? 0)
+            : (type === "percentage" ? String(Math.abs(Number(loaderData.markupPercent ?? 0))) : String(loaderData.adjustmentValue ?? 0));
+        const ending = String(actionData?.endingOption ?? loaderData.endingOption ?? "0.99").toLowerCase();
+        const precision = String(actionData?.roundingPrecision ?? loaderData.roundingPrecision ?? "standard").toLowerCase();
+        
+        const minVal = actionData?.minPrice !== undefined 
+            ? String(actionData.minPrice ?? "") 
+            : (loaderData.minPrice === null ? "" : String(loaderData.minPrice));
+            
+        const maxVal = actionData?.maxPrice !== undefined 
+            ? String(actionData.maxPrice ?? "") 
+            : (loaderData.maxPrice === null ? "" : String(loaderData.maxPrice));
+
+        return {
+            adjustmentType: type,
+            adjustmentDirection: dir,
+            adjustmentValue: val,
+            endingOption: ending,
+            roundingPrecision: precision,
+            minPrice: minVal,
+            maxPrice: maxVal,
+        };
+    }, [loaderData, actionData, derivedDirection]);
+
+    const isDirty = useMemo(() => {
+        return (
+            adjustmentType !== baseline.adjustmentType ||
+            adjustmentDirection !== baseline.adjustmentDirection ||
+            adjustmentValue !== baseline.adjustmentValue ||
+            endingOption !== baseline.endingOption ||
+            roundingPrecision !== baseline.roundingPrecision ||
+            minPrice !== baseline.minPrice ||
+            maxPrice !== baseline.maxPrice
+        );
+    }, [
+        adjustmentType,
+        adjustmentDirection,
+        adjustmentValue,
+        endingOption,
+        roundingPrecision,
+        minPrice,
+        maxPrice,
+        baseline,
+    ]);
+
+    // Intercept router-based navigation attempts when dirty.
+    // (beforeunload + useBlocker live inside the shared hook.)
+    const { blocker, discardChanges, keepEditing } = useUnsavedChangesGuard(isDirty);
 
     useEffect(() => {
         if (actionData?.saved) {
             shopify.toast.show(t("toast.savedSuccessfully"));
-            // Phase 2 (UX): only when the user came from the onboarding
-            // wizard (query param ?from=onboarding), auto-return to the
-            // wizard on Step 2 (Preview). Normal navigation to Pricing
-            // Rules remains unchanged. Preserves ?revisit=1 so already-
-            // onboarded merchants stay inside the wizard.
             if (isFromOnboarding) {
                 navigate(`/app/welcome?step=preview-prices${revisitSuffix}`, { replace: true });
             }
@@ -306,6 +361,29 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
             setBillingBlockModalOpen(true);
         }
     }, [actionData]);
+
+    const targetBackUrl = isFromOnboarding
+        ? `/app/welcome?step=create-rule${revisitSuffix}`
+        : "/app";
+
+    const handleBackClick = () => {
+        if (!isDirty) {
+            navigate(targetBackUrl);
+        }
+        // If dirty, navigation triggered by back button will be caught automatically by `useBlocker`
+    };
+
+    const handleDiscard = () => {
+        if (blocker.state === "blocked") {
+            discardChanges();
+        } else {
+            navigate(targetBackUrl);
+        }
+    };
+
+    const handleKeepEditing = () => {
+        keepEditing();
+    };
 
     const basePrice = 59.99;
 
@@ -332,12 +410,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
         <Page
             title={t("rules.pageTitle")}
             backAction={{
-                onAction: () =>
-                    navigate(
-                        isFromOnboarding
-                            ? `/app/welcome?step=create-rule${revisitSuffix}`
-                            : "/app"
-                    ),
+                onAction: handleBackClick,
             }}
             fullWidth
         >
@@ -601,6 +674,12 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                 shop={shop}
                 host={host}
                 onClose={() => setBillingBlockModalOpen(false)}
+            />
+
+            <DiscardChangesModal
+                open={blocker.state === "blocked"}
+                onDiscard={handleDiscard}
+                onKeepEditing={handleKeepEditing}
             />
         </Page>
     );
