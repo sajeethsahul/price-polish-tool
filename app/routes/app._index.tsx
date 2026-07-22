@@ -58,7 +58,7 @@ import {
   type BillingBlockModalCode,
 } from "../components/BillingBlockModal";
 import { DiscardChangesModal } from "../components/DiscardChangesModal";
-import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import type {
   OperationalSafeguardNotice,
   PricingPreviewItem,
@@ -2267,7 +2267,7 @@ const filteredPreviews = useMemo(() => {
     blocker: overrideBlocker,
     discardChanges: discardOverrides,
     keepEditing: keepOverrides,
-  } = useUnsavedChangesGuard(hasManualOverrides || isImmediateApplyDirty || isScheduleDirty);
+  } = useUnsavedChanges(hasManualOverrides || isImmediateApplyDirty || isScheduleDirty);
 
   // UPDATED: Wrapped with guardNoRules — does NOT change existing handler logic
   const handleGoLiveClick = useCallback(() => {

@@ -33,7 +33,7 @@ import { calculatePrice } from "../utils/pricing";
 import { requireActiveBilling } from "../utils/billing-protection.server";
 import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
 import { DiscardChangesModal } from "../components/DiscardChangesModal";
-import { useUnsavedChangesGuard } from "../hooks/useUnsavedChangesGuard";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import { t } from "../utils/i18n";
 
 // ================= LOADER =================
@@ -344,7 +344,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
     // Intercept router-based navigation attempts when dirty.
     // (beforeunload + useBlocker live inside the shared hook.)
-    const { blocker, discardChanges, keepEditing } = useUnsavedChangesGuard(isDirty);
+    const { blocker, discardChanges, keepEditing } = useUnsavedChanges(isDirty);
 
     useEffect(() => {
         if (actionData?.saved) {

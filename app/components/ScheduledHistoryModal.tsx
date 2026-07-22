@@ -19,7 +19,7 @@ import { CampaignConflictExplorerModal } from "./CampaignConflictExplorerModal";
 import { ExpandableList } from "./ExpandableList";
 import { ModalScrollableSection } from "./ModalScrollableSection";
 import { BillingBlockModal, type BillingBlockModalCode } from "./BillingBlockModal";
-import { DiscardChangesModal } from "./DiscardChangesModal";
+import { DiscardChangesModal } from "../components/DiscardChangesModal";
 import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
 import { t } from "../utils/i18n";
 import type {
