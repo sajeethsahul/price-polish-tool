@@ -1241,7 +1241,7 @@ export default function CampaignHistoryPage() {
 
   return (
     <>
-      <Page title={t("campaignHistory.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
+<Page title={t("campaignHistory.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
         {isInitialCampaignHistoryLoad ? (
           showInitialCampaignHistoryLoader ? (
             <PricePolishLoader
@@ -1337,7 +1337,8 @@ export default function CampaignHistoryPage() {
                       />
 
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Showing {visibleCampaignHistory.length} of {filteredCampaignHistory.length} matching campaigns
+                        {`${t("campaignHistory.revertPreview.showingPrefix" in ({} as never) ? "" : "")}`}
+                        {t("campaignHistory.list.showingPrefix")} {visibleCampaignHistory.length} {t("campaignHistory.list.ofSuffix")} {filteredCampaignHistory.length} {t("campaignHistory.list.matchingCampaignsSuffix")}
                       </Text>
                     </BlockStack>
                   </BlockStack>
@@ -1378,11 +1379,11 @@ export default function CampaignHistoryPage() {
                                 </Badge>
                                 {conflictMeta?.count ? (
                                   <Badge tone={conflictTone}>
-                                    {`Conflicts: ${conflictMeta.count}`}
+                                    {`${t("campaignHistory.list.conflictsBadgePrefix")} ${conflictMeta.count}`}
                                   </Badge>
                                 ) : null}
                                 {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
-                                  <Badge tone="success">Pricing Currently Active</Badge>
+                                  <Badge tone="success">{t("campaignHistory.campaignDetail.pricingActiveBadge")}</Badge>
                                 )}
                               </InlineStack>
                               {formatTimeWindowSummary(campaign) && (
@@ -1401,13 +1402,13 @@ export default function CampaignHistoryPage() {
                                 <Box padding="200" background="bg-surface" borderRadius="200">
                                   <BlockStack gap="100">
                                     <InlineStack gap="200" blockAlign="center" wrap>
-                                      <Badge tone="warning">Scheduled</Badge>
+                                      <Badge tone="warning">{t("campaignHistory.list.scheduledBadge")}</Badge>
                                       <Text as="p" variant="headingSm">
-                                        {`Starts in ${formatDurationParts(new Date(campaign.runAt).getTime() - campaignRuntimeNow.getTime())}`}
+                                        {`${t("campaignHistory.list.startsInPrefix")} ${formatDurationParts(new Date(campaign.runAt).getTime() - campaignRuntimeNow.getTime())}`}
                                       </Text>
                                     </InlineStack>
                                     <Text as="p" variant="bodySm" tone="subdued">
-                                      {`Publishing at ${new Date(campaign.runAt).toLocaleTimeString([], {
+                                      {`${t("campaignHistory.list.publishingAtPrefix")} ${new Date(campaign.runAt).toLocaleTimeString([], {
                                         hour: "numeric",
                                         minute: "2-digit",
                                       })}`}
@@ -1423,11 +1424,11 @@ export default function CampaignHistoryPage() {
                                     <BlockStack gap="050">
                                       <Text as="p" variant="bodySm" fontWeight="medium">
                                         {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "publishing-window"
-                                          ? "Publishing window..."
-                                          : "Publishing..."}
+                                          ? t("campaignHistory.list.publishingWindowStatus")
+                                          : t("campaignHistory.list.publishingStatus")}
                                       </Text>
                                       <Text as="p" variant="bodySm" tone="subdued">
-                                        Applying scheduled pricing...
+                                        {t("campaignHistory.list.applyingScheduledPricingNotice")}
                                       </Text>
                                     </BlockStack>
                                   </InlineStack>
@@ -1439,10 +1440,10 @@ export default function CampaignHistoryPage() {
                                     <Spinner size="small" />
                                     <BlockStack gap="050">
                                       <Text as="p" variant="bodySm" fontWeight="medium">
-                                        Restoring...
+                                        {t("campaignHistory.list.restoringStatus")}
                                       </Text>
                                       <Text as="p" variant="bodySm" tone="subdued">
-                                        Restoring original storefront pricing...
+                                        {t("campaignHistory.list.restoringOriginalPricingNotice")}
                                       </Text>
                                     </BlockStack>
                                   </InlineStack>
@@ -1452,13 +1453,15 @@ export default function CampaignHistoryPage() {
                                 <Box padding="200" background="bg-surface" borderRadius="200">
                                   <BlockStack gap="150">
                                     <InlineStack gap="200" blockAlign="center" wrap>
-                                      <Badge tone="success">Live</Badge>
+                                <Badge tone="success">
+                                {t("campaignHistory.campaignDetail.liveBadge")}
+                               </Badge>
                                       <Text as="p" variant="headingSm">
-                                        {`Restores in ${formatDurationParts(new Date(campaign.windowEndAt).getTime() - campaignRuntimeNow.getTime())}`}
+                                        {`${t("campaignHistory.list.restoresInPrefix")} ${formatDurationParts(new Date(campaign.windowEndAt).getTime() - campaignRuntimeNow.getTime())}`}
                                       </Text>
                                     </InlineStack>
                                     <Text as="p" variant="bodySm" tone="subdued">
-                                      {`Auto restore scheduled for ${new Date(campaign.windowEndAt).toLocaleTimeString([], {
+                                      {`${t("campaignHistory.list.autoRestoreScheduledForPrefix")} ${new Date(campaign.windowEndAt).toLocaleTimeString([], {
                                         hour: "numeric",
                                         minute: "2-digit",
                                         second: "2-digit",
@@ -1477,17 +1480,17 @@ export default function CampaignHistoryPage() {
                               >
                                 <div>
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Source: {formatCampaignSourceLabel(campaign.source)}
+                                    {t("campaignHistory.list.sourceLabel")} {formatCampaignSourceLabel(campaign.source)}
                                   </Text>
                                 </div>
                                 <div>
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Products: {campaign.productCount}
+                                    {t("campaignHistory.list.productsLabel")} {campaign.productCount}
                                   </Text>
                                 </div>
                                 <div>
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Created: {new Date(campaign.createdAt).toLocaleString()}
+                                    {t("campaignHistory.campaignDetail.createdLabel")} {new Date(campaign.createdAt).toLocaleString()}
                                   </Text>
                                 </div>
                               </div>
@@ -1498,19 +1501,19 @@ export default function CampaignHistoryPage() {
                             <Box padding="200" background="bg-surface" borderRadius="200">
                               <BlockStack gap="150">
                                 <InlineStack gap="150" wrap>
-                                  <Badge tone="success">{`Reverted: ${campaign.revertedCount ?? 0}`}</Badge>
-                                  <Badge tone="warning">{`Failed: ${campaign.failedCount ?? 0}`}</Badge>
+                                  <Badge tone="success">{`${t("campaignHistory.campaignDetail.revertedBadgePrefix")} ${campaign.revertedCount ?? 0}`}</Badge>
+                                  <Badge tone="warning">{`${t("campaignHistory.campaignDetail.failedBadgePrefix")} ${campaign.failedCount ?? 0}`}</Badge>
                                 </InlineStack>
                                 <InlineStack gap="150" wrap>
-                                  <Badge tone="critical">{`Unrecoverable: ${campaign.unrecoverableCount ?? 0}`}</Badge>
-                                  <Badge tone="info">{`Tracked: ${campaign.totalTrackedCount ?? 0}`}</Badge>
+                                  <Badge tone="critical">{`${t("campaignHistory.campaignDetail.unrecoverableBadgePrefix")} ${campaign.unrecoverableCount ?? 0}`}</Badge>
+                                  <Badge tone="info">{`${t("campaignHistory.list.trackedBadgePrefix")} ${campaign.totalTrackedCount ?? 0}`}</Badge>
                                 </InlineStack>
                               </BlockStack>
                             </Box>
                             {campaign.unrecoverableReason && (
                               <Box paddingBlockStart="100">
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Reason: {campaign.unrecoverableReason}
+                                  {t("campaignHistory.list.reasonPrefix")} {campaign.unrecoverableReason}
                                 </Text>
                               </Box>
                             )}
@@ -1525,7 +1528,7 @@ export default function CampaignHistoryPage() {
                                   disabled={scheduleJobsLoading}
                                   onClick={() => openCampaignConflictDetails(campaign)}
                                 >
-                                  View Conflict Details
+                                  {t("campaignHistory.list.viewConflictDetailsCta")}
                                 </Button>
                               ) : null}
                               <Button
@@ -1533,7 +1536,7 @@ export default function CampaignHistoryPage() {
                                 variant="tertiary"
                                 onClick={() => { void openCampaignDetailView(campaign); }}
                               >
-                                View
+                                 {t("campaignHistory.campaignDetail.view")}
                               </Button>
                               {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "scheduled-window" && (
                                 <Button
@@ -1545,7 +1548,7 @@ export default function CampaignHistoryPage() {
                                     void handleWindowLifecycleAction(campaign, "cancel-schedule");
                                   }}
                                 >
-                                  Cancel Schedule
+                                  {t("campaignHistory.list.cancelScheduleCta")}
                                 </Button>
                               )}
                               {normalizeCampaignSource(campaign.source) === "scheduled" &&
@@ -1559,7 +1562,7 @@ export default function CampaignHistoryPage() {
                                     void handlePublishLifecycleAction(campaign);
                                   }}
                                 >
-                                  Cancel Publish
+                                  {t("campaignHistory.list.cancelPublishCta")}
                                 </Button>
                               )}
                               {resolveCampaignRuntimeStatus(campaign, campaignRuntimeNow) === "active-window" && (
@@ -1572,7 +1575,7 @@ export default function CampaignHistoryPage() {
                                     void handleWindowLifecycleAction(campaign, "stop-window");
                                   }}
                                 >
-                                  Stop Window
+                                  {t("campaignHistory.list.stopWindowCta")}
                                 </Button>
                               )}
                               {campaign.status.toLowerCase() === "partial" && campaign.revertable && (
@@ -1583,7 +1586,7 @@ export default function CampaignHistoryPage() {
                                   loading={isProcessing}
                                   onClick={() => openCampaignRevertPreview(campaign, true)}
                                 >
-                                  Retry Failed Reverts
+                                  {t("campaignHistory.revertPreview.modalTitleRetry")}
                                 </Button>
                               )}
                               {campaign.revertable && normalizeCampaignSource(campaign.source) !== "time-window" && (
@@ -1594,7 +1597,7 @@ export default function CampaignHistoryPage() {
                                   loading={isProcessing}
                                   onClick={() => openCampaignRevertPreview(campaign)}
                                 >
-                                  Revert
+                                  {t("campaignHistory.list.revertCta")}
                                 </Button>
                               )}
                             </BlockStack>
@@ -1630,7 +1633,7 @@ export default function CampaignHistoryPage() {
           setCampaignDetailPageSize(15);
           setCampaignDetailPage(1);
         }}
-        title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
+        title={`${t("campaignHistory.campaignDetail.modalTitle")}${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
         secondaryActions={[{
           content: t("common.close"),
           onAction: () => {
@@ -1661,10 +1664,10 @@ export default function CampaignHistoryPage() {
                 <>
                 <InlineStack gap="300" wrap>
                   <Text as="p" variant="bodySm">
-                    <strong>Campaign:</strong> {campaignDetail.title}
+                    <strong>{t("campaignHistory.revertPreview.campaignLabel")}</strong> {campaignDetail.title}
                   </Text>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    <strong>{campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Scheduled products" : "Tracked items"}:</strong>{" "}
+                    <strong>{campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? t("campaignHistory.campaignDetail.scheduledProductsLabel") : t("campaignHistory.campaignDetail.trackedItemsLabel")}:</strong>{" "}
                     {(() => {
                       const fallbackCount = campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged
                         ? campaignDetail.productCount
@@ -1673,9 +1676,9 @@ export default function CampaignHistoryPage() {
                         ? campaignDetailCounts
                         : { productCount: fallbackCount, variantCount: fallbackCount };
                       if (counts.variantCount !== counts.productCount) {
-                        return `${counts.productCount} products • ${counts.variantCount} variants`;
+                        return `${counts.productCount} ${t("campaignHistory.campaignDetail.productsSuffix")} • ${counts.variantCount} ${t("campaignHistory.revertPreview.variantsSuffix")}`;
                       }
-                      return `${counts.productCount} products`;
+                      return `${counts.productCount} ${t("campaignHistory.campaignDetail.productsSuffix")}`;
                     })()}
                   </Text>
                 </InlineStack>
@@ -1693,14 +1696,14 @@ export default function CampaignHistoryPage() {
                               : "warning"
                         }>
                           {campaignDetail.staged
-                            ? "Ready to Publish"
+                            ? t("campaignHistory.campaignDetail.readyToPublishBadge")
                             : campaignDetail.schedule?.status === "cancelled-window"
-                              ? "Cancelled Window"
+                              ? t("campaignHistory.campaignDetail.cancelledWindowBadge")
                               : campaignDetail.schedule?.status === "cancelled-publish"
-                                ? "Cancelled"
+                                ? t("campaignHistory.campaignDetail.cancelledBadge")
                                 : campaignDetail.prePublish
-                                  ? "Publish Scheduled"
-                                  : "Window Scheduled"}
+                                  ? t("campaignHistory.campaignDetail.publishScheduledBadge")
+                                  : t("campaignHistory.campaignDetail.windowScheduledBadge")}
                         </Badge>
                         {!campaignDetail.staged && (
                           <Badge tone="attention">
@@ -1710,41 +1713,41 @@ export default function CampaignHistoryPage() {
                       </InlineStack>
                       <Text as="p" variant="bodySm">
                         {campaignDetail.staged
-                          ? "This campaign has been staged but has not yet been published."
+                          ? t("campaignHistory.campaignDetail.stagedBody")
                           : campaignDetail.schedule?.status === "cancelled-window"
-                            ? "This pricing window was cancelled before it started."
+                            ? t("campaignHistory.campaignDetail.cancelledWindowBody")
                             : campaignDetail.schedule?.status === "cancelled-publish"
-                              ? "This scheduled publish was cancelled before it started."
+                              ? t("campaignHistory.campaignDetail.cancelledPublishBody")
                               : campaignDetail.prePublish
-                                ? "This pricing publish is scheduled and has not started yet."
-                                : "This pricing window is scheduled and has not started yet."}
+                                ? t("campaignHistory.campaignDetail.prePublishBody")
+                                : t("campaignHistory.campaignDetail.windowScheduledBody")}
                       </Text>
                       <Text as="p" variant="bodySm" tone="subdued">
                         {campaignDetail.staged
-                          ? "Go to the Dashboard to publish these changes."
+                          ? t("campaignHistory.campaignDetail.stagedSubBody")
                           : campaignDetail.schedule?.status === "cancelled-window" ||
                             campaignDetail.schedule?.status === "cancelled-publish"
-                            ? "No storefront pricing was changed for this cancelled schedule."
+                            ? t("campaignHistory.campaignDetail.cancelledSubBody")
                             : campaignDetail.prePublish
-                              ? "Applied storefront details will appear after publishing completes."
-                              : "Tracked storefront pricing details will appear once the publish window activates."}
+                              ? t("campaignHistory.campaignDetail.prePublishSubBody")
+                              : t("campaignHistory.campaignDetail.windowSubBody")}
                       </Text>
                       {campaignDetail.staged && (
                         <InlineStack gap="200" wrap>
                           <Button variant="secondary" onClick={() => navigate("/app")}>
-                            Go to Dashboard
+                            {t("campaignHistory.campaignDetail.goToDashboardCta")}
                           </Button>
                         </InlineStack>
                       )}
                       <InlineStack gap="400" wrap>
                         {campaignDetail.schedule?.runAt && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Publish start: {new Date(campaignDetail.schedule.runAt).toLocaleString()}
+                            {t("campaignHistory.campaignDetail.publishStartLabel")} {new Date(campaignDetail.schedule.runAt).toLocaleString()}
                           </Text>
                         )}
                         {campaignDetail.schedule?.windowEndAt && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Automatic restore: {new Date(campaignDetail.schedule.windowEndAt).toLocaleString()}
+                            {t("campaignHistory.campaignDetail.automaticRestoreLabel")} {new Date(campaignDetail.schedule.windowEndAt).toLocaleString()}
                           </Text>
                         )}
                         <Text as="p" variant="bodySm" tone="subdued">
@@ -1753,14 +1756,14 @@ export default function CampaignHistoryPage() {
                               ? campaignDetailCounts
                               : { productCount: campaignDetail.productCount, variantCount: campaignDetail.productCount };
                             if (counts.variantCount !== counts.productCount) {
-                              return `Intended pricing scope: ${counts.productCount} products • ${counts.variantCount} variants`;
+                              return `${t("campaignHistory.campaignDetail.intendedScopePrefix")} ${counts.productCount} ${t("campaignHistory.campaignDetail.productsSuffix")} • ${counts.variantCount} ${t("campaignHistory.revertPreview.variantsSuffix")}`;
                             }
-                            return `Intended pricing scope: ${counts.productCount} products`;
+                            return `${t("campaignHistory.campaignDetail.intendedScopePrefix")} ${counts.productCount} ${t("campaignHistory.campaignDetail.productsSuffix")}`;
                           })()}
                         </Text>
                         {campaignDetail.schedule?.createdAt && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Created: {new Date(campaignDetail.schedule.createdAt).toLocaleString()}
+                            {t("campaignHistory.campaignDetail.createdLabel")} {new Date(campaignDetail.schedule.createdAt).toLocaleString()}
                           </Text>
                         )}
                       </InlineStack>
@@ -1773,24 +1776,24 @@ export default function CampaignHistoryPage() {
                         <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                           <BlockStack gap="150">
                             <InlineStack gap="200" wrap>
-                              <Badge tone="success">Pricing Currently Active</Badge>
-                              <Badge tone="attention">Time Window</Badge>
+                              <Badge tone="success">{t("campaignHistory.campaignDetail.pricingActiveBadge")}</Badge>
+                              <Badge tone="attention">{t("campaignHistory.campaignDetail.timeWindowBadge")}</Badge>
                             </InlineStack>
                             <InlineStack gap="400" wrap>
                               {selectedCampaignForDetail.runAt && (
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Active since: {new Date(selectedCampaignForDetail.runAt).toLocaleString()}
+                                  {t("campaignHistory.campaignDetail.activeSinceLabel")} {new Date(selectedCampaignForDetail.runAt).toLocaleString()}
                                 </Text>
                               )}
                               {selectedCampaignForDetail.windowEndAt && (
                                 <Text as="p" variant="bodySm" tone="subdued">
-                                  Restore time: {new Date(selectedCampaignForDetail.windowEndAt).toLocaleString()}
+                                  {t("campaignHistory.campaignDetail.restoreTimeLabel")} {new Date(selectedCampaignForDetail.windowEndAt).toLocaleString()}
                                 </Text>
                               )}
                             </InlineStack>
                             {selectedCampaignForDetail.windowEndAt && (
                               <Text as="p" variant="bodySm" fontWeight="medium">
-                                {`Remaining duration: ${formatDurationParts(
+                                {`${t("campaignHistory.campaignDetail.remainingDurationPrefix")} ${formatDurationParts(
                                   new Date(selectedCampaignForDetail.windowEndAt).getTime() -
                                   campaignRuntimeNow.getTime()
                                 )}`}
@@ -1800,9 +1803,9 @@ export default function CampaignHistoryPage() {
                         </Box>
                       )}
                     <InlineStack gap="200" wrap>
-                      <Badge tone="success">{`Reverted: ${campaignDetail.revertedCount ?? 0}`}</Badge>
-                      <Badge tone="warning">{`Failed: ${campaignDetail.failedCount ?? 0}`}</Badge>
-                      <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
+                      <Badge tone="success">{`${t("campaignHistory.campaignDetail.revertedBadgePrefix")} ${campaignDetail.revertedCount ?? 0}`}</Badge>
+                      <Badge tone="warning">{`${t("campaignHistory.campaignDetail.failedBadgePrefix")} ${campaignDetail.failedCount ?? 0}`}</Badge>
+                      <Badge tone="critical">{`${t("campaignHistory.campaignDetail.unrecoverableBadgePrefix")} ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
                     </InlineStack>
                   </BlockStack>
                 )}
@@ -1811,7 +1814,7 @@ export default function CampaignHistoryPage() {
                   <Box padding="300" background="bg-surface" borderRadius="200">
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">
-                        Operational timeline
+                        {t("campaignHistory.campaignDetail.operationalTimelineTitle")}
                       </Text>
                       <div
                         style={{
@@ -1854,7 +1857,7 @@ export default function CampaignHistoryPage() {
                                     {milestone.label}
                                   </Text>
                                   <Badge tone={milestone.tone}>
-                                    {milestone.badgeLabel ?? "Milestone"}
+                                    {milestone.badgeLabel ?? t("campaignHistory.campaignDetail.milestoneBadgeDefault")}
                                   </Badge>
                                 </InlineStack>
                                 {milestone.timestamp ? (
@@ -1882,7 +1885,7 @@ export default function CampaignHistoryPage() {
                       pageSize={campaignDetailPageSize}
                       onPageChange={(nextPage) => setCampaignDetailPage(nextPage)}
                       onPageSizeChange={(nextSize) => setCampaignDetailPageSize(nextSize)}
-                      itemLabel={campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "scheduled products" : "tracked items"}
+                      itemLabel={campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? t("campaignHistory.campaignDetail.scheduledProductsLower") : t("campaignHistory.campaignDetail.trackedItemsLower")}
                       pageSizeOptions={OPERATIONAL_PAGE_SIZE_OPTIONS}
                     />
 
@@ -1897,18 +1900,18 @@ export default function CampaignHistoryPage() {
                             paddingInline: "2px",
                           }}
                         >
-                          <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">{t("campaignHistory.revertPreview.tableHeaderProduct")}</Text>
                           <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                             <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
-                              Current
+                              {t("campaignHistory.revertPreview.tableHeaderCurrent")}
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                             <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
-                              {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? "Scheduled" : "Revert Target"}
+                              {campaignDetail.preActivation || campaignDetail.prePublish || campaignDetail.staged ? t("campaignHistory.campaignDetail.scheduledHeader") : t("campaignHistory.revertPreview.tableHeaderRevertTarget")}
                             </Text>
                           </div>
-                          <Text as="p" variant="bodySm" fontWeight="medium">Status</Text>
+                          <Text as="p" variant="bodySm" fontWeight="medium">{t("campaignHistory.campaignDetail.statusHeader")}</Text>
                         </div>
                         <div style={campaignDetailPaginatedRows.length > 10 ? { maxHeight: 300, overflowY: "auto", paddingRight: 4 } : undefined}>
                           {campaignDetailPaginatedRows.map((row) => {
@@ -1971,7 +1974,7 @@ export default function CampaignHistoryPage() {
                         </div>
                         {(campaignDetail.missingHistoricalRevertedFromCount ?? 0) > 0 && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Some historical pre-revert values are unavailable. Restored values remain accurate.
+                            {t("campaignHistory.campaignDetail.historicalUnavailableNotice")}
                           </Text>
                         )}
                       </BlockStack>
@@ -1981,7 +1984,7 @@ export default function CampaignHistoryPage() {
               </>
             ) : (
               <Text as="p" variant="bodySm" tone="subdued">
-                No campaign detail data available.
+                {t("campaignHistory.campaignDetail.noDetailData")}
               </Text>
             )}
             </BlockStack>
@@ -1999,12 +2002,12 @@ export default function CampaignHistoryPage() {
           setRevertPreviewRetryFailedOnly(false);
           resetRevertPreviewViewState();
         }}
-        title={`${revertPreviewRetryFailedOnly ? "Retry Failed Reverts" : "Revert Campaign"}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
+        title={`${revertPreviewRetryFailedOnly ? t("campaignHistory.revertPreview.modalTitleRetry") : t("campaignHistory.revertPreview.modalTitleRevert")}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
         primaryAction={
           revertPreview?.terminal
             ? undefined
             : {
-              content: revertPreviewRetryFailedOnly ? "Confirm Retry" : "Confirm Revert",
+              content: revertPreviewRetryFailedOnly ? t("campaignHistory.revertPreview.confirmRetryCta") : t("campaignHistory.revertPreview.confirmRevertCta"),
               onAction: () => { void confirmCampaignRevert(); },
               destructive: true,
               loading: isProcessing,
@@ -2044,16 +2047,16 @@ export default function CampaignHistoryPage() {
                   </Banner>
                 )}
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Review the current storefront prices against revert target prices before confirming.
+                  {t("campaignHistory.revertPreview.reviewPricesNotice")}
                 </Text>
                 <InlineStack gap="300" wrap>
                   <Text as="p" variant="bodySm">
-                    <strong>Campaign:</strong> {revertPreview.title}
+                    <strong>{t("campaignHistory.revertPreview.campaignLabel")}</strong> {revertPreview.title}
                   </Text>
                   <Text as="p" variant="bodySm">
-                    <strong>Affected products:</strong>{" "}
+                    <strong>{t("campaignHistory.revertPreview.affectedProductsLabel")}</strong>{" "}
                     {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
-                      ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
+                      ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} ${t("campaignHistory.revertPreview.variantsSuffix")}`
                       : revertPreviewCounts.productCount}
                   </Text>
                 </InlineStack>
@@ -2066,11 +2069,11 @@ export default function CampaignHistoryPage() {
                     }
                   >
                     {revertPreviewCounts.variantCount !== revertPreviewCounts.productCount
-                      ? `Affected products: ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
-                      : `Affected products: ${revertPreviewCounts.productCount}`}
+                      ? `${t("campaignHistory.revertPreview.affectedProductsBadgePrefix")} ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} ${t("campaignHistory.revertPreview.variantsSuffix")}`
+                      : `${t("campaignHistory.revertPreview.affectedProductsBadgePrefix")} ${revertPreviewCounts.productCount}`}
                   </Badge>
                   <Badge tone="success">
-                    {`Revert rows in preview: ${revertPreview.rows.length}`}
+                    {`${t("campaignHistory.revertPreview.revertRowsBadgePrefix")} ${revertPreview.rows.length}`}
                   </Badge>
                 </InlineStack>
                 {revertSafeguardNotices.length > 0 && (
@@ -2084,18 +2087,18 @@ export default function CampaignHistoryPage() {
                     <BlockStack gap="200">
                       <InlineStack align="space-between" blockAlign="center" wrap>
                         <Text as="p" variant="bodySm" fontWeight="medium">
-                          Operational safeguards
+                          {t("campaignHistory.revertPreview.operationalSafeguardsTitle")}
                         </Text>
                         <InlineStack gap="100" wrap>
                           <Badge tone="warning">
-                            {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} Warning${
+                            {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} ${
                               revertSafeguardNotices.filter((notice) => notice.severity === "warning").length === 1
-                                ? ""
-                                : "s"
+                                ? t("campaignHistory.revertPreview.warningLabel")
+                                : t("campaignHistory.revertPreview.warningLabelPlural")
                             }`}
                           </Badge>
                           <Badge tone="info">
-                            {`${revertSafeguardNotices.filter((notice) => notice.severity === "informational").length} Info`}
+                            {`${revertSafeguardNotices.filter((notice) => notice.severity === "informational").length} ${t("campaignHistory.revertPreview.infoLabel")}`}
                           </Badge>
                         </InlineStack>
                       </InlineStack>
@@ -2103,7 +2106,7 @@ export default function CampaignHistoryPage() {
                         {revertSafeguardNotices.map((notice) => (
                           <InlineStack key={notice.id} gap="200" blockAlign="center">
                             <Badge tone={notice.severity === "warning" ? "warning" : "info"}>
-                              {notice.severity === "warning" ? "Warning" : "Info"}
+                              {notice.severity === "warning" ? t("campaignHistory.revertPreview.warningLabel") : t("campaignHistory.revertPreview.infoLabel")}
                             </Badge>
                             <Text as="p" variant="bodySm" tone="subdued">
                               {notice.message}
@@ -2129,22 +2132,22 @@ export default function CampaignHistoryPage() {
                   <InlineStack gap="200" wrap align="space-between" blockAlign="end">
                     <div style={{ minWidth: 220, flex: "1 1 320px" }}>
                       <TextField
-                        label="Search product"
+                        label={t("campaignHistory.revertPreview.searchLabel")}
                         value={revertPreviewSearchQuery}
                         onChange={setRevertPreviewSearchQuery}
-                        placeholder="Search by product title"
+                        placeholder={t("campaignHistory.revertPreview.searchPlaceholder")}
                         autoComplete="off"
                         disabled={isProcessing}
                       />
                     </div>
                     <div style={{ minWidth: 210 }}>
                       <Select
-                        label="Movement filter"
+                        label={t("campaignHistory.revertPreview.movementFilterLabel")}
                         options={[
-                          { label: `${SELECT_OPTION_PREFIX}All products`, value: "all" },
-                          { label: `${SELECT_OPTION_PREFIX}Price increases`, value: "increase" },
-                          { label: `${SELECT_OPTION_PREFIX}Price decreases`, value: "decrease" },
-                          { label: `${SELECT_OPTION_PREFIX}Large movements`, value: "large_movement" },
+                          { label: `${SELECT_OPTION_PREFIX}${t("campaignHistory.revertPreview.movementFilterAll")}`, value: "all" },
+                          { label: `${SELECT_OPTION_PREFIX}${t("campaignHistory.revertPreview.movementFilterIncrease")}`, value: "increase" },
+                          { label: `${SELECT_OPTION_PREFIX}${t("campaignHistory.revertPreview.movementFilterDecrease")}`, value: "decrease" },
+                          { label: `${SELECT_OPTION_PREFIX}${t("campaignHistory.revertPreview.movementFilterLarge")}`, value: "large_movement" },
                         ]}
                         value={revertPreviewMovementFilter}
                         onChange={(value) =>
@@ -2155,7 +2158,7 @@ export default function CampaignHistoryPage() {
                     </div>
                     <div style={{ minWidth: 130 }}>
                       <Select
-                        label="Rows per page"
+                        label={t("campaignHistory.revertPreview.rowsPerPageLabel")}
                         options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
                           label: `${SELECT_OPTION_PREFIX}${size}`,
                           value: String(size),
@@ -2178,15 +2181,15 @@ export default function CampaignHistoryPage() {
                         paddingInline: "2px",
                       }}
                     >
-                      <Text as="p" variant="bodySm" fontWeight="medium">Product</Text>
+                      <Text as="p" variant="bodySm" fontWeight="medium">{t("campaignHistory.revertPreview.tableHeaderProduct")}</Text>
                       <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                         <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
-                          Current
+                          {t("campaignHistory.revertPreview.tableHeaderCurrent")}
                         </Text>
                       </div>
                       <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                         <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
-                          Revert Target
+                          {t("campaignHistory.revertPreview.tableHeaderRevertTarget")}
                         </Text>
                       </div>
                     </div>
@@ -2241,7 +2244,7 @@ export default function CampaignHistoryPage() {
                             Math.min(revertPreviewTotalPages, prev + 1)
                           )
                         }
-                        label={`Page ${revertPreviewPage} of ${revertPreviewTotalPages}`}
+                        label={`${t("campaignHistory.revertPreview.pagePrefix")} ${revertPreviewPage} ${t("campaignHistory.revertPreview.ofSuffix")} ${revertPreviewTotalPages}`}
                       />
                     </InlineStack>
                   </BlockStack>
@@ -2249,7 +2252,7 @@ export default function CampaignHistoryPage() {
               </>
             ) : (
               <Text as="p" variant="bodySm" tone="subdued">
-                No revert preview data available.
+                {t("campaignHistory.revertPreview.noPreviewData")}
               </Text>
             )}
           </BlockStack>

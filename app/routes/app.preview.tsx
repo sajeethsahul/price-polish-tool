@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useSearchParams } from "react-router";
 import type { PricingPreviewItem } from "../types/pricing";
 import { useAppFetch } from "../utils/fetch";
+import { t } from "../utils/i18n";
 import {
   Banner,
   BlockStack,
@@ -101,13 +102,13 @@ export default function PreviewPage() {
 
   return (
     <Page
-      title="Product Previews"
+      title={t("common.nav.preview")}
       subtitle={`Currency: ${currencyCode}`}
       backAction={backActionProps}
     >
       <BlockStack gap="400">
         {error ? (
-          <Banner tone="critical" title="Unable to load previews">
+          <Banner tone="critical" title={t("common.error.previewFailed")}>
             <p>{error}</p>
           </Banner>
         ) : null}

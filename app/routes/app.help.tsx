@@ -14,58 +14,65 @@ import {
 } from "@shopify/polaris";
 import { ShieldCheckMarkIcon } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 
 export default function HelpPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation(["help", "common"]);
 
   return (
     <Page
-      title="Help & User Guide"
+      title={t("help:page.title")}
       backAction={{ onAction: () => navigate("/app") }}
       fullWidth
     >
       <div style={{ maxWidth: "980px", margin: "0 auto" }}>
         <BlockStack gap="500">
 
-          <Banner tone="info" title="Quick Overview">
-            Preview upcoming prices, apply catalog updates instantly, schedule future campaigns, or enable dynamic live storefront pricing.
+          <Banner tone="info" title={t("help:section.quickOverview")}>
+            {t("help:banner.intro")}
           </Banner>
 
           <Text as="h2" variant="headingLg">
-            Core Workflow
+            {t("help:section.coreWorkflow")}
           </Text>
 
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Recommended Workflow
+                {t("help:section.recommendedWorkflow")}
               </Text>
 
               <Text as="p" tone="subdued">
-                A safe and predictable workflow for managing pricing updates.
+                {t("help:desc.recommendedWorkflow")}
               </Text>
 
               <Divider />
 
               <List type="number">
                 <List.Item>
-                  <strong>Configure pricing rules:</strong> Set markup, rounding, and charm pricing in Pricing Rules.
+                  <strong>{t("help:workflow.step1_label")}</strong>{" "}
+                  {t("help:workflow.step1_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Refresh previews:</strong> Load the latest calculated prices on the Dashboard.
+                  <strong>{t("help:workflow.step2_label")}</strong>{" "}
+                  {t("help:workflow.step2_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Review changes:</strong> Compare Current vs Textbox before applying updates.
+                  <strong>{t("help:workflow.step3_label")}</strong>{" "}
+                  {t("help:workflow.step3_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Apply now or Schedule for later:</strong> Apply updates Shopify immediately or schedule automated campaigns.
+                  <strong>{t("help:workflow.step4_label")}</strong>{" "}
+                  {t("help:workflow.step4_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Undo if needed:</strong> Restore previous prices after bulk updates.
+                  <strong>{t("help:workflow.step5_label")}</strong>{" "}
+                  {t("help:workflow.step5_desc")}
                 </List.Item>
               </List>
             </BlockStack>
@@ -74,28 +81,28 @@ export default function HelpPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Understanding Current vs Textbox
+                {t("help:section.currentVsTextbox")}
               </Text>
 
               <Text as="p" tone="subdued">
-                These values work together to help you review pricing changes clearly.
+                {t("help:desc.currentVsTextbox")}
               </Text>
 
               <Divider />
 
               <InlineStack gap="200" wrap>
-                <Badge tone="info">Current</Badge>
+                <Badge tone="info">{t("help:labels.current")}</Badge>
 
                 <Text as="p">
-                  Your current live product price.
+                  {t("help:currentVsTextbox.current_desc")}
                 </Text>
               </InlineStack>
 
               <InlineStack gap="200" wrap>
-                <Badge tone="success">Textbox</Badge>
+                <Badge tone="success">{t("help:labels.textbox")}</Badge>
 
                 <Text as="p">
-                  Your next calculated preview price based on pricing rules or manual input.
+                  {t("help:currentVsTextbox.textbox_desc")}
                 </Text>
               </InlineStack>
             </BlockStack>
@@ -106,30 +113,34 @@ export default function HelpPage() {
               <Card>
                 <BlockStack gap="300">
                   <Text variant="headingMd" as="h2">
-                    Apply Updates
+                    {t("help:section.applyUpdates")}
                   </Text>
 
                   <Text as="p" tone="subdued">
-                    Apply updates Shopify immediately across your catalog.
+                    {t("help:desc.applyUpdates")}
                   </Text>
 
                   <Divider />
 
                   <List>
                     <List.Item>
-                      <strong>Apply All</strong> updates every item in the preview list.
+                      <strong>{t("help:labels.applyAll")}</strong>{" "}
+                      {t("help:applyUpdates.all_desc")}
                     </List.Item>
 
                     <List.Item>
-                      <strong>Apply Selected</strong> updates only checked products.
+                      <strong>{t("help:labels.applySelected")}</strong>{" "}
+                      {t("help:applyUpdates.selected_desc")}
                     </List.Item>
 
                     <List.Item>
-                      <strong>Filtered workflow</strong> applies updates to filtered results.
+                      <strong>{t("help:labels.filteredWorkflow")}</strong>{" "}
+                      {t("help:applyUpdates.filtered_desc")}
                     </List.Item>
 
                     <List.Item>
-                      <strong>Collection</strong> applies updates to a selected collection.
+                      <strong>{t("help:labels.collection")}</strong>{" "}
+                      {t("help:applyUpdates.collection_desc")}
                     </List.Item>
                   </List>
                 </BlockStack>
@@ -140,31 +151,31 @@ export default function HelpPage() {
               <Card>
                 <BlockStack gap="300">
                   <Text variant="headingMd" as="h2">
-                    Live Pricing
+                    {t("help:section.livePricing")}
                   </Text>
 
                   <Text as="p" tone="subdued">
-                    Dynamically adjusts storefront display prices without modifying catalog values.
+                    {t("help:desc.livePricing")}
                   </Text>
 
                   <Divider />
 
                   <List>
                     <List.Item>
-                      Live Pricing affects storefront display only.
+                      {t("help:livePricing.point1")}
                     </List.Item>
 
                     <List.Item>
-                      Apply permanently updates catalog prices.
+                      {t("help:livePricing.point2")}
                     </List.Item>
 
                     <List.Item>
-                      Live Pricing rules may layer on top of applied catalog prices.
+                      {t("help:livePricing.point3")}
                     </List.Item>
                   </List>
 
                   <Banner tone="info">
-                    If you want your applied catalog value to remain the final customer-facing price, keep Live Pricing disabled or reduce Live Pricing rules to 0%.
+                    {t("help:banner.livePricingTip")}
                   </Banner>
                 </BlockStack>
               </Card>
@@ -174,66 +185,66 @@ export default function HelpPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Manual Overrides
+                {t("help:section.manualOverrides")}
               </Text>
 
               <Text as="p" tone="subdued">
-                Manual input is designed for one-time pricing overrides.
+                {t("help:desc.manualOverrides")}
               </Text>
 
               <Divider />
 
               <List>
                 <List.Item>
-                  Typing a custom value temporarily overrides the calculated preview for that product.
+                  {t("help:manualOverrides.point1")}
                 </List.Item>
 
                 <List.Item>
-                  When applied, Shopify receives your exact manual value without additional pricing adjustments.
+                  {t("help:manualOverrides.point2")}
                 </List.Item>
 
                 <List.Item>
-                  After apply, pricing rules resume using the newly updated product price as the baseline.
+                  {t("help:manualOverrides.point3")}
                 </List.Item>
 
                 <List.Item>
-                  Use Reset to restore pricing-rule control before applying.
+                  {t("help:manualOverrides.point4")}
                 </List.Item>
               </List>
             </BlockStack>
           </Card>
 
           <Text as="h2" variant="headingLg">
-            Automation & Safety
+            {t("help:section.automationSafety")}
           </Text>
 
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Scheduling
+                {t("help:section.scheduling")}
               </Text>
 
               <Text as="p" tone="subdued">
-                Create automated pricing campaigns that run later without manual intervention.
+                {t("help:desc.scheduling")}
               </Text>
 
               <Divider />
 
               <List>
                 <List.Item>
-                  Scheduling automatically stages and publishes pricing updates.
+                  {t("help:scheduling.point1")}
                 </List.Item>
 
                 <List.Item>
-                  You no longer need to Apply before scheduling.
+                  {t("help:scheduling.point2")}
                 </List.Item>
 
                 <List.Item>
-                  Schedule History tracks campaigns and included products.
+                  {t("help:scheduling.point3")}
                 </List.Item>
 
                 <List.Item>
-                  Ideal for promotions, launch events, and timed campaigns.
+                  {t("help:scheduling.point4")}
                 </List.Item>
               </List>
             </BlockStack>
@@ -245,27 +256,30 @@ export default function HelpPage() {
                 <Icon source={ShieldCheckMarkIcon} tone="success" />
 
                 <Text as="h2" variant="headingMd">
-                  Safety & Recovery
+                  {t("help:section.safetyRecovery")}
                 </Text>
               </InlineStack>
 
               <Text as="p" tone="subdued">
-                All pricing actions are designed to be reviewable and recoverable.
+                {t("help:desc.safetyRecovery")}
               </Text>
 
               <Divider />
 
               <List>
                 <List.Item>
-                  <strong>Preview first:</strong> Review calculated changes before applying.
+                  <strong>{t("help:safety.step1_label")}</strong>{" "}
+                  {t("help:safety.step1_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Undo:</strong> Restore previous prices after bulk updates.
+                  <strong>{t("help:safety.step2_label")}</strong>{" "}
+                  {t("help:safety.step2_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>History:</strong> Original prices are stored securely for rollback and audit purposes.
+                  <strong>{t("help:safety.step3_label")}</strong>{" "}
+                  {t("help:safety.step3_desc")}
                 </List.Item>
               </List>
             </BlockStack>
@@ -274,33 +288,36 @@ export default function HelpPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Pricing Rules Basics
+                {t("help:section.pricingRulesBasics")}
               </Text>
 
               <Text as="p" tone="subdued">
-                Preview prices are calculated from your current live product prices.
+                {t("help:desc.pricingRulesBasics")}
               </Text>
 
               <Divider />
 
               <List>
                 <List.Item>
-                  <strong>Markup:</strong> Percentage increase or decrease.
+                  <strong>{t("help:pricingRules.markup_label")}</strong>{" "}
+                  {t("help:pricingRules.markup_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Rounding:</strong> Set consistent decimal endings.
+                  <strong>{t("help:pricingRules.rounding_label")}</strong>{" "}
+                  {t("help:pricingRules.rounding_desc")}
                 </List.Item>
 
                 <List.Item>
-                  <strong>Charm Pricing:</strong> Common endings like .99 when enabled.
+                  <strong>{t("help:pricingRules.charm_label")}</strong>{" "}
+                  {t("help:pricingRules.charm_desc")}
                 </List.Item>
               </List>
             </BlockStack>
           </Card>
 
           <Banner tone="success">
-            Refresh previews after updating pricing rules so the dashboard reflects your latest calculations.
+            {t("help:banner.refreshTip")}
           </Banner>
 
         </BlockStack>

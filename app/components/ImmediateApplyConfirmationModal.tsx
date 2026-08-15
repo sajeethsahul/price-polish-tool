@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, BlockStack, Text, TextField, Badge, InlineStack, Box } from "@shopify/polaris";
 import { DiscardChangesModal } from "./DiscardChangesModal";
 import type { OperationalSafeguardNotice } from "../types/pricing";
+import { t } from "../utils/i18n";
 
 export interface ImmediateApplyImpactSummary {
   increaseCount: number;
@@ -123,7 +124,7 @@ export function ImmediateApplyConfirmationModal({
       onClose={() => {
         if (!isProcessing) runOrConfirm(onClose);
       }}
-      title="Confirm Immediate Apply"
+      title={t("bulk.modal.confirmTitle")}
       primaryAction={{
         content: "Apply",
         loading: isProcessing,
@@ -208,7 +209,7 @@ export function ImmediateApplyConfirmationModal({
           )}
           <Box paddingBlockStart={safeguardNotices.length > 0 ? "300" : "0"}>
             <TextField
-              label="Campaign Title"
+              label={t("bulk.modal.campaignLabel")}
               value={campaignTitle}
               onChange={(value) => {
                 setCampaignTitle(value);
@@ -224,7 +225,7 @@ export function ImmediateApplyConfirmationModal({
                 const validationError = validateCampaignTitle(normalized);
                 setTitleError(validationError);
               }}
-              placeholder="e.g., Weekend Price Refresh"
+              placeholder={t("bulk.modal.campaignPlaceholder")}
               autoComplete="off"
               error={titleError}
               disabled={isProcessing}

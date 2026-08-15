@@ -551,10 +551,10 @@ function StoreHealthCard({
           : "not-configured";
 
   const statusBadge = {
-    attention: <Badge tone="critical">Attention Required</Badge>,
-    healthy: <Badge tone="success">Healthy</Badge>,
-    staged: <Badge tone="attention">Changes Ready</Badge>,
-    "not-configured": <Badge>Not Configured</Badge>,
+    attention: <Badge tone="critical">{t("common.statusAttention")}</Badge>,
+    healthy: <Badge tone="success">{t("common.statusHealthy")}</Badge>,
+    staged: <Badge tone="attention">{t("common.statusChangesReady")}</Badge>,
+    "not-configured": <Badge>{t("common.statusNotConfigured")}</Badge>,
   }[storeStatus];
 
   const lastPublish = formatRelativeTime(latestInfluenceAt);
@@ -3016,7 +3016,7 @@ const filteredPreviews = useMemo(() => {
 
       `}</style>
 
-      <Page title="Dashboard" fullWidth>
+      <Page title={t("common.dashboard")} fullWidth>
         <div style={{ width: "100%" }}>
           <BlockStack gap="300">
             {/* Debug Tools */}
@@ -3066,7 +3066,7 @@ const filteredPreviews = useMemo(() => {
                     </BlockStack>
                     <Banner tone="info">
                       <p>
-                        If <strong>Is Embedded</strong> is NO, the app is
+                        If <strong>{t("common.isEmbedded")}</strong> is NO, the app is
                         running on its own domain instead of{" "}
                         <code>admin.shopify.com</code>. This will cause App
                         Bridge origin mismatches.
@@ -3111,9 +3111,9 @@ const filteredPreviews = useMemo(() => {
                     updates safely.
                   </Text>
                   <InlineStack gap="200">
-                    <Badge tone="success">Bulk Pricing</Badge>
-                    <Badge tone="success">Undo Anytime</Badge>
-                    <Badge tone="success">Live Store Sync</Badge>
+                    <Badge tone="success">{t("pricing.bulkPricing")}</Badge>
+                    <Badge tone="success">{t("pricing.undoAnytime")}</Badge>
+                    <Badge tone="success">{t("pricing.liveStoreSync")}</Badge>
                   </InlineStack>
                   {/* UPDATED: variant="primary" — Task 5 hierarchy */}
                   <Button
@@ -3547,7 +3547,7 @@ const filteredPreviews = useMemo(() => {
 
               {/* Warning Banner Row */}
               {!hasRules && ruleExists !== null && (
-                <Banner tone="warning" title="No Pricing Rules Found">
+                <Banner tone="warning" title={t("errors.noPricingRulesFound")}>
                   <BlockStack gap="200">
                     <p>
                       You must configure at least one pricing rule before
@@ -3804,12 +3804,12 @@ const filteredPreviews = useMemo(() => {
             {/* Search Input */}
             <div style={{ flex: "2 1 180px", minWidth: "160px" }}>
               <TextField
-                label="Search Products"
+                label={t("dashboard.products.searchLabel")}
                 labelHidden
                 value={searchQuery}
                 onChange={handleSearchChange}
                 autoComplete="off"
-                placeholder="Search by product, type, vendor, or category..."
+                placeholder={t("dashboard.products.searchPlaceholder")}
                 prefix={<Icon source={SearchIcon} tone="base" />}
                 maxLength={100}
               />
@@ -3818,7 +3818,7 @@ const filteredPreviews = useMemo(() => {
             {/* Sort Menu Selector */}
             <div style={{ flex: "1.5 1 140px", minWidth: "140px" }}>
               <Select
-                label="Sort by"
+                label={t("common.sortBy")}
                 labelHidden
                 options={[
                   { label: "Sort: A–Z", value: "alphabetical_az" },
@@ -3833,10 +3833,10 @@ const filteredPreviews = useMemo(() => {
               />
             </div>
 
-            {/* Min Price Field */}
-            <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
+{/* Min Price Field */}
+      <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
               <TextField
-                label="Min Price"
+                label={t("dashboard.products.minPriceLabel")}
                 labelHidden
                 type="text"
                 inputMode="decimal"
@@ -3844,7 +3844,7 @@ const filteredPreviews = useMemo(() => {
                 onChange={handleMinPriceChange}
                 autoComplete="off"
                 prefix={currencySymbol}
-                placeholder="Min"
+                placeholder={t("dashboard.products.minPricePlaceholder")}
                 maxLength={15}
               />
             </div>
@@ -3852,7 +3852,7 @@ const filteredPreviews = useMemo(() => {
             {/* Max Price Field */}
             <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
               <TextField
-                label="Max Price"
+                label={t("dashboard.products.maxPriceLabel")}
                 labelHidden
                 type="text"
                 inputMode="decimal"
@@ -3860,7 +3860,7 @@ const filteredPreviews = useMemo(() => {
                 onChange={handleMaxPriceChange}
                 autoComplete="off"
                 prefix={currencySymbol}
-                placeholder="Max"
+                placeholder={t("dashboard.products.maxPricePlaceholder")}
                 maxLength={15}
               />
             </div>
@@ -4637,10 +4637,10 @@ const filteredPreviews = useMemo(() => {
                   marginTop: "4px",
                 }}
               >
-                {isManual && <Badge tone="attention">Manual override</Badge>}
+                {isManual && <Badge tone="attention">{t("pricing.manualOverride")}</Badge>}
 
                 {Math.abs(diffFromOriginal) >= 20 && (
-                  <Badge tone="warning">High impact</Badge>
+                  <Badge tone="warning">{t("pricing.highImpact")}</Badge>
                 )}
               </div>
             </BlockStack>
@@ -4916,10 +4916,10 @@ const filteredPreviews = useMemo(() => {
             setCampaignDetailPageSize(15);
             setCampaignDetailPage(1);
           }}
-          title={`Campaign Details${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
+          title={`${t("dashboard.campaignDetail.modalTitle")}${selectedCampaignForDetail ? `: ${selectedCampaignForDetail.title}` : ""}`}
           secondaryActions={[
             {
-              content: "Close",
+              content: t("common.close"),
               onAction: () => {
                 setCampaignDetailOpen(false);
                 setCampaignDetail(null);
@@ -4940,15 +4940,15 @@ const filteredPreviews = useMemo(() => {
                 <>
                   <InlineStack gap="300" wrap>
                     <Text as="p" variant="bodySm">
-                      <strong>Campaign:</strong> {campaignDetail.title}
+                      <strong>{t("dashboard.revertPreview.campaignLabel")}</strong> {campaignDetail.title}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
                       <strong>
                         {campaignDetail.preActivation ||
                         campaignDetail.prePublish ||
                         campaignDetail.staged
-                          ? "Scheduled products"
-                          : "Tracked items"}
+                          ? t("dashboard.campaignDetail.scheduledProductsLabel")
+                          : t("dashboard.campaignDetail.trackedItemsLabel")}
                         :
                       </strong>{" "}
                       {(() => {
@@ -4967,9 +4967,9 @@ const filteredPreviews = useMemo(() => {
                                 variantCount: fallbackCount,
                               };
                         if (counts.variantCount !== counts.productCount) {
-                          return `${counts.productCount} products • ${counts.variantCount} variants`;
+                          return `${counts.productCount} ${t("dashboard.campaignDetail.productsSuffix")} • ${counts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`;
                         }
-                        return `${counts.productCount} products`;
+                        return `${counts.productCount} ${t("dashboard.campaignDetail.productsSuffix")}`;
                       })()}
                     </Text>
                   </InlineStack>
@@ -4997,16 +4997,16 @@ const filteredPreviews = useMemo(() => {
                             }
                           >
                             {campaignDetail.staged
-                              ? "Draft Campaign"
+                              ? t("dashboard.campaignDetail.draftCampaignBadge")
                               : campaignDetail.schedule?.status ===
                                   "cancelled-window"
-                                ? "Cancelled Window"
+                                ? t("dashboard.campaignDetail.cancelledWindowBadge")
                                 : campaignDetail.schedule?.status ===
                                     "cancelled-publish"
-                                  ? "Cancelled"
+                                  ? t("dashboard.campaignDetail.cancelledBadge")
                                   : campaignDetail.prePublish
-                                    ? "Publish Scheduled"
-                                    : "Window Scheduled"}
+                                    ? t("dashboard.campaignDetail.publishScheduledBadge")
+                                    : t("dashboard.campaignDetail.windowScheduledBadge")}
                           </Badge>
                           {!campaignDetail.staged && (
                             <Badge tone="attention">
@@ -5018,33 +5018,33 @@ const filteredPreviews = useMemo(() => {
                         </InlineStack>
                         <Text as="p" variant="bodySm">
                           {campaignDetail.staged
-                            ? "These prices have been staged but not yet published to Shopify."
+                            ? t("dashboard.campaignDetail.stagedBody")
                             : campaignDetail.schedule?.status ===
                                 "cancelled-window"
-                              ? "This pricing window was cancelled before it started."
+                              ? t("dashboard.campaignDetail.cancelledWindowBody")
                               : campaignDetail.schedule?.status ===
                                   "cancelled-publish"
-                                ? "This scheduled publish was cancelled before it started."
+                                ? t("dashboard.campaignDetail.cancelledPublishBody")
                                 : campaignDetail.prePublish
-                                  ? "This pricing publish is scheduled and has not started yet."
-                                  : "This pricing window is scheduled and has not started yet."}
+                                  ? t("dashboard.campaignDetail.prePublishBody")
+                                  : t("dashboard.campaignDetail.windowScheduledBody")}
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
                           {campaignDetail.staged
-                            ? "Use Publish Pricing to apply these changes to your storefront."
+                            ? t("dashboard.campaignDetail.stagedSubBody")
                             : campaignDetail.schedule?.status ===
                                   "cancelled-window" ||
                                 campaignDetail.schedule?.status ===
                                   "cancelled-publish"
-                              ? "No storefront pricing was changed for this cancelled schedule."
+                              ? t("dashboard.campaignDetail.cancelledSubBody")
                               : campaignDetail.prePublish
-                                ? "Applied storefront details will appear after publishing completes."
-                                : "Tracked storefront pricing details will appear once the publish window activates."}
+                                ? t("dashboard.campaignDetail.prePublishSubBody")
+                                : t("dashboard.campaignDetail.windowSubBody")}
                         </Text>
                         <InlineStack gap="400" wrap>
                           {campaignDetail.schedule?.runAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Publish start:{" "}
+                              {t("dashboard.campaignDetail.publishStartLabel")}{" "}
                               {new Date(
                                 campaignDetail.schedule.runAt,
                               ).toLocaleString()}
@@ -5052,7 +5052,7 @@ const filteredPreviews = useMemo(() => {
                           )}
                           {campaignDetail.schedule?.windowEndAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Automatic restore:{" "}
+                              {t("dashboard.campaignDetail.automaticRestoreLabel")}{" "}
                               {new Date(
                                 campaignDetail.schedule.windowEndAt,
                               ).toLocaleString()}
@@ -5068,14 +5068,14 @@ const filteredPreviews = useMemo(() => {
                                       variantCount: campaignDetail.productCount,
                                     };
                               if (counts.variantCount !== counts.productCount) {
-                                return `Intended pricing scope: ${counts.productCount} products • ${counts.variantCount} variants`;
+                                return `${t("dashboard.campaignDetail.intendedScopePrefix")} ${counts.productCount} ${t("dashboard.campaignDetail.productsSuffix")} • ${counts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`;
                               }
-                              return `Intended pricing scope: ${counts.productCount} products`;
+                              return `${t("dashboard.campaignDetail.intendedScopePrefix")} ${counts.productCount} ${t("dashboard.campaignDetail.productsSuffix")}`;
                             })()}
                           </Text>
                           {campaignDetail.schedule?.createdAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Created:{" "}
+                              {t("dashboard.campaignDetail.createdLabel")}{" "}
                               {new Date(
                                 campaignDetail.schedule.createdAt,
                               ).toLocaleString()}
@@ -5099,14 +5099,14 @@ const filteredPreviews = useMemo(() => {
                             <BlockStack gap="150">
                               <InlineStack gap="200" wrap>
                                 <Badge tone="success">
-                                  Pricing Currently Active
+                                  {t("dashboard.campaignDetail.pricingActiveBadge")}
                                 </Badge>
-                                <Badge tone="attention">Time Window</Badge>
+                                <Badge tone="attention">{t("dashboard.campaignDetail.timeWindowBadge")}</Badge>
                               </InlineStack>
                               <InlineStack gap="400" wrap>
                                 {selectedCampaignForDetail.runAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Active since:{" "}
+                                    {t("dashboard.campaignDetail.activeSinceLabel")}{" "}
                                     {new Date(
                                       selectedCampaignForDetail.runAt,
                                     ).toLocaleString()}
@@ -5114,7 +5114,7 @@ const filteredPreviews = useMemo(() => {
                                 )}
                                 {selectedCampaignForDetail.windowEndAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Restore time:{" "}
+                                    {t("dashboard.campaignDetail.restoreTimeLabel")}{" "}
                                     {new Date(
                                       selectedCampaignForDetail.windowEndAt,
                                     ).toLocaleString()}
@@ -5127,7 +5127,7 @@ const filteredPreviews = useMemo(() => {
                                   variant="bodySm"
                                   fontWeight="medium"
                                 >
-                                  {`Remaining duration: ${formatDurationParts(
+                                  {`${t("dashboard.campaignDetail.remainingDurationPrefix")} ${formatDurationParts(
                                     new Date(
                                       selectedCampaignForDetail.windowEndAt,
                                     ).getTime() - campaignRuntimeNow.getTime(),
@@ -5138,9 +5138,9 @@ const filteredPreviews = useMemo(() => {
                           </Box>
                         )}
                       <InlineStack gap="200" wrap>
-                        <Badge tone="success">{`Reverted: ${campaignDetail.revertedCount ?? 0}`}</Badge>
-                        <Badge tone="warning">{`Failed: ${campaignDetail.failedCount ?? 0}`}</Badge>
-                        <Badge tone="critical">{`Unrecoverable: ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
+                        <Badge tone="success">{`${t("dashboard.campaignDetail.revertedBadgePrefix")} ${campaignDetail.revertedCount ?? 0}`}</Badge>
+                        <Badge tone="warning">{`${t("dashboard.campaignDetail.failedBadgePrefix")} ${campaignDetail.failedCount ?? 0}`}</Badge>
+                        <Badge tone="critical">{`${t("dashboard.campaignDetail.unrecoverableBadgePrefix")} ${campaignDetail.unrecoverableCount ?? 0}`}</Badge>
                       </InlineStack>
                     </BlockStack>
                   )}
@@ -5153,7 +5153,7 @@ const filteredPreviews = useMemo(() => {
                     >
                       <BlockStack gap="200">
                         <Text as="h3" variant="headingSm">
-                          Operational timeline
+                          {t("dashboard.campaignDetail.operationalTimelineTitle")}
                         </Text>
                         <div
                           style={{
@@ -5210,7 +5210,7 @@ const filteredPreviews = useMemo(() => {
                                         {milestone.label}
                                       </Text>
                                       <Badge tone={milestone.tone}>
-                                        {milestone.badgeLabel ?? "Milestone"}
+                                        {milestone.badgeLabel ?? t("dashboard.campaignDetail.milestoneBadgeDefault")}
                                       </Badge>
                                     </InlineStack>
                                     {milestone.timestamp ? (
@@ -5243,7 +5243,7 @@ const filteredPreviews = useMemo(() => {
                     <BlockStack gap="300">
                       <InlineStack align="space-between" blockAlign="end">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          {`Showing ${
+                          {`${t("dashboard.revertPreview.showingPrefix")} ${
                             campaignDetailPaginatedRows.length === 0
                               ? 0
                               : (campaignDetailPage - 1) *
@@ -5252,17 +5252,17 @@ const filteredPreviews = useMemo(() => {
                           }-${
                             (campaignDetailPage - 1) * campaignDetailPageSize +
                             campaignDetailPaginatedRows.length
-                          } of ${campaignDetailRows.length} ${
+                          } ${t("dashboard.revertPreview.ofSuffix")} ${campaignDetailRows.length} ${
                             campaignDetail.preActivation ||
                             campaignDetail.prePublish ||
                             campaignDetail.staged
-                              ? "scheduled products"
-                              : "tracked items"
+                              ? t("dashboard.campaignDetail.scheduledProductsLower")
+                              : t("dashboard.campaignDetail.trackedItemsLower")
                           }`}
                         </Text>
                         <div style={{ minWidth: 140 }}>
                           <Select
-                            label="Rows per page"
+                            label={t("dashboard.revertPreview.rowsPerPageLabel")}
                             options={OPERATIONAL_PAGE_SIZE_OPTIONS.map(
                               (size) => ({
                                 label: `${SELECT_OPTION_PREFIX}${size}`,
@@ -5288,7 +5288,7 @@ const filteredPreviews = useMemo(() => {
                           }}
                         >
                           <Text as="p" variant="bodySm" fontWeight="medium">
-                            Product
+                            {t("dashboard.revertPreview.tableHeaderProduct")}
                           </Text>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
                             <Text
@@ -5300,8 +5300,8 @@ const filteredPreviews = useMemo(() => {
                               {campaignDetail.preActivation ||
                               campaignDetail.prePublish ||
                               campaignDetail.staged
-                                ? "Original Price"
-                                : "Reverted From"}
+                                ? t("dashboard.campaignDetail.originalPriceHeader")
+                                : t("dashboard.campaignDetail.revertedFromHeader")}
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -5314,13 +5314,13 @@ const filteredPreviews = useMemo(() => {
                               {campaignDetail.preActivation ||
                               campaignDetail.prePublish ||
                               campaignDetail.staged
-                                ? "Staged Price"
-                                : "Restored To"}
+                                ? t("dashboard.campaignDetail.stagedPriceHeader")
+                                : t("dashboard.campaignDetail.restoredToHeader")}
                             </Text>
                           </div>
                           <InlineStack align="start">
                             <Text as="p" variant="bodySm" fontWeight="medium">
-                              Status
+                              {t("dashboard.campaignDetail.statusHeader")}
                             </Text>
                           </InlineStack>
                         </div>
@@ -5445,8 +5445,7 @@ const filteredPreviews = useMemo(() => {
                         {(campaignDetail.missingHistoricalRevertedFromCount ??
                           0) > 0 && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Some historical pre-revert values are unavailable.
-                            Restored values remain accurate.
+                            {t("dashboard.campaignDetail.historicalUnavailableNotice")}
                           </Text>
                         )}
                         <InlineStack align="end">
@@ -5465,7 +5464,7 @@ const filteredPreviews = useMemo(() => {
                                 Math.min(campaignDetailTotalPages, prev + 1),
                               )
                             }
-                            label={`Page ${campaignDetailPage} of ${campaignDetailTotalPages}`}
+                            label={`${t("dashboard.revertPreview.pagePrefix")} ${campaignDetailPage} ${t("dashboard.revertPreview.ofSuffix")} ${campaignDetailTotalPages}`}
                           />
                         </InlineStack>
                       </BlockStack>
@@ -5474,13 +5473,12 @@ const filteredPreviews = useMemo(() => {
                 </>
               ) : (
                 <Text as="p" variant="bodySm" tone="subdued">
-                  No campaign detail data available.
+                  {t("dashboard.campaignDetail.noDetailData")}
                 </Text>
               )}
             </BlockStack>
           </Modal.Section>
         </Modal>
-
         <Modal
           open={revertPreviewOpen}
           onClose={() => {
@@ -5491,14 +5489,14 @@ const filteredPreviews = useMemo(() => {
             setRevertPreviewRetryFailedOnly(false);
             resetRevertPreviewViewState();
           }}
-          title={`${revertPreviewRetryFailedOnly ? "Retry Failed Reverts" : "Revert Campaign"}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
+          title={`${revertPreviewRetryFailedOnly ? t("dashboard.revertPreview.modalTitleRetry") : t("dashboard.revertPreview.modalTitleRevert")}${selectedCampaignForRevert ? `: ${selectedCampaignForRevert.title}` : ""}`}
           primaryAction={
             revertPreview?.terminal
               ? undefined
               : {
                   content: revertPreviewRetryFailedOnly
-                    ? "Confirm Retry"
-                    : "Confirm Revert",
+                    ? t("dashboard.revertPreview.confirmRetryCta")
+                    : t("dashboard.revertPreview.confirmRevertCta"),
                   onAction: () => {
                     void confirmCampaignRevert();
                   },
@@ -5512,7 +5510,7 @@ const filteredPreviews = useMemo(() => {
           }
           secondaryActions={[
             {
-              content: "Cancel",
+              content: t("common.cancel"),
               onAction: () => {
                 setRevertPreviewOpen(false);
                 setSelectedCampaignForRevert(null);
@@ -5537,18 +5535,17 @@ const filteredPreviews = useMemo(() => {
                     </Banner>
                   )}
                   <Text as="p" variant="bodySm" tone="subdued">
-                    Review the current storefront prices against revert target
-                    prices before confirming.
+                    {t("dashboard.revertPreview.reviewPricesNotice")}
                   </Text>
                   <InlineStack gap="300" wrap>
                     <Text as="p" variant="bodySm">
-                      <strong>Campaign:</strong> {revertPreview.title}
+                      <strong>{t("dashboard.revertPreview.campaignLabel")}</strong> {revertPreview.title}
                     </Text>
                     <Text as="p" variant="bodySm">
-                      <strong>Affected products:</strong>{" "}
+                      <strong>{t("dashboard.revertPreview.affectedProductsLabel")}</strong>{" "}
                       {revertPreviewCounts.variantCount !==
                       revertPreviewCounts.productCount
-                        ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
+                        ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`
                         : revertPreviewCounts.productCount}
                     </Text>
                   </InlineStack>
@@ -5563,11 +5560,11 @@ const filteredPreviews = useMemo(() => {
                     >
                       {revertPreviewCounts.variantCount !==
                       revertPreviewCounts.productCount
-                        ? `Affected products: ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} variants`
-                        : `Affected products: ${revertPreviewCounts.productCount}`}
+                        ? `${t("dashboard.revertPreview.affectedProductsBadgePrefix")} ${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`
+                        : `${t("dashboard.revertPreview.affectedProductsBadgePrefix")} ${revertPreviewCounts.productCount}`}
                     </Badge>
                     <Badge tone="success">
-                      {`Revert rows in preview: ${revertPreview.rows.length}`}
+                      {`${t("dashboard.revertPreview.revertRowsBadgePrefix")} ${revertPreview.rows.length}`}
                     </Badge>
                   </InlineStack>
                   {revertSafeguardNotices.length > 0 && (
@@ -5585,20 +5582,20 @@ const filteredPreviews = useMemo(() => {
                           wrap
                         >
                           <Text as="p" variant="bodySm" fontWeight="medium">
-                            Operational safeguards
+                            {t("dashboard.revertPreview.operationalSafeguardsTitle")}
                           </Text>
                           <InlineStack gap="100" wrap>
                             <Badge tone="warning">
-                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} Warning${
+                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "warning").length} ${
                                 revertSafeguardNotices.filter(
                                   (notice) => notice.severity === "warning",
                                 ).length === 1
-                                  ? ""
-                                  : "s"
+                                  ? t("dashboard.revertPreview.warningLabel")
+                                  : t("dashboard.revertPreview.warningLabelPlural")
                               }`}
                             </Badge>
                             <Badge tone="info">
-                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "informational").length} Info`}
+                              {`${revertSafeguardNotices.filter((notice) => notice.severity === "informational").length} ${t("dashboard.revertPreview.infoLabel")}`}
                             </Badge>
                           </InlineStack>
                         </InlineStack>
@@ -5617,8 +5614,8 @@ const filteredPreviews = useMemo(() => {
                                 }
                               >
                                 {notice.severity === "warning"
-                                  ? "Warning"
-                                  : "Info"}
+                                  ? t("dashboard.revertPreview.warningLabel")
+                                  : t("dashboard.revertPreview.infoLabel")}
                               </Badge>
                               <Text as="p" variant="bodySm" tone="subdued">
                                 {notice.message}
@@ -5641,7 +5638,7 @@ const filteredPreviews = useMemo(() => {
                     borderColor="border"
                     borderWidth="025"
                   >
-                    <InlineStack
+                  <InlineStack
                       gap="200"
                       wrap
                       align="space-between"
@@ -5649,32 +5646,32 @@ const filteredPreviews = useMemo(() => {
                     >
                       <div style={{ minWidth: 220, flex: "1 1 320px" }}>
                         <TextField
-                          label="Search product"
+                          label={t("dashboard.revertPreview.searchLabel")}
                           value={revertPreviewSearchQuery}
                           onChange={setRevertPreviewSearchQuery}
-                          placeholder="Search by product title"
+                          placeholder={t("dashboard.revertPreview.searchPlaceholder")}
                           autoComplete="off"
                           disabled={isProcessing}
                         />
                       </div>
                       <div style={{ minWidth: 210 }}>
                         <Select
-                          label="Movement filter"
+                          label={t("dashboard.revertPreview.movementFilterLabel")}
                           options={[
                             {
-                              label: `${SELECT_OPTION_PREFIX}All products`,
+                              label: `${SELECT_OPTION_PREFIX}${t("dashboard.revertPreview.movementFilterAll")}`,
                               value: "all",
                             },
                             {
-                              label: `${SELECT_OPTION_PREFIX}Price increases`,
+                              label: `${SELECT_OPTION_PREFIX}${t("dashboard.revertPreview.movementFilterIncrease")}`,
                               value: "increase",
                             },
                             {
-                              label: `${SELECT_OPTION_PREFIX}Price decreases`,
+                              label: `${SELECT_OPTION_PREFIX}${t("dashboard.revertPreview.movementFilterDecrease")}`,
                               value: "decrease",
                             },
                             {
-                              label: `${SELECT_OPTION_PREFIX}Large movements`,
+                              label: `${SELECT_OPTION_PREFIX}${t("dashboard.revertPreview.movementFilterLarge")}`,
                               value: "large_movement",
                             },
                           ]}
@@ -5689,7 +5686,7 @@ const filteredPreviews = useMemo(() => {
                       </div>
                       <div style={{ minWidth: 130 }}>
                         <Select
-                          label="Rows per page"
+                          label={t("dashboard.revertPreview.rowsPerPageLabel")}
                           options={OPERATIONAL_PAGE_SIZE_OPTIONS.map(
                             (size) => ({
                               label: `${SELECT_OPTION_PREFIX}${size}`,
@@ -5721,7 +5718,7 @@ const filteredPreviews = useMemo(() => {
                         }}
                       >
                         <Text as="p" variant="bodySm" fontWeight="medium">
-                          Product
+                          {t("dashboard.revertPreview.tableHeaderProduct")}
                         </Text>
                         <div
                           style={{
@@ -5735,7 +5732,7 @@ const filteredPreviews = useMemo(() => {
                             fontWeight="medium"
                             alignment="end"
                           >
-                            Current
+                            {t("dashboard.revertPreview.tableHeaderCurrent")}
                           </Text>
                         </div>
                         <div
@@ -5750,7 +5747,7 @@ const filteredPreviews = useMemo(() => {
                             fontWeight="medium"
                             alignment="end"
                           >
-                            Revert Target
+                            {t("dashboard.revertPreview.tableHeaderRevertTarget")}
                           </Text>
                         </div>
                       </div>
@@ -5838,20 +5835,19 @@ const filteredPreviews = useMemo(() => {
                       ))}
                       {revertPreviewFilteredRows.length === 0 ? (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          No products match the current revert preview filters.
+                          {t("dashboard.revertPreview.noMatchingProducts")}
                         </Text>
                       ) : null}
                       {revertPreview.rows.some((row) =>
                         Boolean(row.revertFailureReason),
                       ) && (
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Some items include recovery notes from previous
-                          Shopify failures.
+                          {t("dashboard.revertPreview.recoveryNotesNotice")}
                         </Text>
                       )}
                       <InlineStack align="space-between" blockAlign="center">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          {`Showing ${
+                          {`${t("dashboard.revertPreview.showingPrefix")} ${
                             revertPreviewFilteredRows.length === 0
                               ? 0
                               : (revertPreviewPage - 1) *
@@ -5860,7 +5856,7 @@ const filteredPreviews = useMemo(() => {
                           }-${Math.min(
                             revertPreviewPage * revertPreviewPageSize,
                             revertPreviewFilteredRows.length,
-                          )} of ${revertPreviewFilteredRows.length} matching products`}
+                          )} ${t("dashboard.revertPreview.ofSuffix")} ${revertPreviewFilteredRows.length} ${t("dashboard.revertPreview.matchingProductsSuffix")}`}
                         </Text>
                         <Pagination
                           hasPrevious={revertPreviewPage > 1}
@@ -5875,7 +5871,7 @@ const filteredPreviews = useMemo(() => {
                               Math.min(revertPreviewTotalPages, prev + 1),
                             )
                           }
-                          label={`Page ${revertPreviewPage} of ${revertPreviewTotalPages}`}
+                          label={`${t("dashboard.revertPreview.pagePrefix")} ${revertPreviewPage} ${t("dashboard.revertPreview.ofSuffix")} ${revertPreviewTotalPages}`}
                         />
                       </InlineStack>
                     </BlockStack>
@@ -5883,39 +5879,39 @@ const filteredPreviews = useMemo(() => {
                 </>
               ) : (
                 <Text as="p" variant="bodySm" tone="subdued">
-                  No preview data available.
+                  {t("dashboard.revertPreview.noPreviewData")}
                 </Text>
               )}
             </BlockStack>
           </Modal.Section>
         </Modal>
 
-        {/* UPDATED TASK 4: Go Live confirmation modal */}
-        <Modal
+{/* UPDATED TASK 4: Go Live confirmation modal */}
+      <Modal
           open={showGoLiveModal}
           onClose={() => setShowGoLiveModal(false)}
-          title="Go Live with Pricing Rules?"
+          title={t("dashboard.goLiveModal.title")}
           primaryAction={{
-            content: "Go Live",
+            content: t("dashboard.goLiveModal.primaryCta"),
             // UPDATED: wraps existing handler — no logic change
             onAction: () => handlePushStorefront(false),
             loading: isProcessing,
             disabled: isProcessing,
           }}
           secondaryActions={[
-            { content: "Cancel", onAction: () => setShowGoLiveModal(false) },
+            { content: t("common.cancel"), onAction: () => setShowGoLiveModal(false) },
           ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
-              <Text as="p">Prices will be applied to your storefront.</Text>
+              <Text as="p">{t("dashboard.goLiveModal.body")}</Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
-                  <Text as="p">✔️ This will affect all product prices</Text>
-                  <Text as="p">✔️ You can stop anytime</Text>
+                  <Text as="p">✔️ {t("dashboard.goLiveModal.bullet1")}</Text>
+                  <Text as="p">✔️ {t("dashboard.goLiveModal.bullet2")}</Text>
                 </BlockStack>
               </Box>
-              <Text as="p">Do you want to continue?</Text>
+              <Text as="p">{t("dashboard.goLiveModal.confirmPrompt")}</Text>
             </BlockStack>
           </Modal.Section>
         </Modal>
@@ -5924,9 +5920,9 @@ const filteredPreviews = useMemo(() => {
         <Modal
           open={showStopModal}
           onClose={() => setShowStopModal(false)}
-          title="Stop Live Pricing?"
+          title={t("dashboard.stopLiveModal.title")}
           primaryAction={{
-            content: "Stop Live",
+            content: t("dashboard.stopLiveModal.primaryCta"),
             // UPDATED: wraps existing handler — no logic change
             onAction: () => handlePushStorefront(true),
             loading: isProcessing,
@@ -5934,20 +5930,20 @@ const filteredPreviews = useMemo(() => {
             destructive: true,
           }}
           secondaryActions={[
-            { content: "Cancel", onAction: () => setShowStopModal(false) },
+            { content: t("common.cancel"), onAction: () => setShowStopModal(false) },
           ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
               <Text as="p">
-                This will disable dynamic pricing on your storefront.
+                {t("dashboard.stopLiveModal.body")}
               </Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
                   <Text as="p">
-                    ✔️ This will remove all live pricing changes
+                    ✔️ {t("dashboard.stopLiveModal.bullet1")}
                   </Text>
-                  <Text as="p">✔️ Your saved rules will NOT be deleted</Text>
+                  <Text as="p">✔️ {t("dashboard.stopLiveModal.bullet2")}</Text>
                 </BlockStack>
               </Box>
             </BlockStack>

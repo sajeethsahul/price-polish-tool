@@ -8,9 +8,12 @@ import {
 import { isRouteErrorResponse, useRouteError } from "react-router";
 
 import { AppProvider } from "@shopify/polaris";
+import { I18nextProvider } from "react-i18next";
 
 import globalStyles from "./styles/global.css?url";
 import { AppLaunchSplash } from "./components/AppLaunchSplash";
+import { t } from "./utils/i18n";
+import i18n from "./utils/i18n.client";
 
 export const links = () => [
   {
@@ -25,28 +28,30 @@ export const links = () => [
 
 export default function App() {
   return (
-    <html lang="en">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <I18nextProvider i18n={i18n}>
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-        <link rel="preconnect" href="https://cdn.shopify.com/" />
+          <link rel="preconnect" href="https://cdn.shopify.com/" />
 
-        {/* ✅ CRITICAL FIX */}
-        <script
-          src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
-          defer
-        ></script>
+          {/* ✅ CRITICAL FIX */}
+          <script
+            src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+            defer
+          ></script>
 
-        <Meta />
-        <Links />
-      </head>
-      <body>
-        <Outlet />
-        <ScrollRestoration />
-        <Scripts />
-      </body>
-    </html>
+          <Meta />
+          <Links />
+        </head>
+        <body>
+          <Outlet />
+          <ScrollRestoration />
+          <Scripts />
+        </body>
+      </html>
+    </I18nextProvider>
   );
 }
 
@@ -97,7 +102,7 @@ export function ErrorBoundary() {
   return (
     <html>
       <body>
-        <h1>App Error</h1>
+        <h1>{t("common.error.appError")}</h1>
         <p>{message}</p>
       </body>
     </html>

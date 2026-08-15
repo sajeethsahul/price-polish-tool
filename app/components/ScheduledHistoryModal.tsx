@@ -51,6 +51,21 @@ const VERY_LARGE_SCHEDULE_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
 const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: t("common.status.pending"),
+  processing: t("common.status.processing"),
+  "missed-during-uninstall": t("common.status.missedDuringUninstall"),
+  "active-window": t("common.status.activeWindow"),
+  restoring: t("common.status.restoring"),
+  "auto-restored": t("common.status.autoRestored"),
+  "restore-failed": t("common.status.restoreFailed"),
+  done: t("common.status.completed"),
+  success: t("common.status.completed"),
+  completed: t("common.status.completed"),
+  failed: t("common.status.failed"),
+  error: t("common.status.failed"),
+};
+
 function normalizeMeaningfulVariantTitle(value: string | null | undefined, productTitle?: string | null) {
   const trimmed = (value ?? "").trim();
   if (!trimmed) return null;
@@ -780,30 +795,33 @@ export function ScheduledHistoryModal({
   }, [open, isCreateFormDirty, onDirtyChange]);
 
   const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
+    const normalized = status.toLowerCase();
+    const label = STATUS_LABELS[normalized] ?? status;
+
+    switch (normalized) {
       case "pending":
-        return <Badge tone="warning">Pending</Badge>;
+        return <Badge tone="warning">{label}</Badge>;
       case "processing":
-        return <Badge tone="info">Processing</Badge>;
+        return <Badge tone="info">{label}</Badge>;
       case "missed-during-uninstall":
-        return <Badge tone="attention">Missed During Uninstall</Badge>;
+        return <Badge tone="attention">{label}</Badge>;
       case "active-window":
-        return <Badge tone="attention">Active Window</Badge>;
+        return <Badge tone="attention">{label}</Badge>;
       case "restoring":
-        return <Badge tone="info">Restoring</Badge>;
+        return <Badge tone="info">{label}</Badge>;
       case "auto-restored":
-        return <Badge tone="success">Auto Restored</Badge>;
+        return <Badge tone="success">{label}</Badge>;
       case "restore-failed":
-        return <Badge tone="critical">Restore Failed</Badge>;
+        return <Badge tone="critical">{label}</Badge>;
       case "done":
       case "success":
       case "completed":
-        return <Badge tone="success">Completed</Badge>;
+        return <Badge tone="success">{label}</Badge>;
       case "failed":
       case "error":
-        return <Badge tone="critical">Failed</Badge>;
+        return <Badge tone="critical">{label}</Badge>;
       default:
-        return <Badge>{status}</Badge>;
+        return <Badge>{label}</Badge>;
     }
   };
 
@@ -1130,7 +1148,7 @@ export function ScheduledHistoryModal({
             onClose();
           });
         }}
-        title="Schedule Center"
+        title={t("dashboard.Schedule.center.modalTitle")}
         size="large"
       >
         <Modal.Section>
@@ -1147,8 +1165,7 @@ export function ScheduledHistoryModal({
             <div style={{ flex: "0 0 auto" }}>
               <BlockStack gap="300">
                 <Text variant="bodySm" as="p" tone="subdued">
-                  Immediate operations run directly from the dashboard. Use Schedule Center for future
-                  pricing operations.
+                  {t("dashboard.Schedule.center.intro")}
                 </Text>
 
                 <Box
@@ -1166,7 +1183,7 @@ export function ScheduledHistoryModal({
                       variant={selectedTab === "create" ? "primary" : "tertiary"}
                       onClick={() => runOrConfirm(() => setSelectedTab("create"))}
                     >
-                      Create Schedule
+                      {t("dashboard.Schedule.center.createTab")}
                     </Button>
                     <Button
                       size="slim"
@@ -1175,7 +1192,7 @@ export function ScheduledHistoryModal({
                       variant={selectedTab === "history" ? "primary" : "tertiary"}
                       onClick={() => runOrConfirm(() => setSelectedTab("history"))}
                     >
-                      Schedule History
+                      {t("dashboard.Schedule.center.historyTab")}
                     </Button>
                   </InlineStack>
                 </Box>
@@ -1196,15 +1213,15 @@ export function ScheduledHistoryModal({
                     <BlockStack gap="400">
                       <BlockStack gap="150">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          Set timing, scope, and campaign naming for future pricing operations.
+                          {t("dashboard.Schedule.center.createIntro")}
                         </Text>
                         <InlineStack gap="200" wrap>
-                          <Badge tone="info">{`Upcoming runs: ${scheduleCenterData.upcoming.length}`}</Badge>
-                          <Badge tone="attention">{`Upcoming products: ${scheduleCenterData.upcomingProductCount}`}</Badge>
+                          <Badge tone="info">{`${t("dashboard.Schedule.center.upcomingRunsPrefix")} ${scheduleCenterData.upcoming.length}`}</Badge>
+                          <Badge tone="attention">{`${t("dashboard.Schedule.center.upcomingProductsPrefix")} ${scheduleCenterData.upcomingProductCount}`}</Badge>
                           <Badge tone="success">
                             {scheduleCenterData.nextRun
-                              ? `Next run: ${formatDateTime(scheduleCenterData.nextRun.runAt)}`
-                              : "Next run: Not scheduled"}
+                              ? `${t("dashboard.Schedule.center.nextRunPrefix")} ${formatDateTime(scheduleCenterData.nextRun.runAt)}`
+                              : `${t("dashboard.Schedule.center.nextRunPrefix")} ${t("dashboard.Schedule.center.notScheduled")}`}
                           </Badge>
                         </InlineStack>
                       </BlockStack>
@@ -1219,20 +1236,20 @@ export function ScheduledHistoryModal({
                         <BlockStack gap="300">
                           <InlineStack align="space-between" blockAlign="center" wrap>
                             <Text as="p" variant="bodySm" fontWeight="medium">
-                              Scheduling mode
+                              {t("dashboard.Schedule.center.schedulingModeLabel")}
                             </Text>
                             <Badge tone={scheduleMode === "time-window" ? "attention" : "success"}>
-                              {scheduleMode === "time-window" ? "Time Window" : "One-time Publish"}
+                              {scheduleMode === "time-window" ? t("dashboard.Schedule.center.timeWindowBadge") : t("dashboard.Schedule.center.oneTimePublishBadge")}
                             </Badge>
                           </InlineStack>
 
                           <BlockStack gap="300">
                             <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
                               <Select
-                                label="Schedule type"
+                                label={t("dashboard.Schedule.center.scheduleTypeLabel")}
                                 options={[
-                                  { label: `${SELECT_OPTION_PREFIX}One-time Publish`, value: "one-time" },
-                                  { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
+                                  { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.oneTimePublishBadge")}`, value: "one-time" },
+                                  { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.timeWindowBadge")}`, value: "time-window" },
                                 ]}
                                 value={scheduleMode}
                                 onChange={(value) => {
@@ -1245,11 +1262,11 @@ export function ScheduledHistoryModal({
 
                               <div>
                                 <Select
-                                  label="Pricing scope"
+                                  label={t("dashboard.Schedule.center.pricingScopeLabel")}
                                   options={[
-                                    { label: `${SELECT_OPTION_PREFIX}Select scope`, value: "none" },
-                                    { label: `${SELECT_OPTION_PREFIX}Selected products (${selectedScopeCount})`, value: "selected" },
-                                    { label: `${SELECT_OPTION_PREFIX}All products (${previews.length})`, value: "all" },
+                                    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.selectScopeOption")}`, value: "none" },
+                                    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.selectedProductsOption")} (${selectedScopeCount})`, value: "selected" },
+                                    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.allProductsOption")} (${previews.length})`, value: "all" },
                                   ]}
                                   value={scheduleApplyMode}
                                   onChange={(value) => {
@@ -1262,13 +1279,13 @@ export function ScheduledHistoryModal({
                                 {scheduleApplyMode === "none" ? (
                                   <Box paddingBlockStart="100">
                                     <Text as="p" variant="bodySm" tone="subdued">
-                                      Select a scope to enable scheduling.
+                                      {t("dashboard.Schedule.center.selectScopeToEnableNotice")}
                                     </Text>
                                   </Box>
                                 ) : scheduleApplyMode === "selected" && selectedScopeCount === 0 ? (
                                   <Box paddingBlockStart="100">
                                     <Text as="p" variant="bodySm" tone="subdued">
-                                      No products selected.
+                                      {t("dashboard.Schedule.center.noProductsSelectedNotice")}
                                     </Text>
                                   </Box>
                                 ) : null}
@@ -1283,7 +1300,7 @@ export function ScheduledHistoryModal({
                             </div>
 
                             <TextField
-                              label="Campaign title"
+                              label={t("dashboard.Schedule.center.campaignTitleLabel")}
                               value={scheduleTitle}
                               onChange={(value) => {
                                 setScheduleTitle(value);
@@ -1292,7 +1309,7 @@ export function ScheduledHistoryModal({
                                 }
                               }}
                               autoComplete="off"
-                              placeholder="e.g., Weekend Flash Schedule"
+                              placeholder={t("dashboard.Schedule.center.campaignTitlePlaceholder")}
                               error={scheduleTitleError}
                               disabled={isScheduling}
                             />
@@ -1305,7 +1322,7 @@ export function ScheduledHistoryModal({
                               }}
                             >
                               <TextField
-                                label={scheduleMode === "time-window" ? "Window Start" : "Publish at"}
+                                label={scheduleMode === "time-window" ? t("dashboard.Schedule.center.windowStartLabel") : t("dashboard.Schedule.center.publishAtLabel")}
                                 type="datetime-local"
                                 value={scheduleTime}
                                 onChange={(value) => {
@@ -1320,7 +1337,7 @@ export function ScheduledHistoryModal({
                               />
                               {scheduleMode === "time-window" && (
                                 <TextField
-                                  label="Window End"
+                                  label={t("dashboard.Schedule.center.windowEndLabel")}
                                   type="datetime-local"
                                   value={windowEndTime}
                                   onChange={(value) => {
@@ -1350,22 +1367,22 @@ export function ScheduledHistoryModal({
                           <BlockStack gap="200">
                             <InlineStack gap="200" align="space-between" blockAlign="center" wrap>
                               <Text as="p" variant="bodySm" fontWeight="medium">
-                                Operational safeguards
+                                {t("dashboard.revertPreview.operationalSafeguardsTitle")}
                               </Text>
                               <InlineStack gap="100" wrap>
                                 <Badge tone="warning">
-                                  {`${safeguardWarningCount} Warning${
-                                    safeguardWarningCount === 1 ? "" : "s"
+                                  {`${safeguardWarningCount} ${
+                                    safeguardWarningCount === 1 ? t("dashboard.revertPreview.warningLabel") : t("dashboard.revertPreview.warningLabelPlural")
                                   }`}
                                 </Badge>
-                                <Badge tone="info">{`${safeguardInfoCount} Info`}</Badge>
+                                <Badge tone="info">{`${safeguardInfoCount} ${t("dashboard.revertPreview.infoLabel")}`}</Badge>
                               </InlineStack>
                             </InlineStack>
                             <BlockStack gap="150">
                               {scheduleOperationalSafeguards.map((notice) => (
                                 <InlineStack key={notice.id} gap="200" blockAlign="center">
                                   <Badge tone={notice.severity === "warning" ? "warning" : "info"}>
-                                    {notice.severity === "warning" ? "Warning" : "Info"}
+                                    {notice.severity === "warning" ? t("dashboard.revertPreview.warningLabel") : t("dashboard.revertPreview.infoLabel")}
                                   </Badge>
                                   <Text as="p" variant="bodySm" tone="subdued">
                                     {notice.message}
@@ -1385,7 +1402,7 @@ export function ScheduledHistoryModal({
                     <InlineStack gap="200" wrap align="space-between" blockAlign="end">
                       <div style={{ minWidth: 220 }}>
                         <Select
-                          label="History filter"
+                          label={t("dashboard.Schedule.center.historyFilterLabel")}
                           options={historyFilterOptions}
                           value={historyFilter}
                           onChange={(value) =>
@@ -1398,7 +1415,7 @@ export function ScheduledHistoryModal({
                       </div>
                       <div style={{ minWidth: 140 }}>
                         <Select
-                          label="Rows per page"
+                          label={t("dashboard.revertPreview.rowsPerPageLabel")}
                           options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
                             label: `${SELECT_OPTION_PREFIX}${size}`,
                             value: String(size),
@@ -1413,17 +1430,17 @@ export function ScheduledHistoryModal({
                     {loading ? (
                       <Box paddingBlockStart="600" paddingBlockEnd="600">
                         <InlineStack align="center" blockAlign="center">
-                          <Spinner size="small" accessibilityLabel="Loading schedule history" />
+                          <Spinner size="small" accessibilityLabel={t("dashboard.Schedule.center.loadingHistoryLabel")} />
                         </InlineStack>
                       </Box>
                     ) : filteredHistoryRows.length === 0 ? (
                       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
                         <BlockStack gap="100">
                           <Text as="p" variant="bodyMd" fontWeight="medium">
-                            No schedule records for this filter
+                            {t("dashboard.Schedule.center.noRecordsTitle")}
                           </Text>
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Try a different filter, or create a new scheduled pricing run.
+                            {t("dashboard.Schedule.center.noRecordsBody")}
                           </Text>
                         </BlockStack>
                       </Box>
@@ -1432,9 +1449,11 @@ export function ScheduledHistoryModal({
                         {scheduleCenterData.overdueCount > 0 && (
                           <Box padding="300" background="bg-surface-warning" borderRadius="200">
                             <Text as="p" variant="bodySm">
-                              {`${scheduleCenterData.overdueCount} scheduled run${
-                                scheduleCenterData.overdueCount > 1 ? "s are" : " is"
-                              } queued past the target time.`}
+                              {`${scheduleCenterData.overdueCount} ${
+                                scheduleCenterData.overdueCount > 1
+                                  ? t("dashboard.Schedule.center.overdueRunsPlural")
+                                  : t("dashboard.Schedule.center.overdueRunSingular")
+                              } ${t("dashboard.Schedule.center.overdueSuffix")}`}
                             </Text>
                           </Box>
                         )}
@@ -1442,14 +1461,20 @@ export function ScheduledHistoryModal({
                         <div>
                           <DataTable
                             columnContentTypes={["text", "text", "text", "text", "text"]}
-                            headings={["Campaign", "Schedule", "Timing", "Products", "Status"]}
+                            headings={[
+                              t("dashboard.Schedule.center.campaignHeader"),
+                              t("dashboard.Schedule.center.scheduleHeader"),
+                              t("dashboard.Schedule.center.timingHeader"),
+                              t("dashboard.campaignDetail.productsSuffix"),
+                              t("dashboard.campaignDetail.statusHeader"),
+                            ]}
                             rows={paginatedHistoryRows.map((job) => [
                               <BlockStack key={`${job.id}-title`} gap="100">
                                 <Text as="span" variant="bodySm">
                                   {job.title}
                                 </Text>
                                 {job.mode === "time-window" && (
-                                  <Badge tone="attention">Time Window</Badge>
+                                  <Badge tone="attention">{t("dashboard.Schedule.center.timeWindowBadge")}</Badge>
                                 )}
                               </BlockStack>,
                               formatScheduleWindow(job),
@@ -1459,7 +1484,7 @@ export function ScheduledHistoryModal({
                                 variant="plain"
                                 onClick={() => setSelectedJob(job)}
                               >
-                                {`${job.productCount} Products`}
+                                {`${job.productCount} ${t("dashboard.campaignDetail.productsSuffix")}`}
                               </Button>,
                               getStatusBadge(job.status),
                             ])}
@@ -1468,13 +1493,13 @@ export function ScheduledHistoryModal({
 
                         <InlineStack align="space-between" blockAlign="center">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            {`Showing ${
+                            {`${t("dashboard.revertPreview.showingPrefix")} ${
                               paginatedHistoryRows.length === 0
                                 ? 0
                                 : (historyPage - 1) * historyPageSize + 1
                             }-${
                               (historyPage - 1) * historyPageSize + paginatedHistoryRows.length
-                            } of ${filteredHistoryRows.length}`}
+                            } ${t("dashboard.revertPreview.ofSuffix")} ${filteredHistoryRows.length}`}
                           </Text>
                           <Pagination
                             hasPrevious={historyPage > 1}
@@ -1483,7 +1508,7 @@ export function ScheduledHistoryModal({
                             onNext={() =>
                               setHistoryPage((prev) => Math.min(totalHistoryPages, prev + 1))
                             }
-                            label={`Page ${historyPage} of ${totalHistoryPages}`}
+                            label={`${t("dashboard.revertPreview.pagePrefix")} ${historyPage} ${t("dashboard.revertPreview.ofSuffix")} ${totalHistoryPages}`}
                           />
                         </InlineStack>
                       </BlockStack>
@@ -1507,7 +1532,7 @@ export function ScheduledHistoryModal({
                       onClick={() => runOrConfirm(onClose)}
                       disabled={isScheduling}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       variant="primary"
@@ -1524,7 +1549,7 @@ export function ScheduledHistoryModal({
                         scopedItemsForSchedule.length === 0
                       }
                     >
-                      {scheduleMode === "time-window" ? "Schedule Window" : "Schedule Pricing"}
+                      {scheduleMode === "time-window" ? t("dashboard.Schedule.center.scheduleWindowCta") : t("dashboard.Schedule.center.schedulePricingCta")}
                     </Button>
                   </InlineStack>
                 </Box>
@@ -1537,9 +1562,9 @@ export function ScheduledHistoryModal({
       <Modal
         open={scheduleConfirmOpen}
         onClose={() => setScheduleConfirmOpen(false)}
-        title="Confirm Schedule"
+        title={t("dashboard.Schedule.confirmModal.title")}
         primaryAction={{
-          content: "Confirm Schedule",
+          content: t("dashboard.Schedule.confirmModal.confirmCta"),
           onAction: () => {
             setScheduleConfirmOpen(false);
             void submitSchedule();
@@ -1547,7 +1572,7 @@ export function ScheduledHistoryModal({
         }}
         secondaryActions={[
           {
-            content: "Back",
+            content: t("dashboard.Schedule.confirmModal.backCta"),
             onAction: () => setScheduleConfirmOpen(false),
           },
         ]}
@@ -1560,15 +1585,15 @@ export function ScheduledHistoryModal({
                   <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Campaign
+                        {t("dashboard.Schedule.confirmModal.campaignLabel")}
                       </Text>
                       <Text as="p" variant="bodySm" fontWeight="medium">
-                        {scheduleTitle.trim() ? scheduleTitle.trim() : "Scheduled Campaign"}
+                        {scheduleTitle.trim() ? scheduleTitle.trim() : t("dashboard.Schedule.confirmModal.defaultCampaignName")}
                       </Text>
                     </BlockStack>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Scope
+                        {t("dashboard.Schedule.confirmModal.scopeLabel")}
                       </Text>
                       <Text as="p" variant="bodySm" fontWeight="medium">
                         {scheduleScopeLabel}
@@ -1576,7 +1601,7 @@ export function ScheduledHistoryModal({
                     </BlockStack>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Products
+                        {t("dashboard.Schedule.confirmModal.productsLabel")}
                       </Text>
                       <Text as="p" variant="bodySm" fontWeight="medium">
                         {scopedItemsForSchedule.length}
@@ -1584,7 +1609,7 @@ export function ScheduledHistoryModal({
                     </BlockStack>
                     <BlockStack gap="050">
                       <Text as="p" variant="bodySm" tone="subdued">
-                        Publish
+                        {t("dashboard.Schedule.confirmModal.publishLabel")}
                       </Text>
                       <Text as="p" variant="bodySm" fontWeight="medium">
                         {scheduleTime ? formatDateTime(scheduleTime) : "—"}
@@ -1594,7 +1619,7 @@ export function ScheduledHistoryModal({
                       <>
                         <BlockStack gap="050">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Restore
+                            {t("dashboard.Schedule.confirmModal.restoreLabel")}
                           </Text>
                           <Text as="p" variant="bodySm" fontWeight="medium">
                             {windowEndTime ? formatDateTime(windowEndTime) : "—"}
@@ -1602,7 +1627,7 @@ export function ScheduledHistoryModal({
                         </BlockStack>
                         <BlockStack gap="050">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Duration
+                            {t("dashboard.Schedule.confirmModal.durationLabel")}
                           </Text>
                           <Text as="p" variant="bodySm" fontWeight="medium">
                             {formatWindowDuration() ?? "—"}
@@ -1614,7 +1639,7 @@ export function ScheduledHistoryModal({
 
                   {scheduleApplyMode === "all" ? (
                     <Text as="p" variant="bodySm" tone="critical">
-                      ⚠ This operation will update pricing across your entire catalog.
+                      ⚠ {t("dashboard.Schedule.confirmModal.fullCatalogWarning")}
                     </Text>
                   ) : null}
                 </BlockStack>
@@ -1630,9 +1655,9 @@ export function ScheduledHistoryModal({
           setOverlapWarningOpen(false);
           setOverlapDetailTab("windows");
         }}
-        title="Scheduling Overlap Detected"
+        title={t("dashboard.Schedule.overlapWarning.modalTitle")}
         primaryAction={{
-          content: "Continue scheduling",
+          content: t("dashboard.Schedule.overlapWarning.continueSchedulingCta"),
           onAction: () => {
             overlapWarningBypassRef.current = true;
             setOverlapWarningOpen(false);
@@ -1646,7 +1671,7 @@ export function ScheduledHistoryModal({
           <ModalScrollableSection>
             <BlockStack gap="200">
               <Text as="p" variant="bodySm">
-                Some selected products already belong to another scheduled pricing campaign during this time window.
+                {t("dashboard.Schedule.overlapWarning.intro")}
               </Text>
               <Box padding="300" background="bg-surface-secondary" borderRadius="200">
                 <BlockStack gap="150">
@@ -1665,7 +1690,7 @@ export function ScheduledHistoryModal({
                         variant={overlapDetailTab === "windows" ? "primary" : "tertiary"}
                         onClick={() => setOverlapDetailTab("windows")}
                       >
-                        {`Overlapping windows (${scheduleOverlapContext.overlappingWindowCount})`}
+                        {`${t("dashboard.Schedule.overlapWarning.overlappingWindowsTabPrefix")} (${scheduleOverlapContext.overlappingWindowCount})`}
                       </Button>
                       <Button
                         size="slim"
@@ -1674,7 +1699,7 @@ export function ScheduledHistoryModal({
                         variant={overlapDetailTab === "variants" ? "primary" : "tertiary"}
                         onClick={() => setOverlapDetailTab("variants")}
                       >
-                        {`Overlapping variants (${scheduleOverlapContext.overlappingVariantCount})`}
+                        {`${t("dashboard.Schedule.overlapWarning.overlappingVariantsTabPrefix")} (${scheduleOverlapContext.overlappingVariantCount})`}
                       </Button>
                     </InlineStack>
                   </Box>
@@ -1683,10 +1708,10 @@ export function ScheduledHistoryModal({
                     <Box padding="200" background="bg-surface" borderRadius="200">
                       <BlockStack gap="150">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          These selected items overlap with another scheduled window.
+                          {t("dashboard.Schedule.overlapWarning.variantsTabNotice")}
                         </Text>
-                        <ExpandableList title="Overlapping products" items={overlapProductLabels} collapsedVisibleCount={5} />
-                        <ExpandableList title="Overlapping variants" items={overlapVariantLabels} collapsedVisibleCount={5} />
+                        <ExpandableList title={t("dashboard.Schedule.overlapWarning.overlappingProductsListTitle")} items={overlapProductLabels} collapsedVisibleCount={5} />
+                        <ExpandableList title={t("dashboard.Schedule.overlapWarning.overlappingVariantsListTitle")} items={overlapVariantLabels} collapsedVisibleCount={5} />
                       </BlockStack>
                     </Box>
                   )}
@@ -1695,10 +1720,10 @@ export function ScheduledHistoryModal({
                     <Box padding="200" background="bg-surface" borderRadius="200">
                       <BlockStack gap="150">
                         <Text as="p" variant="bodySm" tone="subdued">
-                          These scheduled windows overlap your selected time range.
+                          {t("dashboard.Schedule.overlapWarning.windowsTabNotice")}
                         </Text>
                         <ExpandableList
-                          title="Overlapping windows"
+                          title={t("dashboard.Schedule.overlapWarning.overlappingWindowsListTitle")}
                           items={scheduleOverlapContext.overlappingWindowJobs}
                           collapsedVisibleCount={5}
                         />
@@ -1708,7 +1733,7 @@ export function ScheduledHistoryModal({
                 </BlockStack>
               </Box>
               <Text as="p" variant="bodySm" tone="subdued">
-                Continue to schedule anyway, or review your selection and timing to avoid operational overlap.
+                {t("dashboard.Schedule.overlapWarning.footerNotice")}
               </Text>
             </BlockStack>
           </ModalScrollableSection>
@@ -1725,76 +1750,81 @@ export function ScheduledHistoryModal({
       />
 
       <Modal
-        open={!!selectedJob}
-        onClose={() => {
-          setSelectedJob(null);
-          setSelectedJobPageSize(15);
-          setSelectedJobPage(1);
-        }}
-        title={selectedJob?.title || "Scheduled Products"}
-        size="large"
-      >
-        <Modal.Section>
-          {selectedJobProducts.length > 0 ? (
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="end">
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {`Showing ${
-                    selectedJobPaginatedProducts.length === 0
-                      ? 0
-                      : (selectedJobPage - 1) * selectedJobPageSize + 1
-                  }-${
-                    (selectedJobPage - 1) * selectedJobPageSize + selectedJobPaginatedProducts.length
-                  } of ${
-                    selectedJobCounts.variantCount !== selectedJobCounts.productCount
-                      ? `${selectedJobCounts.productCount} products • ${selectedJobCounts.variantCount} variants`
-                      : `${selectedJobCounts.productCount} products`
-                  }`}
-                </Text>
-                <div style={{ minWidth: 140 }}>
-                  <Select
-                    label="Rows per page"
-                    options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
-                      label: `${SELECT_OPTION_PREFIX}${size}`,
-                      value: String(size),
-                    }))}
-                    value={String(selectedJobPageSize)}
-                    onChange={(value) => setSelectedJobPageSize(Number(value))}
-                  />
-                </div>
-              </InlineStack>
-              <DataTable
-                columnContentTypes={["text", "text", "text", "text"]}
-                headings={["Product", "Variant", "Old Price", "Scheduled Price"]}
-                rows={selectedJobPaginatedProducts.map((product) => [
-                  product.title || "Untitled Product",
-                  buildVariantSubtitle({
-                    productTitle: product.title ?? null,
-                    variantTitle: product.variantTitle ?? null,
-                    sku: product.sku ?? null,
-                  }) ?? "—",
-                  formatMoney(Number(product.oldPrice), currencyCode),
-                  formatMoney(Number(product.newPrice), currencyCode),
-                ])}
-              />
-              <InlineStack align="end">
-                <Pagination
-                  hasPrevious={selectedJobPage > 1}
-                  onPrevious={() => setSelectedJobPage((prev) => Math.max(1, prev - 1))}
-                  hasNext={selectedJobPage < selectedJobTotalPages}
-                  onNext={() => setSelectedJobPage((prev) => Math.min(selectedJobTotalPages, prev + 1))}
-                  label={`Page ${selectedJobPage} of ${selectedJobTotalPages}`}
-                />
-              </InlineStack>
-            </BlockStack>
-            ) : (
-            <Box padding="400">
-              <Text as="p" tone="subdued" alignment="center">
-                No product details available for this schedule.
-              </Text>
-            </Box>
-          )}
-        </Modal.Section>
+              open={!!selectedJob}
+              onClose={() => {
+                setSelectedJob(null);
+                setSelectedJobPageSize(15);
+                setSelectedJobPage(1);
+              }}
+              title={selectedJob?.title || t("dashboard.scheduleHistory.defaultModalTitle")}
+              size="large"
+            >
+              <Modal.Section>
+                {selectedJobProducts.length > 0 ? (
+                  <BlockStack gap="300">
+                    <InlineStack align="space-between" blockAlign="end">
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {`${t("dashboard.revertPreview.showingPrefix")} ${
+                          selectedJobPaginatedProducts.length === 0
+                            ? 0
+                            : (selectedJobPage - 1) * selectedJobPageSize + 1
+                        }-${
+                          (selectedJobPage - 1) * selectedJobPageSize + selectedJobPaginatedProducts.length
+                        } ${t("dashboard.revertPreview.ofSuffix")} ${
+                          selectedJobCounts.variantCount !== selectedJobCounts.productCount
+                            ? `${selectedJobCounts.productCount} ${t("dashboard.campaignDetail.productsSuffix")} • ${selectedJobCounts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`
+                            : `${selectedJobCounts.productCount} ${t("dashboard.campaignDetail.productsSuffix")}`
+                        }`}
+                      </Text>
+                      <div style={{ minWidth: 140 }}>
+                        <Select
+                          label={t("dashboard.revertPreview.rowsPerPageLabel")}
+                          options={OPERATIONAL_PAGE_SIZE_OPTIONS.map((size) => ({
+                            label: `${SELECT_OPTION_PREFIX}${size}`,
+                            value: String(size),
+                          }))}
+                          value={String(selectedJobPageSize)}
+                          onChange={(value) => setSelectedJobPageSize(Number(value))}
+                        />
+                      </div>
+                    </InlineStack>
+                    <DataTable
+                      columnContentTypes={["text", "text", "text", "text"]}
+                      headings={[
+                        t("dashboard.revertPreview.tableHeaderProduct"),
+                        t("dashboard.scheduleHistory.variantHeader"),
+                        t("dashboard.scheduleHistory.oldPriceHeader"),
+                        t("dashboard.scheduleHistory.scheduledPriceHeader"),
+                      ]}
+                      rows={selectedJobPaginatedProducts.map((product) => [
+                        product.title || t("dashboard.scheduleHistory.untitledProduct"),
+                        buildVariantSubtitle({
+                          productTitle: product.title ?? null,
+                          variantTitle: product.variantTitle ?? null,
+                          sku: product.sku ?? null,
+                        }) ?? "—",
+                        formatMoney(Number(product.oldPrice), currencyCode),
+                        formatMoney(Number(product.newPrice), currencyCode),
+                      ])}
+                    />
+                    <InlineStack align="end">
+                      <Pagination
+                        hasPrevious={selectedJobPage > 1}
+                        onPrevious={() => setSelectedJobPage((prev) => Math.max(1, prev - 1))}
+                        hasNext={selectedJobPage < selectedJobTotalPages}
+                        onNext={() => setSelectedJobPage((prev) => Math.min(selectedJobTotalPages, prev + 1))}
+                        label={`${t("dashboard.revertPreview.pagePrefix")} ${selectedJobPage} ${t("dashboard.revertPreview.ofSuffix")} ${selectedJobTotalPages}`}
+                      />
+                    </InlineStack>
+                  </BlockStack>
+                  ) : (
+                  <Box padding="400">
+                    <Text as="p" tone="subdued" alignment="center">
+                      {t("dashboard.scheduleHistory.noProductDetails")}
+                    </Text>
+                  </Box>
+                )}
+              </Modal.Section>
       </Modal>
 
       <BillingBlockModal

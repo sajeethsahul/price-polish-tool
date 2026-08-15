@@ -10,6 +10,7 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { t } from "../utils/i18n";
 
 interface BulkEditorData {
     hasRules: boolean;
@@ -47,7 +48,7 @@ export default function BulkEditorPage() {
     const navigate = useNavigate();
 
     return (
-        <Page title="Bulk Editor" backAction={{ onAction: () => navigate("/app") }}>
+        <Page title={t("bulk.page.title")} backAction={{ onAction: () => navigate("/app") }}>
             <BlockStack gap="500">
                 {error && (
                     <Banner tone="critical">
@@ -56,8 +57,8 @@ export default function BulkEditorPage() {
                 )}
 
                 {!hasRules && !error && (
-                    <Banner title="No pricing rules found" tone="warning">
-                        <p>The bulk editor requires at least one pricing rule to be configured. Please go to the <strong>Pricing Rules</strong> page to create your first rule.</p>
+                    <Banner title={t("bulk.page.emptyTitle")} tone="warning">
+                        <p>The bulk editor requires at least one pricing rule to be configured. Please go to the <strong>{t("common.nav.pricingRules")}</strong> page to create your first rule.</p>
                     </Banner>
                 )}
 

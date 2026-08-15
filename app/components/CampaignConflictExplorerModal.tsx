@@ -2,6 +2,7 @@ import { Badge, BlockStack, Box, InlineStack, Modal, Text } from "@shopify/polar
 import type { CampaignConflict, CampaignConflictCampaign, CampaignConflictSeverity, CampaignConflictType } from "../types/pricing";
 import { ExpandableList } from "./ExpandableList";
 import { ModalScrollableSection } from "./ModalScrollableSection";
+import { t } from "../utils/i18n";
 
 function severityTone(severity: CampaignConflictSeverity) {
   if (severity === "critical") return "critical" as const;
@@ -103,13 +104,13 @@ export function CampaignConflictExplorerModal({
   const resolvedVariantLabels = variantLabelById ?? new Map<string, string>();
 
   return (
-    <Modal
+<Modal
       open={open}
       onClose={onClose}
-      title="Conflict Explorer"
+      title={t("dashboard.conflictExplorer.modalTitle")}
       secondaryActions={[
         {
-          content: "Close",
+          content: t("common.close"),
           onAction: onClose,
         },
       ]}
@@ -120,7 +121,7 @@ export function CampaignConflictExplorerModal({
             <Box padding="300" background="bg-surface-secondary" borderRadius="200">
               <BlockStack gap="050">
                 <Text as="p" variant="bodySm" tone="subdued">
-                  Primary campaign
+                  {t("dashboard.conflictExplorer.primaryCampaignLabel")}
                 </Text>
                 <Text as="p" variant="bodyMd" fontWeight="medium">
                   {primaryTitle}
@@ -130,7 +131,7 @@ export function CampaignConflictExplorerModal({
 
             {groups.length === 0 ? (
               <Text as="p" variant="bodySm" tone="subdued">
-                No conflicts detected.
+                {t("dashboard.conflictExplorer.noConflictsDetected")}
               </Text>
             ) : (
               <BlockStack gap="300">
@@ -151,7 +152,7 @@ export function CampaignConflictExplorerModal({
                         <InlineStack align="space-between" blockAlign="start" wrap>
                           <BlockStack gap="050">
                             <Text as="p" variant="bodyMd" fontWeight="medium">
-                              {group.conflicting.title || "Scheduled Campaign"}
+                              {group.conflicting.title || t("dashboard.Schedule.confirmModal.defaultCampaignName")}
                             </Text>
                             <InlineStack gap="150" wrap>
                               <Badge tone={statusTone(group.conflicting.status)}>{group.conflicting.status}</Badge>
@@ -181,8 +182,8 @@ export function CampaignConflictExplorerModal({
                         </InlineStack>
 
                         <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
-                          <ExpandableList title="Affected Products" items={productLabels} collapsedVisibleCount={5} />
-                          <ExpandableList title="Affected Variants" items={variantLabels} collapsedVisibleCount={5} />
+                          <ExpandableList title={t("dashboard.conflictExplorer.affectedProductsTitle")} items={productLabels} collapsedVisibleCount={5} />
+                          <ExpandableList title={t("dashboard.conflictExplorer.affectedVariantsTitle")} items={variantLabels} collapsedVisibleCount={5} />
                         </div>
                       </BlockStack>
                     </Box>

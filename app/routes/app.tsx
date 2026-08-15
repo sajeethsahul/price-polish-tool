@@ -304,17 +304,17 @@ export default function AppLayout() {
         ) : null}
         <>
           <NavMenu>
-            <Link to="/app">Dashboard</Link>
+            <Link to="/app">{t("common.nav.dashboard")}</Link>
             {!isOnboarded ? (
-              <Link to="/app/welcome">Get Started</Link>
+              <Link to="/app/welcome">{t("common.nav.getStarted")}</Link>
             ) : null}
-            <Link to="/app/campaign-history">Campaign History</Link>
-            <Link to="/app/rules">Pricing Rules</Link>
-            <Link to="/app/billing">Billing</Link>
-            <Link to="/app/settings">Settings</Link>
-            <Link to="/app/help">Help</Link>
+            <Link to="/app/campaign-history">{t("common.nav.campaignHistory")}</Link>
+            <Link to="/app/rules">{t("common.nav.pricingRules")}</Link>
+            <Link to="/app/billing">{t("common.nav.billing")}</Link>
+            <Link to="/app/settings">{t("common.nav.settings")}</Link>
+            <Link to="/app/help">{t("common.nav.help")}</Link>
             {isOnboarded ? (
-              <Link to="/app/welcome?revisit=1">Revisit Setup</Link>
+              <Link to="/app/welcome?revisit=1">{t("common.nav.revisitSetup")}</Link>
             ) : null}
           </NavMenu>
 
@@ -325,7 +325,7 @@ export default function AppLayout() {
           />
 
           {!hasActivePlan ? (
-            <Page title="Start Free Trial">
+            <Page title={t("common.nav.startFreeTrial")}>
               <Card>
                 <BlockStack gap="300">
                   <Text  as="h2"  variant="headingMd">

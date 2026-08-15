@@ -153,7 +153,7 @@ export default function WelcomePage() {
           {isRevisit ? (
             <Banner
               tone="info"
-              title="You're revisiting the setup guide"
+              title={t("welcome.revisitTitle")}
             >
               <p>
                 Reopening the guide won't change your pricing rules, published prices, or any existing configuration. Feel free to review the steps and close this page whenever you're done.

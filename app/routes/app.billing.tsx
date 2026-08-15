@@ -15,6 +15,7 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { t } from "../utils/i18n";
 
 type BillingPageData = {
   shop: string;
@@ -112,7 +113,7 @@ export default function BillingPage() {
   }, []);
 
   return (
-    <Page title="Billing" backAction={{ onAction: () => navigate("/app") }} fullWidth>
+    <Page title={t("common.nav.billing")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
       <div style={{ maxWidth: "980px", margin: "0 auto" }}>
         <BlockStack gap="500">
           <Card>
@@ -253,7 +254,7 @@ export default function BillingPage() {
                 <Button variant="primary" disabled>
                   Upgrade Plan
                 </Button>
-                <Badge tone="info">Coming Soon</Badge>
+                <Badge tone="info">{t("common.status.comingSoon")}</Badge>
               </InlineStack>
             </BlockStack>
           </Card>

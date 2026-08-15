@@ -602,7 +602,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                 </InlineStack>
                                 <Divider />
                                 <InlineStack align="space-between" blockAlign="center">
-                                    <Text as="span" variant="headingSm">Final price</Text>
+                                    <Text as="span" variant="headingSm">{t("pricing.labels.finalPrice")}</Text>
                                     <Text as="span" variant="headingLg" tone="success">
                                         {currencyCode} {finalPrice.toFixed(2)}
                                     </Text>
@@ -616,7 +616,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                             )}
 
                             <BlockStack gap="200">
-                                <Text as="span" variant="headingSm">Recent Changes</Text>
+                                <Text as="span" variant="headingSm">{t("pricing.labels.recentChanges")}</Text>
 
                                 <BlockStack gap="150">
                                     {loaderData.history.map((h: any) => {
