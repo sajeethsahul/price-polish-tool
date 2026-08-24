@@ -15,6 +15,7 @@
   "common": {
     "save": "Guardar",
     "cancel": "Cancelar",
+    "apply": "Aplicar",
     "close": "Cerrar",
     "refresh": "Actualizar",
     "done": "Listo",
@@ -73,7 +74,7 @@
     "configureRulesFirstShort": "Configure las reglas de precios primero",
     "networkErrorTryAgain": "Error de red. Por favor, inténtelo de nuevo.",
     "noProductsToApply": "No hay productos para aplicar",
-    "campaignTitleRequired": "Se requiere un título de campaña antes de aplicar los precios.",
+    "campaignTitleRequired": "El título de la campaña es obligatorio antes de aplicar los precios.",
     "pricingApplied": "Precios aplicados correctamente",
     "pricesLiveUpdated": "Precios actualizados y en vigor en la tienda",
     "failedLoadCampaignDetails": "Error al cargar los detalles de la campaña",
@@ -880,7 +881,23 @@
     "modal": {
       "confirmTitle": "Confirmar Aplicación Inmediata",
       "campaignLabel": "Título de Campaña",
-      "campaignPlaceholder": "Ej.: Actualización de Precios de Fin de Semana"
+      "campaignPlaceholder": "Ej.: Actualización de Precios de Fin de Semana",
+      "applyingTo": "Aplicando precios a: {count} {scope}.",
+      "willUpdateProduct": "{count} producto se actualizará de inmediato.",
+      "willUpdateProducts": "{count} productos se actualizarán de inmediato.",
+      "priceChangeSummary": "{increases} aumentos de precio • {decreases} reducciones de precio",
+      "averageChange": "Cambio promedio: {value}",
+      "largestIncrease": "Mayor aumento: {value}",
+      "largestDecrease": "Mayor reducción: {value}",
+      "largestMovement": "Mayor movimiento: {value}",
+      "beforeApplying": "Antes de aplicar",
+      "reviewBeforeApplying": "Revise antes de aplicar.",
+      "warningLabel": "Advertencia",
+      "warningLabelPlural": "Advertencias",
+      "infoLabel": "Información",
+      "singleItemIncrease": "Esta actualización es un aumento de precio.",
+      "singleItemDecrease": "Esta actualización es una reducción de precio.",
+      "singleItemNoChange": "Esta actualización mantiene el mismo precio."
     },
     "page": {
       "title": "Editor Masivo",
@@ -1105,7 +1122,27 @@
   },
   "settings": {
     "page": {
-      "title": "Configuración Avanzada"
+      "title": "Configuración Avanzada",
+      "description": "Price Polish usa automáticamente la moneda de su tienda Shopify. Configuración avanzada próximamente."
+    }
+  },
+  "preview": {
+    "backToDashboard": "Volver al panel",
+    "currency": "Moneda: {currencyCode}",
+    "showingCount": "Mostrando {visible} de {total} productos",
+    "showFewer": "Mostrar menos",
+    "viewFull": "Ver vista completa",
+    "collapseAria": "Colapsar la lista de vista previa a los primeros {count} productos",
+    "expandAria": "Expandir la vista previa para mostrar todos los {count} productos",
+    "previousStep": "← Paso anterior",
+    "previousStepAria": "Volver al Paso 1: Crear regla de precios",
+    "continue": "Continuar →",
+    "continueAria": "Continuar al Paso 3: Aplicar precios",
+    "priceChange": "Antes: {old} → Después: {new}",
+    "empty": {
+      "heading": "Aún no hay productos para previsualizar",
+      "action": "Ajustar la regla de precios",
+      "body": "Una vez que cree o refuerce una regla de precios, le mostraremos una vista previa en vivo de los nuevos precios aquí para que los revise antes de aplicar."
     }
   },
   "loader": {

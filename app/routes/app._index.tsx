@@ -1100,14 +1100,12 @@ function DashboardContent({
       selectedPreviewItems,
       immediateApplySingleItem,
     ],
-  );
-
-  const immediateApplyScopeLabel =
+  );  const immediateApplyScopeLabel =
     immediateApplyScope === "all"
-      ? "products"
+      ? t("dashboard.scopeLabels.products")
       : immediateApplyScope === "single"
-        ? "product"
-        : "selected products";
+        ? t("dashboard.scopeLabels.product")
+        : t("dashboard.scopeLabels.selectedProducts");
 
   const immediateApplyContextItems =
     immediateApplyModalItems.length > 0
@@ -1219,48 +1217,42 @@ function DashboardContent({
     ) {
       notices.push({
         id: "immediate-large-operation",
-        severity: "informational",
-        message: "A large number of products will update.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.largeOperation"),
       });
     }
 
     if (affectsMostVisible) {
       notices.push({
         id: "immediate-most-visible",
-        severity: "informational",
-        message: "This update affects most visible products.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.mostVisible"),
       });
     }
 
     if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "immediate-significant-movement",
-        severity: "informational",
-        message: "Some products have larger price changes.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.significantMovement"),
       });
     }
 
     if (immediateApplyContextItems.length >= VERY_LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "immediate-very-large-operation",
-        severity: "warning",
-        message: "A very large number of products will update.",
+        severity: "warning",        message: t("dashboard.safeguardNotices.veryLargeOperation"),
       });
     }
 
     if (isStorefrontWide) {
       notices.push({
         id: "immediate-storefront-wide",
-        severity: "warning",
-        message: "Most visible storefront products will update.",
+        severity: "warning",        message: t("dashboard.safeguardNotices.storefrontWide"),
       });
     }
 
     if (isAllProductsScope && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "immediate-all-products-major-movement",
-        severity: "warning",
-        message: "This all-products update includes larger price changes.",
+        severity: "warning",        message: t("dashboard.safeguardNotices.allProductsMajorMovement"),
       });
     }
 
@@ -1414,41 +1406,35 @@ function DashboardContent({
     if (productCount >= LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "revert-large-scope",
-        severity: "informational",
-        message: "Large revert operation detected.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.revertLargeScope"),
       });
     }
 
     if (affectsMostVisible) {
       notices.push({
         id: "revert-most-visible",
-        severity: "informational",
-        message: "This revert restores pricing across most visible products.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.revertMostVisible"),
       });
     }
 
     if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "revert-significant-movement",
-        severity: "informational",
-        message: "Some products contain significant pricing movement.",
+        severity: "informational",        message: t("dashboard.safeguardNotices.revertSignificantMovement"),
       });
     }
 
     if (productCount >= VERY_LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "revert-very-large-scope",
-        severity: "warning",
-        message: "This revert restores pricing across a large campaign set.",
+        severity: "warning",        message: t("dashboard.safeguardNotices.revertVeryLargeScope"),
       });
     }
 
     if (storefrontWide && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "revert-storefront-major-movement",
-        severity: "warning",
-        message:
-          "Storefront-wide revert scope includes major pricing movement.",
+        severity: "warning",        message: t("dashboard.safeguardNotices.revertStorefrontMajor"),
       });
     }
 
