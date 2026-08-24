@@ -3,10 +3,12 @@ import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { stagePrices } from "../utils/staging.server";
 import { requireActiveBilling } from "../utils/billing-protection.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
+  applyLocaleFromSession(session);
 
   const billingError = await requireActiveBilling(shop);
   if (billingError) return new Response(JSON.stringify(billingError), { status: 403 });
@@ -22,7 +24,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const campaignTitle =
     typeof body?.campaignTitle === "string" && body.campaignTitle.trim().length > 0
       ? body.campaignTitle.trim()
-      : "Manual Apply Campaign";
+      : t("server.manualApplyCampaign");
 
   console.log("[STAGING] stage.started", { shop, productCount: products.length, campaignId });
 

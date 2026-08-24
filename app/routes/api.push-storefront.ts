@@ -5,13 +5,14 @@ import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { requireActiveBilling } from "../utils/billing-protection.server";
 import { withShopifyRetry } from "../utils/shopify-graphql.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
   return cors(
-    new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+    new Response(JSON.stringify({ error: t("server.methodNotAllowed") }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
     })
@@ -30,6 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { session, admin } = auth;
   const shop = session.shop;
+  applyLocaleFromSession(session);
 
   const billingError = await requireActiveBilling(shop);
   if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
@@ -165,7 +167,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         new Response(
           JSON.stringify({
             success: true,
-            message: "Live storefront pricing disabled.",
+            message: t("server.liveDisabled"),
           }),
           {
             headers: { "Content-Type": "application/json" },
@@ -186,7 +188,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return cors(
         new Response(JSON.stringify({
           success: false,
-          message: "No staged prices found. Click Apply before going live.",
+          message: t("server.noStagedPrices"),
         }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
@@ -217,7 +219,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return cors(
           new Response(JSON.stringify({
             success: false,
-            error: "Multiple staged campaigns detected. Publish one campaign at a time.",
+            error: t("server.multipleStagedCampaigns"),
           }), {
             status: 409,
             headers: { "Content-Type": "application/json" },
@@ -246,7 +248,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       console.warn("[PUBLISH] publish.duplicate", { shop, runningJobId: runningJob.id, campaignId });
       return cors(
         new Response(JSON.stringify({
-          error: "A publish is already in progress. Please wait for it to complete.",
+          error: t("server.publishInProgress"),
           jobId: runningJob.id,
         }), {
           status: 409,
@@ -461,7 +463,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return cors(
       new Response(JSON.stringify({
-        error: "Failed to push prices to storefront.",
+        error: t("server.pushFailed"),
       }), {
         status: 500,
         headers: { "Content-Type": "application/json" },

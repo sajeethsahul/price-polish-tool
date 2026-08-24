@@ -35,7 +35,17 @@ function resolveLocaleDictionary(localeId: string): Dictionary {
   return enDefault;
 }
 
-const dictionary: Dictionary = resolveLocaleDictionary(DEFAULT_LOCALE_ID);
+let activeDictionary: Dictionary = resolveLocaleDictionary(DEFAULT_LOCALE_ID);
+
+export function setLocale(localeId: string): void {
+  activeDictionary =
+    resolveLocaleDictionary(localeId) ??
+    resolveLocaleDictionary(DEFAULT_LOCALE_ID);
+}
+
+export function getActiveDictionary(): Dictionary {
+  return activeDictionary;
+}
 
 function getValueAtPath(obj: unknown, parts: string[]): unknown {
   let current: unknown = obj;
@@ -47,7 +57,39 @@ function getValueAtPath(obj: unknown, parts: string[]): unknown {
 }
 
 export function t(key: TranslationKey): string {
-  const value = getValueAtPath(dictionary, key.split("."));
+  const value = getValueAtPath(activeDictionary, key.split("."));
   return typeof value === "string" ? value : key;
 }
 
+/**
+ * Server-side locale detection helper.
+ * Detects the locale from a Shopify session (BCP-47) or falls back to "en".
+ * Call setLocale() with the detected value before using t() server-side.
+ */
+export function detectLocaleFromSession(session: { locale?: string } | null | undefined | any): string {
+  const raw = session?.locale;
+  if (typeof raw === "string" && raw.length > 0) {
+    const normalized = raw.toLowerCase();
+    if (normalized.startsWith("es")) return "es";
+    if (normalized.startsWith("en")) return "en.default";
+  }
+  return "en.default";
+}
+
+/**
+ * Server-side helper: given a session, set the active dictionary and return
+ * the resolved locale id. Call this at the top of API loaders/actions before
+ * using t() to localize response messages.
+ */
+export function applyLocaleFromSession(session: { locale?: string } | null | undefined | any): string {
+  const localeId = detectLocaleFromSession(session);
+  setLocale(localeId);
+  return localeId;
+}
+
+// Client-side locale init: the Remix loader sets the locale server-side,
+// but the browser bundle re-initialises this module with the default locale.
+// Read the locale injected into window.__LOCALE__ by root.tsx and apply it.
+if (typeof window !== "undefined" && (window as any).__LOCALE__) {
+  setLocale((window as any).__LOCALE__);
+}

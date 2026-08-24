@@ -5,6 +5,7 @@ import { calculatePrice } from "../utils/pricing";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import type { PricingPreviewItem } from "../types/pricing";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
@@ -18,6 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { admin, session } = auth;
     const shop = session.shop;
+    applyLocaleFromSession(session);
     const previewStartMs = Date.now();
 
     console.log("[PREVIEW] preview.started", { shop });
@@ -210,7 +212,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
 
         return cors(new Response(JSON.stringify({
-            error: "Failed to load preview data",
+            error: t("server.previewLoadFailed"),
             debug: error?.message || "unknown-error"
         }), {
             status: 500,

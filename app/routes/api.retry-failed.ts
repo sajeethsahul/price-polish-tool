@@ -4,6 +4,7 @@ import prisma from "../db.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { logActivity } from "../utils/activity.server";
 import { requireActiveBilling } from "../utils/billing-protection.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const preflight = handlePreflight(request);
@@ -17,6 +18,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { session, admin } = auth;
   const shop = session.shop;
+  applyLocaleFromSession(session);
 
   const billingError = await requireActiveBilling(shop);
   if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
@@ -27,7 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (!failedItems || !Array.isArray(failedItems)) {
       return cors(new Response(JSON.stringify({
-        error: "Invalid failedItems"
+        error: t("server.invalidFailedItems")
       }), { status: 400 }));
     }
 
@@ -76,7 +78,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   } catch (error: any) {
     return cors(new Response(JSON.stringify({
-      error: "Retry failed",
+      error: t("server.retryFailed"),
     }), { status: 500 }));
   }
 };

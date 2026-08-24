@@ -4,12 +4,13 @@ import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { revertCampaignPrices } from "../utils/revert.server";
 import { requireActiveBilling } from "../utils/billing-protection.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
     if (preflight) return preflight;
 
-    return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+    return cors(new Response(JSON.stringify({ error: t("server.methodNotAllowed") }), {
         status: 405,
         headers: { "Content-Type": "application/json" },
     }));
@@ -28,6 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const { admin, session } = auth;
     const shop = session.shop;
+    applyLocaleFromSession(session);
 
     const billingError = await requireActiveBilling(shop);
     if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
@@ -50,7 +52,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (!campaignId && !batchId) {
             console.warn("[UNDO] ⚠️ NO CAMPAIGN ID OR BATCH ID PROVIDED");
             return new Response(
-                JSON.stringify({ error: "No campaignId or batchId provided" }),
+                JSON.stringify({ error: t("server.noCampaignOrBatch") }),
                 { status: 400, headers: { "Content-Type": "application/json" } },
             );
         }
@@ -126,7 +128,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         return cors(new Response(
-            JSON.stringify({ error: "Something went wrong during undo" }),
+            JSON.stringify({ error: t("server.bulkUpdateFailed") }),
             { status: 500, headers: { "Content-Type": "application/json" } },
         ));
     }

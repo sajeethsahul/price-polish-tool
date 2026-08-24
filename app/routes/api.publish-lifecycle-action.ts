@@ -2,12 +2,13 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { cors, handlePreflight } from "../utils/cors";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
-  return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+  return cors(new Response(JSON.stringify({ error: t("server.methodNotAllowed") }), {
     status: 405,
     headers: { "Content-Type": "application/json" },
   }));
@@ -21,6 +22,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!auth?.session) throw new Response("Unauthorized", { status: 401 });
 
   const shop = auth.session.shop;
+  applyLocaleFromSession(auth.session);
   const body = await request.json().catch(() => ({}));
   const campaignId =
     typeof body?.campaignId === "string" && body.campaignId.length > 0
@@ -28,7 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : null;
 
   if (!campaignId || body?.action !== "cancel-publish") {
-    return cors(new Response(JSON.stringify({ error: "Choose a valid publish action." }), {
+    return cors(new Response(JSON.stringify({ error: t("server.chooseValidPublishAction") }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     }));
@@ -48,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (!campaign) {
-    return cors(new Response(JSON.stringify({ error: "Scheduled publish was not found." }), {
+    return cors(new Response(JSON.stringify({ error: t("server.publishNotFound") }), {
       status: 404,
       headers: { "Content-Type": "application/json" },
     }));
@@ -56,7 +58,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (campaign.status !== "scheduled-publish" || new Date(campaign.runAt).getTime() <= Date.now()) {
     return cors(new Response(JSON.stringify({
-      error: "This publish has already started and can no longer be cancelled.",
+      error: t("server.publishAlreadyStarted"),
     }), {
       status: 409,
       headers: { "Content-Type": "application/json" },
@@ -100,7 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return cors(new Response(JSON.stringify({
     success: true,
     status: "cancelled-publish",
-    message: "Scheduled publish cancelled before it started.",
+    message: t("server.publishCancelled"),
   }), {
     headers: { "Content-Type": "application/json" },
   }));

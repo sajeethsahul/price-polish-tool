@@ -1,4 +1,5 @@
 import { InlineStack, Pagination, Select, Text } from "@shopify/polaris";
+import { t } from "../utils/i18n";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 15, 25, 50];
 const SELECT_OPTION_PREFIX = "\u2002";
@@ -11,7 +12,7 @@ export function ModalPagination({
   onPageSizeChange,
   itemLabel,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
-  pageSizeLabel = "Rows per page",
+  pageSizeLabel = t("pagination.rowsPerPage"),
 }: {
   totalCount: number;
   page: number;
@@ -29,12 +30,25 @@ export function ModalPagination({
   const startIndex = normalizedTotal === 0 ? 0 : (normalizedPage - 1) * normalizedPageSize + 1;
   const endIndex = normalizedTotal === 0 ? 0 : Math.min(normalizedTotal, (normalizedPage - 1) * normalizedPageSize + normalizedPageSize);
 
+  const showingText = itemLabel
+    ? t("pagination.showingWithLabel")
+        .replace("{start}", String(startIndex))
+        .replace("{end}", String(endIndex))
+        .replace("{total}", String(normalizedTotal))
+        .replace("{label}", itemLabel)
+    : t("pagination.showing")
+        .replace("{start}", String(startIndex))
+        .replace("{end}", String(endIndex))
+        .replace("{total}", String(normalizedTotal));
+
+  const pageLabel = t("pagination.page")
+    .replace("{current}", String(normalizedPage))
+    .replace("{total}", String(totalPages));
+
   return (
     <InlineStack align="space-between" blockAlign="center" wrap>
       <Text as="p" variant="bodySm" tone="subdued">
-        {itemLabel
-          ? `Showing ${startIndex}-${endIndex} of ${normalizedTotal} ${itemLabel}`
-          : `Showing ${startIndex}-${endIndex} of ${normalizedTotal}`}
+        {showingText}
       </Text>
       <InlineStack gap="300" blockAlign="center" wrap={false}>
         <div style={{ minWidth: 160 }}>
@@ -53,10 +67,9 @@ export function ModalPagination({
           onPrevious={() => onPageChange(Math.max(1, normalizedPage - 1))}
           hasNext={normalizedPage < totalPages}
           onNext={() => onPageChange(Math.min(totalPages, normalizedPage + 1))}
-          label={`Page ${normalizedPage} of ${totalPages}`}
+          label={pageLabel}
         />
       </InlineStack>
     </InlineStack>
   );
 }
-

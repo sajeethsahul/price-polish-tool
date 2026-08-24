@@ -37,10 +37,12 @@
     "@shopify/polaris-icons": "^9.3.1",
     "@shopify/shopify-app-react-router": "^1.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
+    "i18next": "^26.3.6",
     "isbot": "^5.1.31",
     "prisma": "^6.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.11",
     "react-router": "^7.13.2",
     "react-router-dom": "^7.13.2",
     "vite-tsconfig-paths": "^5.1.4"

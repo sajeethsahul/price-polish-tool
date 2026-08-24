@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { cors, handlePreflight } from "../utils/cors";
 import prisma from "../db.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
@@ -23,6 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { session } = auth;
     const shop = session.shop;
+    applyLocaleFromSession(session);
     console.log("SESSION SHOP (METRICS):", shop);
 
     try {
@@ -170,8 +172,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 activeCampaignId: appState?.activeCampaignId ?? null,
                 canGoLive,
                 goLiveMessage: canGoLive
-                    ? "Staged prices are ready to publish."
-                    : "No staged prices are ready. Apply pricing before going live."
+                    ? t("server.stagedPricesReady")
+                    : t("server.noStagedReady")
             },
         }), {
             headers: { "Content-Type": "application/json" },
@@ -204,7 +206,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 openCampaignCount: 0,
                 closedCampaignCount: 0,
                 canGoLive: false,
-                goLiveMessage: "Unable to load storefront control status.",
+                goLiveMessage: t("server.unableLoadStorefront"),
             },
         }), {
             headers: { "Content-Type": "application/json" },

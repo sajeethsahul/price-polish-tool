@@ -199,7 +199,7 @@ const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
   openCampaignCount: 0,
   closedCampaignCount: 0,
   canGoLive: false,
-  goLiveMessage: "No staged prices are ready. Apply pricing before going live.",
+  goLiveMessage: t("server.noStagedReady"),
 };
 
 const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
@@ -390,10 +390,10 @@ function resolveCampaignRuntimeStatus(
 
 function formatCampaignSourceLabel(source: string | null) {
   const normalized = normalizeCampaignSource(source);
-  if (normalized === "manual") return "Manual";
-  if (normalized === "scheduled") return "Scheduled";
-  if (normalized === "time-window") return "Time Window";
-  return source || "Unknown";
+  if (normalized === "manual") return t("dashboard.campaignHistory.manual");
+  if (normalized === "scheduled") return t("dashboard.campaignHistory.scheduled");
+  if (normalized === "time-window") return t("dashboard.campaignHistory.timeWindow");
+  return source || t("dashboard.campaignHistory.unknown");
 }
 
 function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
@@ -414,13 +414,13 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
     return `Pricing is active now. Original pricing will automatically restore at ${end}.`;
   }
   if (status === "auto-restored") {
-    return "Original pricing was automatically restored when the window ended.";
+    return t("server.windowRestored");
   }
   if (status === "window-stopped") {
-    return "Original storefront pricing was restored before the scheduled end time.";
+    return t("server.windowRestored");
   }
   if (status === "cancelled-window") {
-    return "This pricing window was cancelled before it started.";
+    return t("server.windowCancelledBeforeStart");
   }
   if (status === "partial") {
     return "Automatic restore needs attention for one or more tracked products.";
@@ -452,7 +452,7 @@ function formatScheduledPublishSummary(
   if (status === "publishing") return "Applying scheduled pricing.";
   if (status === "published") return "Pricing was published successfully.";
   if (status === "cancelled-publish")
-    return "This scheduled publish was cancelled before it started.";
+    return t("server.publishCancelledBeforeStart");
   if (status === "failed") return "Scheduled publish needs attention.";
   return null;
 }
@@ -512,18 +512,18 @@ function DashboardLoader() {
 // ─── Store Health Card ───────────────────────────────────────────────────────
 
 function formatRelativeTime(isoString: string): string {
-  if (!isoString) return "Never";
+  if (!isoString) return t("dashboard.storeHealth.never");
   const diffMs = Date.now() - new Date(isoString).getTime();
   const diffSecs = Math.floor(diffMs / 1000);
-  if (diffSecs < 60) return "Just now";
+  if (diffSecs < 60) return t("dashboard.storeHealth.justNow");
   const diffMins = Math.floor(diffSecs / 60);
   if (diffMins < 60)
-    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+    return `${diffMins} ${t("dashboard.storeHealth.minutesAgo")}`;
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours < 24)
-    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+    return `${diffHours} ${t("dashboard.storeHealth.hoursAgo")}`;
   const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  return `${diffDays} ${t("dashboard.storeHealth.daysAgo")}`;
 }
 
 function StoreHealthCard({
@@ -572,14 +572,14 @@ function StoreHealthCard({
         <BlockStack gap="200">
           <InlineStack align="space-between" blockAlign="center">
             <Text as="h2" variant="headingSm">
-              Store Health
+              {t("dashboard.storeHealth.title")}
             </Text>
             {statusBadge}
           </InlineStack>
           <BlockStack gap="100">
             <InlineStack align="space-between">
               <Text as="p" variant="bodySm" tone="subdued">
-                Products Ready to Publish
+                {t("dashboard.storeHealth.productsReadyToPublish")}
               </Text>
               <Text as="p" variant="bodySm" fontWeight="semibold">
                 {stagedPendingCount}
@@ -587,7 +587,7 @@ function StoreHealthCard({
             </InlineStack>
             <InlineStack align="space-between">
               <Text as="p" variant="bodySm" tone="subdued">
-                Scheduled Jobs
+                {t("dashboard.storeHealth.scheduledJobs")}
               </Text>
               <Text as="p" variant="bodySm" fontWeight="semibold">
                 {scheduledRunsCount}
@@ -595,7 +595,7 @@ function StoreHealthCard({
             </InlineStack>
             <InlineStack align="space-between">
               <Text as="p" variant="bodySm" tone="subdued">
-                Last Publish
+                {t("dashboard.storeHealth.lastPublish")}
               </Text>
               <Text as="p" variant="bodySm" fontWeight="semibold">
                 {lastPublish}
@@ -3104,11 +3104,10 @@ const filteredPreviews = useMemo(() => {
               <Card>
                 <BlockStack gap="300">
                   <Text as="h3" variant="headingMd">
-                    Start Your 7-Day Free Trial
+                    {t("dashboard.billingUpsell.title")}
                   </Text>
                   <Text as="p">
-                    Apply smart pricing, increase profits, and manage bulk
-                    updates safely.
+                    {t("dashboard.billingUpsell.body")}
                   </Text>
                   <InlineStack gap="200">
                     <Badge tone="success">{t("pricing.bulkPricing")}</Badge>
@@ -3121,10 +3120,10 @@ const filteredPreviews = useMemo(() => {
                     tone="success"
                     onClick={handleUpgrade}
                   >
-                    Start Free Trial
+                    {t("dashboard.billingUpsell.cta")}
                   </Button>
                   <Text as="p" variant="bodySm" tone="subdued">
-                    No charge today • Cancel anytime
+                    {t("dashboard.billingUpsell.noCharge")}
                   </Text>
                 </BlockStack>
               </Card>
@@ -3212,11 +3211,8 @@ const filteredPreviews = useMemo(() => {
                 <Banner tone="warning">
                   <BlockStack gap="100">
                     <Text as="p" variant="bodyMd">
-                      <strong>Live Pricing is on.</strong> Applied prices update
-                      your Shopify catalog. With live rules active, the
-                      storefront may layer rules on top of those prices. Stop
-                      Live Pricing or adjust rules if you need the applied
-                      amount to be final.
+                      <strong>{t("dashboard.liveModeWarning.title")}</strong>{" "}
+                      {t("dashboard.liveModeWarning.body")}
                     </Text>
                   </BlockStack>
                 </Banner>
@@ -3273,7 +3269,7 @@ const filteredPreviews = useMemo(() => {
                       >
                         <BlockStack gap="050" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Pricing Impact
+                            {t("dashboard.metrics.pricingImpact")}
                           </Text>
                           <Text
                             as="p"
@@ -3304,7 +3300,7 @@ const filteredPreviews = useMemo(() => {
                             })()}
                           </Text>
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Projected delta
+                            {t("dashboard.metrics.projectedDelta")}
                           </Text>
                         </BlockStack>
                       </Box>
@@ -3321,7 +3317,7 @@ const filteredPreviews = useMemo(() => {
                       >
                         <BlockStack gap="050" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Active Campaigns
+                            {t("dashboard.metrics.activeCampaigns")}
                           </Text>
                           <Text
                             as="p"
@@ -3331,7 +3327,7 @@ const filteredPreviews = useMemo(() => {
                             {metrics.activeCampaignsCount}
                           </Text>
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Affecting storefront
+                            {t("dashboard.metrics.affectingStorefront")}
                           </Text>
                         </BlockStack>
                       </Box>
@@ -3348,7 +3344,7 @@ const filteredPreviews = useMemo(() => {
                       >
                         <BlockStack gap="050" align="start">
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Products Automated
+                            {t("dashboard.metrics.productsAutomated")}
                           </Text>
                           <Text
                             as="p"
@@ -3358,7 +3354,7 @@ const filteredPreviews = useMemo(() => {
                             {metrics.productsUnderAutomationCount}
                           </Text>
                           <Text as="p" variant="bodySm" tone="subdued">
-                            Under workflows
+                            {t("dashboard.metrics.underWorkflows")}
                           </Text>
                         </BlockStack>
                       </Box>
@@ -3388,7 +3384,7 @@ const filteredPreviews = useMemo(() => {
                             variant="headingSm"
                             fontWeight="semibold"
                           >
-                            Recent Activity
+                            {t("dashboard.recentActivity.title")}
                           </Text>
                         </div>
                         <Button
@@ -3396,7 +3392,7 @@ const filteredPreviews = useMemo(() => {
                           variant="tertiary"
                           onClick={() => navigate("/app/campaign-history")}
                         >
-                          View All
+                          {t("dashboard.recentActivity.viewAll")}
                         </Button>
                       </InlineStack>
 
@@ -3413,7 +3409,7 @@ const filteredPreviews = useMemo(() => {
                       >
                         {campaignHistory.length === 0 ? (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            No campaigns recorded yet.
+                            {t("dashboard.recentActivity.noCampaigns")}
                           </Text>
                         ) : (
                           <BlockStack gap="150">
@@ -3496,7 +3492,7 @@ const filteredPreviews = useMemo(() => {
                         }}
                       >
                         <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          Quick Actions
+                          {t("dashboard.quickActions.title")}
                         </Text>
                       </div>
 
@@ -3520,7 +3516,7 @@ const filteredPreviews = useMemo(() => {
                             onClick={() => navigate("/app/rules")}
                             fullWidth
                           >
-                            Configure Rules
+                            {t("dashboard.quickActions.configureRules")}
                           </Button>
                           <Button
                             variant="secondary"
@@ -3528,7 +3524,7 @@ const filteredPreviews = useMemo(() => {
                             onClick={() => navigate("/app/preview")}
                             fullWidth
                           >
-                            Preview Prices
+                            {t("dashboard.quickActions.previewPrices")}
                           </Button>
                           <Button
                             variant="tertiary"
@@ -3536,7 +3532,7 @@ const filteredPreviews = useMemo(() => {
                             onClick={() => navigate("/app/campaign-history")}
                             fullWidth
                           >
-                            Campaign History
+                            {t("dashboard.quickActions.campaignHistory")}
                           </Button>
                         </BlockStack>
                       </div>
@@ -3550,8 +3546,7 @@ const filteredPreviews = useMemo(() => {
                 <Banner tone="warning" title={t("errors.noPricingRulesFound")}>
                   <BlockStack gap="200">
                     <p>
-                      You must configure at least one pricing rule before
-                      applying changes or going live.
+                      {t("dashboard.noRulesBanner.body")}
                     </p>
                     <InlineStack>
                       <Button
@@ -3560,7 +3555,7 @@ const filteredPreviews = useMemo(() => {
                         size="slim"
                         onClick={() => navigate("/app/rules")}
                       >
-                        Configure Pricing Rules
+                        {t("dashboard.noRulesBanner.cta")}
                       </Button>
                     </InlineStack>
                   </BlockStack>
@@ -3605,9 +3600,9 @@ const filteredPreviews = useMemo(() => {
                                 variant="headingSm"
                                 fontWeight="semibold"
                               >
-                                Storefront Control Panel
+                                {t("dashboard.storefrontControl.title")}
                               </Text>
-                              <Tooltip content="Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.">
+                              <Tooltip content={t("dashboard.storefrontControl.tooltip")}>
                                 <span
                                   style={{
                                     cursor: "pointer",
@@ -3619,9 +3614,7 @@ const filteredPreviews = useMemo(() => {
                               </Tooltip>
                             </InlineStack>
                             <Text as="p" variant="bodySm" tone="subdued">
-                              Manage storefront pricing visibility for shoppers.
-                              Admin catalog prices remain unchanged until
-                              updates are applied in this app.
+                              {t("dashboard.storefrontControl.body")}
                             </Text>
                           </BlockStack>
                         </div>
@@ -3632,7 +3625,7 @@ const filteredPreviews = useMemo(() => {
                             tone={metrics.isLive ? "success" : "attention"}
                             size="small"
                           >
-                            {metrics.isLive ? "Live" : "Paused"}
+                            {metrics.isLive ? t("dashboard.storefrontControl.live") : t("dashboard.storefrontControl.paused")}
                           </Badge>
                           <Text
                             as="span"
@@ -3641,8 +3634,8 @@ const filteredPreviews = useMemo(() => {
                             tone={metrics.isLive ? "success" : "subdued"}
                           >
                             {metrics.isLive
-                              ? "Live pricing is active"
-                              : "Live pricing is paused"}
+                              ? t("dashboard.storefrontControl.liveActive")
+                              : t("dashboard.storefrontControl.livePaused")}
                           </Text>
                         </InlineStack>
                       </InlineStack>
@@ -3657,7 +3650,7 @@ const filteredPreviews = useMemo(() => {
                             variant="primary"
                             size="slim"
                           >
-                            Pause Live Pricing
+                            {t("dashboard.storefrontControl.pauseLivePricing")}
                           </Button>
                         ) : (
                           <Button
@@ -3673,7 +3666,7 @@ const filteredPreviews = useMemo(() => {
                             }
                             size="slim"
                           >
-                            Publish Pricing
+                            {t("dashboard.storefrontControl.publishPricing")}
                           </Button>
                         )}
                         <Text as="span" variant="bodySm" tone="subdued">
@@ -3698,7 +3691,7 @@ const filteredPreviews = useMemo(() => {
                   >
                     <BlockStack gap="200" align="center">
                       <Text as="h2" variant="headingSm" fontWeight="semibold">
-                        No preview products yet
+                        {t("dashboard.emptyProducts.title")}
                       </Text>
                       <Text
                         as="p"
@@ -3706,15 +3699,14 @@ const filteredPreviews = useMemo(() => {
                         tone="subdued"
                         alignment="center"
                       >
-                        Refresh previews after configuring rules, or check that
-                        this app can access products in your catalog.
+                        {t("dashboard.emptyProducts.body")}
                       </Text>
                       <Button
                         variant="primary"
                         size="slim"
                         onClick={handlePreview}
                       >
-                        Refresh previews
+                        {t("dashboard.emptyProducts.cta")}
                       </Button>
                     </BlockStack>
                   </div>
@@ -3741,7 +3733,7 @@ const filteredPreviews = useMemo(() => {
     {/* Clean, low-profile header row */}
     <InlineStack align="space-between" blockAlign="center">
       <Text as="h3" variant="headingSm" fontWeight="semibold" tone="subdued">
-        Filters & Smart Segments
+        {t("dashboard.filters.title")}
       </Text>
     </InlineStack>
 
@@ -3765,7 +3757,7 @@ const filteredPreviews = useMemo(() => {
             pressed={activeFilter === "all"}
             onClick={() => setActiveFilter("all")}
           >
-            All
+            {t("dashboard.filters.all")}
           </Button>
           <Button
             size="slim"
@@ -3773,7 +3765,7 @@ const filteredPreviews = useMemo(() => {
             pressed={activeFilter === "increase"}
             onClick={() => setActiveFilter("increase")}
           >
-            Price Increase
+            {t("dashboard.filters.priceIncrease")}
           </Button>
           <Button
             size="slim"
@@ -3781,7 +3773,7 @@ const filteredPreviews = useMemo(() => {
             pressed={activeFilter === "decrease"}
             onClick={() => setActiveFilter("decrease")}
           >
-            Price Decrease
+            {t("dashboard.filters.priceDecrease")}
           </Button>
           <Button
             size="slim"
@@ -3789,7 +3781,7 @@ const filteredPreviews = useMemo(() => {
             pressed={activeFilter === "high_impact"}
             onClick={() => setActiveFilter("high_impact")}
           >
-            {"High Impact (>10%)"}
+            {t("dashboard.filters.highImpact")}
           </Button>
         </InlineStack>
 
@@ -3821,12 +3813,12 @@ const filteredPreviews = useMemo(() => {
                 label={t("common.sortBy")}
                 labelHidden
                 options={[
-                  { label: "Sort: A–Z", value: "alphabetical_az" },
-                  { label: "Sort: Z–A", value: "alphabetical_za" },
-                  { label: "Sort: Highest Increase", value: "highest_increase" },
-                  { label: "Sort: Highest Decrease", value: "highest_decrease" },
-                  { label: "Sort: Highest Final Price", value: "highest_final_price" },
-                  { label: "Sort: Lowest Final Price", value: "lowest_final_price" },
+                  { label: t("dashboard.filters.sortAZ"), value: "alphabetical_az" },
+                  { label: t("dashboard.filters.sortZA"), value: "alphabetical_za" },
+                  { label: t("dashboard.filters.sortHighestIncrease"), value: "highest_increase" },
+                  { label: t("dashboard.filters.sortHighestDecrease"), value: "highest_decrease" },
+                  { label: t("dashboard.filters.sortHighestFinalPrice"), value: "highest_final_price" },
+                  { label: t("dashboard.filters.sortLowestFinalPrice"), value: "lowest_final_price" },
                 ]}
                 value={sortOrder}
                 onChange={(value) => setSortOrder(value as PreviewSortOrder)}
@@ -3867,15 +3859,15 @@ const filteredPreviews = useMemo(() => {
 
             {/* 🔴 Added: Clear Filter Icon Action Button with Tooltip */}
             {(searchQuery || minPrice || maxPrice || activeFilter !== "all") && (
-              <Tooltip content="Clear all active filters" dismissOnMouseOut>
+              <Tooltip content={t("dashboard.filters.clearAllFilters")} dismissOnMouseOut>
              <Button
               variant="tertiary"
               tone="critical"
               icon={XCircleIcon}
               onClick={handleClearFilters}
-              accessibilityLabel="Clear active dataset filters"
+              accessibilityLabel={t("dashboard.filters.clearAccessibility")}
             >
-              Clear 
+              {t("dashboard.filters.clear")}
             </Button>
               </Tooltip>
             )}
@@ -3894,7 +3886,7 @@ const filteredPreviews = useMemo(() => {
       {/* Header Summary Metadata Row */}
       <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
         <Text as="h3" variant="headingSm" fontWeight="semibold">
-          Preview Summary
+          {t("dashboard.previewSummary.title")}
         </Text>
         <Text as="p" variant="bodySm" tone="subdued">
           {(() => {
@@ -3902,9 +3894,12 @@ const filteredPreviews = useMemo(() => {
             const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
             
             if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
-              return `Based on ${productCount} products • ${variantCount} variants in your current view`;
+              return t("dashboard.previewSummary.basedOnProductsVariants")
+                .replace("{count}", String(productCount))
+                .replace("{variants}", String(variantCount));
             }
-            return `Based on ${productCount} products in your current view`;
+            return t("dashboard.previewSummary.basedOnProducts")
+              .replace("{count}", String(productCount));
           })()}
         </Text>
       </InlineStack>
@@ -3920,7 +3915,7 @@ const filteredPreviews = useMemo(() => {
           textAlign="center"
         >
           <Text as="p" variant="bodySm" tone="subdued">
-            No pricing changes detected in the current view.
+            {t("dashboard.previewSummary.noChanges")}
           </Text>
         </Box>
       ) : (
@@ -3944,7 +3939,7 @@ const filteredPreviews = useMemo(() => {
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  Products affected
+                  {t("dashboard.previewSummary.productsAffected")}
                 </Text>
                 <Text as="p" variant="headingMd" fontWeight="bold">
                   {previewImpactSummary.affectedCount}
@@ -3965,7 +3960,7 @@ const filteredPreviews = useMemo(() => {
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  Average change
+                  {t("dashboard.previewSummary.averageChange")}
                 </Text>
                 <Text 
                   as="p" 
@@ -3991,7 +3986,7 @@ const filteredPreviews = useMemo(() => {
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  Largest increase
+                  {t("dashboard.previewSummary.largestIncrease")}
                 </Text>
                 <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasIncrease ? "success" : "default"}>
                   {previewImpactSummary.hasIncrease 
@@ -4015,7 +4010,7 @@ const filteredPreviews = useMemo(() => {
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  Largest decrease
+                  {t("dashboard.previewSummary.largestDecrease")}
                 </Text>
                 <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasDecrease ? "critical" : "default"}>
                   {previewImpactSummary.hasDecrease 
@@ -4039,7 +4034,7 @@ const filteredPreviews = useMemo(() => {
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  Avg price / Safeguards
+                  {t("dashboard.previewSummary.avgPriceSafeguards")}
                 </Text>
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="p" variant="headingMd" fontWeight="bold">
@@ -4053,7 +4048,7 @@ const filteredPreviews = useMemo(() => {
                       borderRadius="100"
                     >
                       <Text as="span" variant="bodyXs" fontWeight="semibold" tone="warning">
-                        {previewImpactSummary.safeguardAdjustedCount} locked
+                        {`${previewImpactSummary.safeguardAdjustedCount} ${t("dashboard.previewSummary.locked")}`}
                       </Text>
                     </Box>
                   )}
@@ -4098,7 +4093,7 @@ const filteredPreviews = useMemo(() => {
                                 loading={loading}
                                 disabled={loading || isProcessing}
                               >
-                                Refresh Previews
+                                {t("dashboard.actionBar.refreshPreviews")}
                               </Button>
                             </div>
 
@@ -4150,7 +4145,7 @@ const filteredPreviews = useMemo(() => {
                                         : "400",
                                   }}
                                 >
-                                  {`Apply Selected (${selectedPreviewItems.length})`}
+                                  {t("dashboard.actionBar.applySelected").replace("{count}", String(selectedPreviewItems.length))}
                                 </span>
                               </Button>
                             </div>
@@ -4176,7 +4171,7 @@ const filteredPreviews = useMemo(() => {
                                 !hasRules
                               }
                             >
-                              {`Apply All (${previews.length})`}
+                              {t("dashboard.actionBar.applyAll").replace("{count}", String(previews.length))}
                             </Button>
 
                             {/* Schedule Center */}
@@ -4186,14 +4181,14 @@ const filteredPreviews = useMemo(() => {
                               icon={CalendarTimeIcon}
                               onClick={() => setScheduleHistoryModalOpen(true)}
                             >
-                              Schedule Center
+                              {t("dashboard.actionBar.scheduleCenter")}
                             </Button>
                           </InlineStack>
 
                           {/* Right Side Group: Utilities / Reports */}
                           <InlineStack gap="150" blockAlign="center">
                             {previews.length === 0 ? (
-                              <Tooltip content="Please refresh previews to generate the latest report.">
+                              <Tooltip content={t("dashboard.actionBar.reportTooltip")}>
                                 <span style={{ display: "inline-block" }}>
                                   <Button
                                     variant="tertiary"
@@ -4201,7 +4196,7 @@ const filteredPreviews = useMemo(() => {
                                     icon={ArrowDownIcon}
                                     disabled
                                   >
-                                    Download Impact Report
+                                    {t("dashboard.actionBar.downloadReport")}
                                   </Button>
                                 </span>
                               </Tooltip>
@@ -4212,7 +4207,7 @@ const filteredPreviews = useMemo(() => {
                                 icon={ArrowDownIcon}
                                 onClick={handleDownloadReport}
                               >
-                                Download Impact Report
+                                {t("dashboard.actionBar.downloadReport")}
                               </Button>
                             )}
                           </InlineStack>
@@ -4233,7 +4228,7 @@ const filteredPreviews = useMemo(() => {
                                     variant="bodySm"
                                     fontWeight="medium"
                                   >
-                                    Publishing Prices...
+                                    {t("dashboard.actionBar.publishingPrices")}
                                   </Text>
                                   <Text as="p" tone="subdued" variant="bodyXs">
                                     {Math.min(
@@ -4265,12 +4260,11 @@ const filteredPreviews = useMemo(() => {
                                       variant="bodySm"
                                       fontWeight="medium"
                                     >
-                                      Processing price updates…
+                                      {t("dashboard.actionBar.processingUpdates")}
                                     </Text>
                                   </InlineStack>
                                   <Text as="p" tone="subdued" variant="bodyXs">
-                                    Keep this page open until processing
-                                    finishes.
+                                    {t("dashboard.actionBar.keepPageOpen")}
                                   </Text>
                                   <ProgressBar
                                     progress={progress === 0 ? 10 : progress}
@@ -4296,16 +4290,16 @@ const filteredPreviews = useMemo(() => {
                       >
                         <InlineStack gap="300" blockAlign="center" wrap>
                           <Text as="h3" variant="headingMd">
-                            Products
+                            {t("dashboard.productGrid.title")}
                           </Text>
                           <Button size="slim" onClick={selectAllVisible}>
-                            Select All on Page
+                            {t("dashboard.productGrid.selectAllOnPage")}
                           </Button>
                           <Button
                             size="slim"
                             onClick={() => setSelectedItems(new Set())}
                           >
-                            Clear Selection
+                            {t("dashboard.productGrid.clearSelection")}
                           </Button>
                         </InlineStack>
                         <Pagination
@@ -4313,7 +4307,7 @@ const filteredPreviews = useMemo(() => {
                           onPrevious={() => setCurrentPage((prev) => prev - 1)}
                           hasNext={currentPage < totalPages}
                           onNext={() => setCurrentPage((prev) => prev + 1)}
-                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                          label={t("dashboard.productGrid.pageLabel").replace("{current}", String(currentPage)).replace("{total}", String(totalPages || 1))}
                         />
                       </InlineStack>
 
@@ -4333,12 +4327,10 @@ const filteredPreviews = useMemo(() => {
                                     variant="bodyMd"
                                     fontWeight="medium"
                                   >
-                                    No products match your filters
+                                    {t("dashboard.productGrid.noMatchTitle")}
                                   </Text>
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    Adjust search, price range, or smart segment
-                                    filters. Clear filters to see all preview
-                                    products again.
+                                    {t("dashboard.productGrid.noMatchBody")}
                                   </Text>
                                 </BlockStack>
                               </Box>
@@ -4359,13 +4351,13 @@ const filteredPreviews = useMemo(() => {
                                   tone="subdued"
                                   fontWeight="medium"
                                 >
-                                  Preview Context:
+                                  {t("dashboard.productGrid.previewContext")}
                                 </Text>
                                 <Text as="span" variant="bodySm" tone="subdued">
                                   {previewPricingRule.adjustmentDirection ===
                                   "decrease"
-                                    ? "Decrease"
-                                    : "Increase"}{" "}
+                                    ? t("dashboard.productGrid.decrease")
+                                    : t("dashboard.productGrid.increase")}{" "}
                                   {previewPricingRule.adjustmentType === "fixed"
                                     ? formatMoney(
                                         previewPricingRule.adjustmentValue ?? 0,
@@ -4374,7 +4366,7 @@ const filteredPreviews = useMemo(() => {
                                     : `${previewPricingRule.adjustmentValue}%`}
                                   {previewPricingRule.endingOption &&
                                   previewPricingRule.endingOption !== "none"
-                                    ? ` • Rounded to ${previewPricingRule.endingOption}`
+                                    ? ` • ${t("dashboard.productGrid.roundedTo").replace("{value}", previewPricingRule.endingOption)}`
                                     : ""}
                                 </Text>
                               </InlineStack>
@@ -4401,7 +4393,7 @@ const filteredPreviews = useMemo(() => {
         {/* Left Area: Product Name Column Offset */}
         <div style={{ flex: 1, paddingLeft: "84px" }}>
           <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-            Product
+            {t("dashboard.productGrid.product")}
           </Text>
         </div>
 
@@ -4418,42 +4410,42 @@ const filteredPreviews = useMemo(() => {
           {/* Inventory */}
           <div style={{ textAlign: "left" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              Inventory
+              {t("dashboard.productGrid.inventory")}
             </Text>
           </div>
 
           {/* Product Type */}
           <div style={{ textAlign: "left" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              Product type
+              {t("dashboard.productGrid.productType")}
             </Text>
           </div>
 
           {/* Vendor */}
           <div style={{ textAlign: "left" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              Vendor
+              {t("dashboard.productGrid.vendor")}
             </Text>
           </div>
 
           {/* Original Catalog */}
           <div style={{ textAlign: "right" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              Original Catalog
+              {t("dashboard.productGrid.originalCatalog")}
             </Text>
           </div>
 
           {/* Live Storefront */}
           <div style={{ textAlign: "right" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              Live Storefront
+              {t("dashboard.productGrid.liveStorefront")}
             </Text>
           </div>
 
           {/* New Preview */}
           <div style={{ textAlign: "left" }}>
             <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              New Preview
+              {t("dashboard.productGrid.newPreview")}
             </Text>
           </div>
         </div>
@@ -4503,7 +4495,7 @@ const filteredPreviews = useMemo(() => {
         withoutMin + 0.01 < minPrice &&
         Math.abs(targetPrice - minPrice) < 0.01
       ) {
-        rowSafeguardNotices.push("Adjusted to minimum allowed price.");
+        rowSafeguardNotices.push(t("dashboard.productGrid.adjustedMin"));
       }
     }
 
@@ -4516,7 +4508,7 @@ const filteredPreviews = useMemo(() => {
         withoutMax - 0.01 > maxPrice &&
         Math.abs(targetPrice - maxPrice) < 0.01
       ) {
-        rowSafeguardNotices.push("Adjusted to maximum allowed price.");
+        rowSafeguardNotices.push(t("dashboard.productGrid.adjustedMax"));
       }
     }
 
@@ -4536,11 +4528,11 @@ const filteredPreviews = useMemo(() => {
 
       if (Math.abs(targetPrice - standardRoundedFinal) > 0.01) {
         if (roundingPrecision === "nearest-0.05") {
-          rowSafeguardNotices.push("Rounded to nearest 0.05.");
+          rowSafeguardNotices.push(t("dashboard.productGrid.roundedNearest005"));
         } else if (roundingPrecision === "whole") {
-          rowSafeguardNotices.push("Rounded to whole amount.");
+          rowSafeguardNotices.push(t("dashboard.productGrid.roundedWhole"));
         } else {
-          rowSafeguardNotices.push("Rounded for storefront consistency.");
+          rowSafeguardNotices.push(t("dashboard.productGrid.roundedConsistency"));
         }
       }
     }
@@ -4782,7 +4774,7 @@ const filteredPreviews = useMemo(() => {
                       variant="tertiary"
                       onClick={() => resetOverride(p.variantId)}
                     >
-                      Reset
+                      {t("dashboard.productGrid.reset")}
                     </Button>
                   )}
 
@@ -4801,10 +4793,10 @@ const filteredPreviews = useMemo(() => {
                       }
                       tone="success"
                     >
-                      Apply
+                      {t("dashboard.productGrid.apply")}
                     </Button>
                   ) : (
-                    <Tooltip content="This price is already synced with your Shopify Admin. No update needed.">
+                    <Tooltip content={t("dashboard.productGrid.alreadySynced")}>
                       <span style={{ display: "inline-block" }}>
                         <Button
                           size="slim"
@@ -4818,7 +4810,7 @@ const filteredPreviews = useMemo(() => {
                             !hasRules
                           }
                         >
-                          Apply
+                          {t("dashboard.productGrid.apply")}
                         </Button>
                       </span>
                     </Tooltip>
@@ -4842,14 +4834,13 @@ const filteredPreviews = useMemo(() => {
                           onPrevious={() => setCurrentPage((prev) => prev - 1)}
                           hasNext={currentPage < totalPages}
                           onNext={() => setCurrentPage((prev) => prev + 1)}
-                          label={`Page ${currentPage} of ${totalPages || 1}`}
+                          label={t("dashboard.productGrid.pageLabel").replace("{current}", String(currentPage)).replace("{total}", String(totalPages || 1))}
                         />
                       </InlineStack>
 
                       {!hasActivePlan && (
                         <Text as="p" variant="bodySm" tone="critical">
-                          Start your free trial to apply pricing changes from
-                          this dashboard.
+                          {t("dashboard.billingUpsell.body")}
                         </Text>
                       )}
                     </BlockStack>

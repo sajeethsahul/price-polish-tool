@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { t } from "../utils/i18n";
 
 export type PricePolishLoaderCopy = {
   title: string;
@@ -7,32 +8,32 @@ export type PricePolishLoaderCopy = {
 
 export const PRICE_POLISH_LOADER_COPY = {
   dashboard: {
-    title: "Preparing your pricing workspace...",
-    subtitle: "Loading storefront status, schedules, and campaign activity...",
+    title: t("loader.dashboard.title"),
+    subtitle: t("loader.dashboard.subtitle"),
   },
   campaignHistory: {
-    title: "Reviewing campaign history...",
-    subtitle: "Loading pricing campaigns and operational events...",
+    title: t("loader.campaignHistory.title"),
+    subtitle: t("loader.campaignHistory.subtitle"),
   },
   pricingRules: {
-    title: "Polishing your pricing rules...",
-    subtitle: "Loading pricing strategy and automation settings...",
+    title: t("loader.pricingRules.title"),
+    subtitle: t("loader.pricingRules.subtitle"),
   },
   help: {
-    title: "Opening the help center...",
-    subtitle: "Loading guides and best practices...",
+    title: t("loader.help.title"),
+    subtitle: t("loader.help.subtitle"),
   },
   settings: {
-    title: "Preparing your preferences...",
-    subtitle: "Loading store configuration...",
+    title: t("loader.settings.title"),
+    subtitle: t("loader.settings.subtitle"),
   },
   campaignDetails: {
-    title: "Inspecting campaign details...",
-    subtitle: "Loading tracked products and pricing history...",
+    title: t("loader.campaignDetails.title"),
+    subtitle: t("loader.campaignDetails.subtitle"),
   },
   revertPreview: {
-    title: "Verifying restore information...",
-    subtitle: "Preparing pricing recovery preview...",
+    title: t("loader.revertPreview.title"),
+    subtitle: t("loader.revertPreview.subtitle"),
   },
 } satisfies Record<string, PricePolishLoaderCopy>;
 
@@ -73,10 +74,10 @@ export function PricePolishLoader({
 }) {
   const hintMessages = useMemo(
     () => [
-      "Syncing storefront status...",
-      "Loading pricing rules...",
-      "Fetching recent campaigns...",
-      "Preparing operational controls...",
+      t("loader.hints.syncing"),
+      t("loader.hints.loadingRules"),
+      t("loader.hints.fetchingCampaigns"),
+      t("loader.hints.preparingControls"),
     ],
     []
   );
@@ -257,4 +258,3 @@ export function PricePolishLoader({
     </div>
   );
 }
-

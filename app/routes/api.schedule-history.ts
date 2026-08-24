@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export async function loader({ request }: LoaderFunctionArgs) {
     const auth = await authenticate.admin(request);
@@ -8,6 +9,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
     const { session } = auth;
     const shop = session.shop;
+    applyLocaleFromSession(session);
 
     try {
         const jobs = await (prisma.scheduledJob as any).findMany({
@@ -31,6 +33,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
         return Response.json({ jobs });
     } catch (error) {
         console.error("[Schedule History API] Error fetching jobs:", error);
-        return Response.json({ error: "Failed to load schedule history" }, { status: 500 });
+        return Response.json({ error: t("server.scheduleHistoryFailed") }, { status: 500 });
     }    
 }

@@ -4,6 +4,7 @@ import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { requireActiveBilling } from "../utils/billing-protection.server";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -14,7 +15,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (preflight) return preflight;
 
   return cors(
-    new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+    new Response(JSON.stringify({ error: t("server.methodNotAllowed") }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
     })
@@ -34,6 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { admin, session } = auth;
   const shop = session.shop;
+  applyLocaleFromSession(session);
 
   console.log("[BULK] SESSION", { shop });
 
@@ -55,7 +57,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return cors(
         new Response(
-          JSON.stringify({ success: false, error: "No items provided" }),
+          JSON.stringify({ success: false, error: t("server.noItemsProvided") }),
           { status: 400 }
         )
       );
@@ -187,7 +189,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       new Response(
         JSON.stringify({
           success: false,
-          error: "Something went wrong during bulk update",
+          error: t("server.bulkUpdateFailed"),
         }),
         { status: 500 }
       )

@@ -356,7 +356,7 @@
       "heroTitle": "Welcome to Price Polish",
       "heroLine1": "Manage pricing updates with confidence.",
       "heroLine2": "Reduce manual pricing work.",
-      "heroLine3": "Stay in control of promotions and scheduled pricing.",
+      "heroLine3": "Stay in control of promotions and scheduled campaigns.",
       "heroWhyThisMatters": "Price Polish helps you manage pricing changes more efficiently, reduce repetitive manual work, and maintain better control over promotions.",
       "createFirstRule": "Create First Rule",
       "watchSetupGuide": "Watch Setup Guide",
@@ -591,6 +591,274 @@
       "body": "This will disable dynamic pricing on your storefront.",
       "bullet1": "This will remove all live pricing changes",
       "bullet2": "Your saved rules will NOT be deleted"
+    },
+    "storeHealth": {
+      "title": "Store Health",
+      "productsReadyToPublish": "Products Ready to Publish",
+      "scheduledJobs": "Scheduled Jobs",
+      "lastPublish": "Last Publish",
+      "never": "Never",
+      "justNow": "Just now",
+      "minutesAgo": "minute(s) ago",
+      "hoursAgo": "hour(s) ago",
+      "daysAgo": "day(s) ago"
+    },
+    "billingUpsell": {
+      "title": "Start Your 7-Day Free Trial",
+      "body": "Apply smart pricing, increase profits, and manage bulk updates safely.",
+      "cta": "Start Free Trial",
+      "noCharge": "No charge today • Cancel anytime"
+    },
+    "liveModeWarning": {
+      "title": "Live Pricing is on.",
+      "body": "Applied prices update your Shopify catalog. With live rules active, the storefront may layer rules on top of those prices. Stop Live Pricing or adjust rules if you need the applied amount to be final."
+    },
+    "metrics": {
+      "pricingImpact": "Pricing Impact",
+      "projectedDelta": "Projected delta",
+      "activeCampaigns": "Active Campaigns",
+      "affectingStorefront": "Affecting storefront",
+      "productsAutomated": "Products Automated",
+      "underWorkflows": "Under workflows"
+    },
+    "recentActivity": {
+      "title": "Recent Activity",
+      "viewAll": "View All",
+      "noCampaigns": "No campaigns recorded yet.",
+      "productsSuffix": "products"
+    },
+    "quickActions": {
+      "title": "Quick Actions",
+      "configureRules": "Configure Rules",
+      "previewPrices": "Preview Prices",
+      "campaignHistory": "Campaign History"
+    },
+    "noRulesBanner": {
+      "body": "You must configure at least one pricing rule before applying changes or going live.",
+      "cta": "Configure Pricing Rules"
+    },
+    "storefrontControl": {
+      "title": "Storefront Control Panel",
+      "tooltip": "Virtual overlay: changes what customers see on your storefront without altering catalog prices until you apply updates elsewhere.",
+      "body": "Manage storefront pricing visibility for shoppers. Admin catalog prices remain unchanged until updates are applied in this app.",
+      "live": "Live",
+      "paused": "Paused",
+      "liveActive": "Live pricing is active",
+      "livePaused": "Live pricing is paused",
+      "pauseLivePricing": "Pause Live Pricing",
+      "publishPricing": "Publish Pricing"
+    },
+    "emptyProducts": {
+      "title": "No preview products yet",
+      "body": "Refresh previews after configuring rules, or check that this app can access products in your catalog.",
+      "cta": "Refresh previews"
+    },
+    "filters": {
+      "title": "Filters & Smart Segments",
+      "all": "All",
+      "priceIncrease": "Price Increase",
+      "priceDecrease": "Price Decrease",
+      "highImpact": "High Impact (>10%)",
+      "sortAZ": "Sort: A–Z",
+      "sortZA": "Sort: Z–A",
+      "sortHighestIncrease": "Sort: Highest Increase",
+      "sortHighestDecrease": "Sort: Highest Decrease",
+      "sortHighestFinalPrice": "Sort: Highest Final Price",
+      "sortLowestFinalPrice": "Sort: Lowest Final Price",
+      "clearAllFilters": "Clear all active filters",
+      "clearAccessibility": "Clear active dataset filters",
+      "clear": "Clear"
+    },
+    "previewSummary": {
+      "title": "Preview Summary",
+      "basedOnProducts": "Based on {count} products in your current view",
+      "basedOnProductsVariants": "Based on {count} products • {variants} variants in your current view",
+      "noChanges": "No pricing changes detected in the current view.",
+      "productsAffected": "Products affected",
+      "averageChange": "Average change",
+      "largestIncrease": "Largest increase",
+      "largestDecrease": "Largest decrease",
+      "avgPriceSafeguards": "Avg price / Safeguards",
+      "locked": "locked"
+    },
+    "actionBar": {
+      "refreshPreviews": "Refresh Previews",
+      "applySelected": "Apply Selected ({count})",
+      "applyAll": "Apply All ({count})",
+      "scheduleCenter": "Schedule Center",
+      "downloadReport": "Download Impact Report",
+      "reportTooltip": "Please refresh previews to generate the latest report.",
+      "publishingPrices": "Publishing Prices...",
+      "processingUpdates": "Processing price updates…",
+      "keepPageOpen": "Keep this page open until processing finishes.",
+      "productsSuffix": "products"
+    },
+    "productGrid": {
+      "title": "Products",
+      "selectAllOnPage": "Select All on Page",
+      "clearSelection": "Clear Selection",
+      "pageLabel": "Page {current} of {total}",
+      "noMatchTitle": "No products match your filters",
+      "noMatchBody": "Adjust search, price range, or smart segment filters. Clear filters to see all preview products again.",
+      "previewContext": "Preview Context:",
+      "decrease": "Decrease",
+      "increase": "Increase",
+      "roundedTo": "Rounded to {value}",
+      "product": "Product",
+      "inventory": "Inventory",
+      "productType": "Product type",
+      "vendor": "Vendor",
+      "originalCatalog": "Original Catalog",
+      "liveStorefront": "Live Storefront",
+      "newPreview": "New Preview",
+      "adjustedMin": "Adjusted to minimum allowed price.",
+      "adjustedMax": "Adjusted to maximum allowed price.",
+      "roundedNearest005": "Rounded to nearest 0.05.",
+      "roundedWhole": "Rounded to whole amount.",
+      "roundedConsistency": "Rounded for storefront consistency.",
+      "reset": "Reset",
+      "apply": "Apply",
+      "alreadySynced": "This price is already synced with your Shopify Admin. No update needed."
+    },
+    "campaignHistory": {
+      "noCampaigns": "No campaigns recorded yet.",
+      "noActive": "No active campaigns found.",
+      "noPartial": "No partial campaigns found.",
+      "noScheduled": "No scheduled campaigns found.",
+      "noClosed": "No closed campaigns found.",
+      "noMatch": "No campaigns match the current filters.",
+      "allClosed": "All matching campaigns are closed. Turn off Hide Closed Campaigns to view them.",
+      "allSources": "All Sources",
+      "manual": "Manual",
+      "scheduled": "Scheduled",
+      "timeWindow": "Time Window",
+      "currentWeek": "Current Week",
+      "currentMonth": "Current Month",
+      "last3Months": "Last 3 Months",
+      "last6Months": "Last 6 Months",
+      "thisYear": "This Year",
+      "allTime": "All Time",
+      "active": "Active",
+      "partial": "Partial",
+      "closed": "Closed",
+      "scheduledWindow": "Scheduled Window",
+      "activeWindow": "Active Window",
+      "expiredWindow": "Expired Window",
+      "autoRestored": "Auto Restored",
+      "windowStopped": "Window Stopped",
+      "cancelledWindow": "Cancelled Window",
+      "scheduledPublish": "Scheduled Publish",
+      "cancelled": "Cancelled",
+      "publishing": "Publishing",
+      "published": "Published",
+      "failed": "Failed",
+      "unrecoverable": "Unrecoverable",
+      "reverted": "Reverted",
+      "pending": "Pending",
+      "oneTimePublish": "One-time Publish",
+      "unknown": "Unknown"
+    },
+    "timeline": {
+      "created": "Created",
+      "recorded": "Recorded",
+      "createdDesc": "Campaign record created and ready for lifecycle actions.",
+      "windowScheduled": "Window Scheduled",
+      "queued": "Queued",
+      "windowScheduledDesc": "Pricing will publish at the window start and automatically restore at the window end.",
+      "windowScheduledDescNoEnd": "Pricing window is queued for publishing and automatic restore.",
+      "scheduled": "Scheduled",
+      "scheduledDesc": "Campaign is queued for execution.",
+      "windowActivated": "Window Activated",
+      "active": "Active",
+      "windowActiveDesc": "Pricing is active now and will automatically restore at the scheduled end time.",
+      "windowActiveDescNoEnd": "Pricing is active now and waiting for automatic restore.",
+      "applied": "Applied",
+      "completed": "Completed",
+      "appliedDesc": "Pricing updates were applied to tracked items.",
+      "partialFailure": "Partial Failure",
+      "attention": "Attention",
+      "partialFailureDesc": "Some items failed to complete rollback operations.",
+      "reverted": "Reverted",
+      "revertedDesc": "Pricing successfully restored to original storefront values.",
+      "autoRestored": "Auto Restored",
+      "autoRestoredDesc": "Original storefront pricing was automatically restored after the window ended.",
+      "unrecoverable": "Unrecoverable",
+      "terminal": "Terminal",
+      "unrecoverableDesc": "Rollback is terminal for one or more items and cannot be retried."
+    },
+    "variant": {
+      "prefix": "Variant: {id}",
+      "shortPrefix": "Variant: ...{id}",
+      "empty": "Variant: -"
+    },
+    "safeguardNotices": {
+      "largeOperation": "A large number of products will update.",
+      "mostVisible": "This update affects most visible products.",
+      "significantMovement": "Some products have larger price changes.",
+      "veryLargeOperation": "A very large number of products will update.",
+      "storefrontWide": "Most visible storefront products will update.",
+      "allProductsMajorMovement": "This all-products update includes larger price changes.",
+      "revertLargeScope": "Large revert operation detected.",
+      "revertMostVisible": "This revert restores pricing across most visible products.",
+      "revertSignificantMovement": "Some products contain significant pricing movement.",
+      "revertVeryLargeScope": "This revert restores pricing across a large campaign set.",
+      "revertStorefrontMajor": "Storefront-wide revert scope includes major pricing movement."
+    },
+    "campaignTitle": {
+      "duplicate": "A campaign with this title already exists. Choose a unique title."
+    },
+    "undo": {
+      "restored": "Restored {count} products",
+      "failed": "Failed to undo changes."
+    },
+    "revert": {
+      "terminalReason": "This campaign can no longer be reverted because {reason}.",
+      "terminal": "This campaign can no longer be reverted.",
+      "noRetryable": "No retryable revert actions remain.",
+      "noRetryableReason": "No retryable revert actions remain because {reason}.",
+      "failed": "Failed to revert campaign."
+    },
+    "windowLifecycle": {
+      "cancelSchedule": "cancel schedule",
+      "stopWindow": "stop window",
+      "unableCancel": "Unable to cancel schedule.",
+      "unableStop": "Unable to stop window.",
+      "cancelled": "Pricing window cancelled",
+      "stopped": "Original pricing restored and window stopped",
+      "unableCancelWindow": "Unable to cancel pricing window",
+      "unableStopWindow": "Unable to stop pricing window"
+    },
+    "publishLifecycle": {
+      "unableCancel": "Unable to cancel publish."
+    },
+    "pushStorefront": {
+      "restored": "Storefront prices restored successfully",
+      "failedStop": "Failed to stop live pricing.",
+      "failedState": "Failed to update storefront pricing state.",
+      "failedPublish": "Failed to publish prices.",
+      "live": "Prices are now live on your storefront"
+    },
+    "billing": {
+      "inactive": "Subscription inactive. Please reactivate billing to continue using Price Polish.",
+      "unknown": "Billing status could not be verified. Please refresh the app and try again.",
+      "applyFailed": "Failed to apply pricing",
+      "applyFailedShort": "Apply failed",
+      "stagedFailed": "Prices staged but failed to push live"
+    },
+    "downloadReport": {
+      "header": "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain",
+      "totalRow": "TOTAL STOREFRONT VALUE INCREASE",
+      "filename": "PricePolish_Impact_Report_{date}.csv"
+    },
+    "previewContext": {
+      "decrease": "Decrease",
+      "increase": "Increase",
+      "roundedTo": "Rounded to {value}"
+    },
+    "scopeLabels": {
+      "products": "products",
+      "product": "product",
+      "selectedProducts": "selected products"
     }
   },
   "pricing": {
@@ -622,101 +890,351 @@
     "page": {
       "title": "Help & User Guide"
     },
-    "section": {
-      "quickOverview": "Quick Overview",
-      "coreWorkflow": "Core Workflow",
-      "recommendedWorkflow": "Recommended Workflow",
-      "currentVsTextbox": "Understanding Current vs Textbox",
-      "applyUpdates": "Apply Updates",
-      "livePricing": "Live Pricing",
-      "manualOverrides": "Manual Overrides",
-      "scheduling": "Scheduling",
-      "safetyRecovery": "Safety & Recovery",
-      "pricingRulesBasics": "Pricing Rules Basics",
-      "automationSafety": "Automation & Safety"
+    "section38": {
+      "title": "Price Polish in One Sentence",
+      "desc": "Price Polish helps Shopify merchants safely manage pricing changes through a controlled workflow of: Configure → Preview → Apply → Schedule/Go Live → Track → Revert."
     },
-    "banner": {
-      "intro": "Preview upcoming prices, apply catalog updates instantly, schedule future campaigns, or enable dynamic live storefront pricing.",
-      "refreshTip": "Refresh previews after updating pricing rules so the dashboard reflects your latest calculations.",
-      "livePricingTip": "If you want your applied catalog value to remain the final customer-facing price, keep Live Pricing disabled or reduce Live Pricing rules to 0%."
+    "sectionA": {
+      "title": "What is Price Polish?",
+      "desc": "Price Polish is a Shopify pricing management tool designed to help merchants manage product pricing changes in a controlled and traceable workflow.",
+      "workflow": "Core workflow: Configure Pricing Rules → Preview Prices → Review Changes → Apply Pricing → Schedule or Publish → Track History → Revert When Needed."
     },
-    "desc": {
-      "recommendedWorkflow": "A safe and predictable workflow for managing pricing updates.",
-      "currentVsTextbox": "These values work together to help you review pricing changes clearly.",
-      "applyUpdates": "Apply updates Shopify immediately across your catalog.",
-      "livePricing": "Dynamically adjusts storefront display prices without modifying catalog values.",
-      "manualOverrides": "Manual input is designed for one-time pricing overrides.",
-      "scheduling": "Create automated pricing campaigns that run later without manual intervention.",
-      "safetyRecovery": "All pricing actions are designed to be reviewable and recoverable.",
-      "pricingRulesBasics": "Preview prices are calculated from your current live product prices."
+    "sectionB": {
+      "title": "Getting Started",
+      "subtitle": "Recommended first steps when you first enter Price Polish.",
+      "step1": "Configure a pricing rule.",
+      "step2": "Preview the calculated prices.",
+      "step3": "Review the proposed changes.",
+      "step4": "Apply pricing when ready.",
+      "step5": "Optionally schedule future pricing.",
+      "step6": "Monitor the resulting campaign in Campaign History."
     },
-    "labels": {
-      "current": "Current",
-      "textbox": "Textbox",
-      "applyAll": "Apply All",
-      "applySelected": "Apply Selected",
-      "filteredWorkflow": "Filtered workflow",
-      "collection": "Collection"
+    "sectionC": {
+      "title": "Core Workflow",
+      "subtitle": "The main operational sequence from Dashboard to Revert.",
+      "step1_label": "Dashboard:",
+      "step1_desc": "Review products, preview prices, and access pricing operations.",
+      "step2_label": "Rules:",
+      "step2_desc": "Configure markup, rounding, and charm pricing.",
+      "step3_label": "Preview:",
+      "step3_desc": "Compare existing prices with calculated proposed prices.",
+      "step4_label": "Apply:",
+      "step4_desc": "Commit pricing changes to your Shopify catalog.",
+      "step5_label": "Schedule:",
+      "step5_desc": "Plan future pricing operations and temporary windows.",
+      "step6_label": "History:",
+      "step6_desc": "Track campaigns and operational status.",
+      "step7_label": "Revert:",
+      "step7_desc": "Reverse pricing changes when needed."
     },
-    "workflow": {
-      "step1_label": "Configure pricing rules:",
-      "step1_desc": "Set markup, rounding, and charm pricing in Pricing Rules.",
-      "step2_label": "Refresh previews:",
-      "step2_desc": "Load the latest calculated prices on the Dashboard.",
-      "step3_label": "Review changes:",
-      "step3_desc": "Compare Current vs Textbox before applying updates.",
-      "step4_label": "Apply now or Schedule for later:",
-      "step4_desc": "Apply updates Shopify immediately or schedule automated campaigns.",
-      "step5_label": "Undo if needed:",
-      "step5_desc": "Restore previous prices after bulk updates."
+    "sectionD": {
+      "title": "Pricing Rules",
+      "subtitle": "Defines how Price Polish calculates proposed prices.",
+      "markup_title": "Markup",
+      "markup_desc": "Percentage increase or decrease applied to the current/base price. A negative markup can be used for a reduction.",
+      "rounding_title": "Rounding",
+      "rounding_desc": "Controls the desired decimal ending of the resulting price. For example, a rounding value such as 0.88 can be used to produce prices ending in .88.",
+      "charm_title": "Charm Pricing",
+      "charm_desc": "Psychological price endings such as .99. Disabled or treated as not applicable for currencies where decimal pricing is not applicable."
     },
-    "currentVsTextbox": {
-      "current_desc": "Your current live product price.",
-      "textbox_desc": "Your next calculated preview price based on pricing rules or manual input."
+    "sectionE": {
+      "title": "Preview & Product Grid",
+      "subtitle": "Review pricing changes before they reach the storefront.",
+      "preview_label": "Preview Pricing:",
+      "preview_desc": "Compare the existing price with the calculated proposed price before applying anything. Preview first. Apply second.",
+      "grid_label": "Product Preview Grid:",
+      "grid_desc": "Product/variant-level visibility including current prices, original prices, calculated target prices, manual overrides, selections, filtering, search, price filters, smart segments, and pagination.",
+      "override_label": "Manual Price Override:",
+      "override_desc": "Manually override a calculated price for an individual item. Manual overrides are preserved separately from auto-calculated prices."
     },
-    "applyUpdates": {
-      "all_desc": "updates every item in the preview list.",
-      "selected_desc": "updates only checked products.",
-      "filtered_desc": "applies updates to filtered results.",
-      "collection_desc": "applies updates to a selected collection."
+    "sectionF": {
+      "title": "Apply Pricing",
+      "subtitle": "Commit pricing changes after reviewing the preview.",
+      "applyAll_label": "Apply All:",
+      "applyAll_desc": "Applies pricing changes across the current preview scope.",
+      "applySelected_label": "Apply Selected:",
+      "applySelected_desc": "Applies pricing only to selected products/variants.",
+      "undo_label": "Undo Last Update:",
+      "undo_desc": "Reverses the most recent pricing update from the Dashboard. Original pricing is preserved."
     },
-    "livePricing": {
-      "point1": "Live Pricing affects storefront display only.",
-      "point2": "Apply permanently updates catalog prices.",
-      "point3": "Live Pricing rules may layer on top of applied catalog prices."
+    "section37": {
+      "title": "Important Operational Expectations",
+      "desc": "Do not assume that clicking Apply means the entire operation has completed immediately. Check the processing state and Campaign History before assuming the operation is finished."
     },
-    "manualOverrides": {
-      "point1": "Typing a custom value temporarily overrides the calculated preview for that product.",
-      "point2": "When applied, Shopify receives your exact manual value without additional pricing adjustments.",
-      "point3": "After apply, pricing rules resume using the newly updated product price as the baseline.",
-      "point4": "Use Reset to restore pricing-rule control before applying."
+    "section10": {
+      "title": "Processing Pricing Updates",
+      "subtitle": "What to expect while a pricing operation is running.",
+      "point1": "Do not close the browser while a pricing operation is actively processing.",
+      "point2": "Batch-oriented processing — large catalogs may take time."
     },
-    "scheduling": {
-      "point1": "Scheduling automatically stages and publishes pricing updates.",
-      "point2": "You no longer need to Apply before scheduling.",
-      "point3": "Schedule History tracks campaigns and included products.",
-      "point4": "Ideal for promotions, launch events, and timed campaigns."
+    "section35": {
+      "title": "Go Live vs Apply",
+      "desc": "Apply Pricing changes the stored Shopify catalog price. Go Live activates dynamic rules on the storefront only. Stopping Live Pricing does NOT reverse already-applied catalog prices."
     },
-    "safety": {
-      "step1_label": "Preview first:",
-      "step1_desc": "Review calculated changes before applying.",
-      "step2_label": "Undo:",
-      "step2_desc": "Restore previous prices after bulk updates.",
-      "step3_label": "History:",
-      "step3_desc": "Original prices are stored securely for rollback and audit purposes."
+    "sectionG": {
+      "title": "Storefront Control",
+      "subtitle": "Manage whether dynamic pricing rules are active on the storefront.",
+      "goLive_label": "Go Live:",
+      "goLive_desc": "Activates storefront pricing behavior (not a permanent catalog change).",
+      "stopLive_label": "Stop Live Pricing:",
+      "stopLive_desc": "Disables live storefront behavior (does NOT undo applied catalog prices).",
+      "apply_label": "Apply Pricing:",
+      "apply_desc": "Changes the stored Shopify catalog price."
     },
-    "pricingRules": {
-      "markup_label": "Markup:",
-      "markup_desc": "Percentage increase or decrease.",
-      "rounding_label": "Rounding:",
-      "rounding_desc": "Set consistent decimal endings.",
-      "charm_label": "Charm Pricing:",
-      "charm_desc": "Common endings like .99 when enabled."
+    "sectionH": {
+      "title": "Scheduling & Campaigns",
+      "subtitle": "Plan future pricing operations and track campaign status.",
+      "schedule_label": "Scheduling:",
+      "schedule_desc": "Schedule pricing changes for a future time.",
+      "window_label": "Time-Window Pricing:",
+      "window_desc": "Temporary pricing change that auto-restores when the window ends.",
+      "conflicts_label": "Campaign Conflicts:",
+      "conflicts_desc": "The system checks for conflicts including publish-time overlaps, all-product schedules, product/variant overlap, and restore-window overlap.",
+      "history_label": "Campaign History:",
+      "history_desc": "Operational record showing campaign title, source, product count, created time, status, scheduled activity, revert info, and failed items.",
+      "detail_label": "Campaign Detail:",
+      "detail_desc": "Inspect products and execution details for individual campaigns.",
+      "status_label": "Campaign Status:",
+      "status_desc": "Status values include Draft, Scheduled, Active, Publishing, Published, Reverted, Failed, and Unrecoverable."
+    },
+    "status": {
+      "draft": "Draft",
+      "scheduled": "Scheduled",
+      "active": "Active",
+      "publishing": "Publishing",
+      "published": "Published",
+      "reverted": "Reverted",
+      "failed": "Failed",
+      "unrecoverable": "Unrecoverable"
+    },
+    "sectionI": {
+      "title": "Revert & Safety",
+      "subtitle": "Reverse pricing changes and understand failure states.",
+      "undo_label": "Undo Last Update:",
+      "undo_desc": "Reverses the most recent pricing update from the Dashboard.",
+      "revert_label": "Campaign Revert:",
+      "revert_desc": "Broader recovery for a full campaign.",
+      "preview_label": "Revert Preview:",
+      "preview_desc": "Review the expected rollback before executing — same philosophy as pricing preview.",
+      "protection_label": "Original Price Protection:",
+      "protection_desc": "Pricing history is preserved for all operations.",
+      "failures_label": "Failure States:",
+      "failures_desc": "Reverted, Failed, Tracked, and Unrecoverable help you understand if an operation needs further action."
+    },
+    "section31": {
+      "title": "Safety Philosophy",
+      "subtitle": "Price Polish is designed around reducing accidental pricing changes.",
+      "item1": "Preview before applying",
+      "item2": "Explicit Apply actions",
+      "item3": "Apply All vs Apply Selected",
+      "item4": "Manual price visibility",
+      "item5": "Campaign tracking",
+      "item6": "Pricing history",
+      "item7": "Revert capability",
+      "item8": "Scheduling conflict awareness",
+      "item9": "Time-window restoration",
+      "item10": "Billing protection",
+      "item11": "Storefront live/off control"
+    },
+    "sectionJ": {
+      "title": "Quick Reference",
+      "subtitle": "A quick summary of each feature area.",
+      "view": "View",
+      "dashboard_title": "Dashboard",
+      "dashboard_desc": "Review products, preview prices, apply pricing, undo recent updates, and control storefront pricing.",
+      "rules_title": "Pricing Rules",
+      "rules_desc": "Configure markup, rounding, charm pricing, and related pricing behavior.",
+      "schedule_title": "Schedule",
+      "schedule_desc": "Plan future pricing operations and temporary pricing windows.",
+      "history_title": "Campaign History",
+      "history_desc": "Review what pricing operations happened and their current operational status.",
+      "detail_title": "Campaign Detail",
+      "detail_desc": "Inspect the details of an individual campaign.",
+      "campaignDetail_note": "Open a specific campaign from Campaign History to inspect its details.",
+      "revert_title": "Revert",
+      "revert_desc": "Review and reverse a previous pricing operation when required.",
+      "storefront_title": "Storefront Control",
+      "storefront_desc": "Turn dynamic storefront pricing ON or OFF.",
+      "settings_title": "Settings",
+      "settings_desc": "Manage application-level configuration.",
+      "help_title": "Help",
+      "help_desc": "Access user guidance.",
+      "billing_title": "Billing",
+      "billing_desc": "Start or restore subscription access and understand which pricing-changing actions require active billing."
+    },
+    "sectionK": {
+      "title": "Recommended Workflows",
+      "subtitle": "Step-by-step guides for common pricing operations.",
+      "workflow_title": "Normal Pricing Update",
+      "promotion_title": "Promotion",
+      "show": "Show",
+      "hide": "Hide",
+      "workflow_step1": "Open Dashboard.",
+      "workflow_step2": "Confirm pricing rules.",
+      "workflow_step3": "Refresh preview.",
+      "workflow_step4": "Review product prices.",
+      "workflow_step5": "Use filters/selection for partial catalog.",
+      "workflow_step6": "Manual overrides if needed.",
+      "workflow_step7": "Apply All or Apply Selected.",
+      "workflow_step8": "Review confirmation.",
+      "workflow_step9": "Apply.",
+      "workflow_step10": "Monitor processing.",
+      "workflow_step11": "Review Campaign History.",
+      "workflow_step12": "Undo/Revert if needed.",
+      "promotion_step1": "Configure pricing rules.",
+      "promotion_step2": "Generate and review preview.",
+      "promotion_step3": "Create campaign with clear title.",
+      "promotion_step4": "Select products/scope.",
+      "promotion_step5": "Select schedule.",
+      "promotion_step6": "Review conflict warnings.",
+      "promotion_step7": "Confirm schedule.",
+      "promotion_step8": "Monitor via Campaign History.",
+      "promotion_step9": "Allow pricing window to execute.",
+      "promotion_step10": "Review after execution.",
+      "promotion_step11": "Confirm restoration after pricing window.",
+      "apply_label": "Apply:",
+      "apply_desc": "Pricing change now.",
+      "schedule_label": "Schedule:",
+      "schedule_desc": "Pricing change at a future planned time.",
+      "window_label": "Time window:",
+      "window_desc": "Temporary change that auto-restores.",
+      "goLive_label": "Go Live:",
+      "goLive_desc": "Dynamic rules active on storefront (not a catalog price change)."
     }
   },
   "settings": {
     "page": {
       "title": "Advanced Settings"
     }
+  },
+  "loader": {
+    "dashboard": {
+      "title": "Preparing your pricing workspace...",
+      "subtitle": "Loading storefront status, schedules, and campaign activity..."
+    },
+    "campaignHistory": {
+      "title": "Reviewing campaign history...",
+      "subtitle": "Loading pricing campaigns and operational events..."
+    },
+    "pricingRules": {
+      "title": "Polishing your pricing rules...",
+      "subtitle": "Loading pricing strategy and automation settings..."
+    },
+    "help": {
+      "title": "Opening the help center...",
+      "subtitle": "Loading guides and best practices..."
+    },
+    "settings": {
+      "title": "Preparing your preferences...",
+      "subtitle": "Loading store configuration..."
+    },
+    "campaignDetails": {
+      "title": "Inspecting campaign details...",
+      "subtitle": "Loading tracked products and pricing history..."
+    },
+    "revertPreview": {
+      "title": "Verifying restore information...",
+      "subtitle": "Preparing pricing recovery preview..."
+    },
+    "hints": {
+      "syncing": "Syncing storefront status...",
+      "loadingRules": "Loading pricing rules...",
+      "fetchingCampaigns": "Fetching recent campaigns...",
+      "preparingControls": "Preparing operational controls..."
+    }
+  },
+  "pagination": {
+    "showing": "Showing {start}-{end} of {total}",
+    "showingWithLabel": "Showing {start}-{end} of {total} {label}",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {current} of {total}"
+  },
+  "additional": {
+    "heading": "Additional page",
+    "sectionHeading": "Multiple pages",
+    "paragraph1": "The app template comes with an additional page which demonstrates how to create multiple pages within app navigation using",
+    "paragraph2": "To create your own page and have it show up in the app navigation, add a page inside",
+    "paragraph2Code": "app/routes",
+    "paragraph2Link": "and a link to it in the",
+    "paragraph2Component": "ui-nav-menu",
+    "paragraph2File": "component found in",
+    "paragraph2FileCode": "app/routes/app.jsx",
+    "resourcesHeading": "Resources",
+    "appNavBestPractices": "App nav best practices"
+  },
+  "auth": {
+    "login": {
+      "missingShop": "Please enter your shop domain to log in",
+      "invalidShop": "Please enter a valid shop domain to log in"
+    }
+  },
+  "server": {
+    "methodNotAllowed": "Method Not Allowed",
+    "unauthorized": "Unauthorized",
+    "noItemsProvided": "No items provided",
+    "bulkUpdateFailed": "Something went wrong during bulk update",
+    "noCampaignOrBatch": "No campaignId or batchId provided",
+    "noCampaignDetails": "No campaign details found",
+    "noCampaignBatchDetails": "No campaign batch details found",
+    "noHistoryForCampaign": "No history found for this campaign",
+    "noHistoryForBatch": "No history found for this batch",
+    "unrecoverableCampaign": "Unrecoverable Campaign",
+    "legacyBatchRevert": "Legacy Batch Revert",
+    "untitledProduct": "Untitled Product",
+    "scheduledCampaign": "Scheduled Campaign",
+    "manualApplyCampaign": "Manual Apply Campaign",
+    "noStagedPrices": "No staged prices found. Click Apply before going live.",
+    "multipleStagedCampaigns": "Multiple staged campaigns detected. Publish one campaign at a time.",
+    "publishInProgress": "A publish is already in progress. Please wait for it to complete.",
+    "pushFailed": "Failed to push prices to storefront.",
+    "liveDisabled": "Live storefront pricing disabled.",
+    "invalidFailedItems": "Invalid failedItems",
+    "retryFailed": "Retry failed",
+    "scheduleHistoryFailed": "Failed to load schedule history",
+    "choosePublishTime": "Choose when pricing should publish.",
+    "chooseValidPublishTime": "Choose a valid publish time.",
+    "chooseFutureStart": "Choose a future start time before scheduling.",
+    "chooseRestoreTime": "Choose when original pricing should restore.",
+    "windowEndAfterStart": "Window end must be after the start time.",
+    "chooseProductsWindow": "Choose products before scheduling a pricing window.",
+    "stageFailed": "Failed to stage prices for scheduling.",
+    "noProductsSchedule": "No products to schedule. Refresh previews and try again.",
+    "chooseValidPublishAction": "Choose a valid publish action.",
+    "publishNotFound": "Scheduled publish was not found.",
+    "publishAlreadyStarted": "This publish has already started and can no longer be cancelled.",
+    "publishCancelled": "Scheduled publish cancelled before it started.",
+    "chooseValidWindowAction": "Choose a valid window action.",
+    "windowNotFound": "Pricing window was not found.",
+    "windowAlreadyStarted": "This window has already started and can no longer be cancelled.",
+    "windowCancelled": "Pricing window cancelled before it started.",
+    "windowNotActive": "This pricing window is not currently active.",
+    "windowRestored": "Original storefront pricing was restored before the scheduled end time.",
+    "windowPartialRestore": "Original pricing was restored for some products. Review failed items before retrying.",
+    "noPricingRule": "No pricing rule configured.",
+    "noProductsToStage": "No products available to stage.",
+    "missingVariantId": "Missing variantId",
+    "invalidInputPrice": "Invalid input price: {price}",
+    "stagedSuccess": "Staged {count} price(s) successfully{failed}.",
+    "allFailedValidation": "All {count} item(s) failed validation.",
+    "stagedFailedSuffix": ", {count} failed",
+    "previewLoadFailed": "Failed to load preview data",
+    "revertPreviewLoadFailed": "Failed to load revert preview",
+    "stagedPricesReady": "Staged prices are ready to publish.",
+    "noStagedReady": "No staged prices are ready. Apply pricing before going live.",
+    "unableLoadStorefront": "Unable to load storefront control status.",
+    "windowCancelledBeforeStart": "This pricing window was cancelled before it started.",
+    "windowScheduledNotStarted": "This pricing window is scheduled and has not started yet.",
+    "publishCancelledBeforeStart": "This scheduled publish was cancelled before it started.",
+    "publishScheduledNotStarted": "This pricing publish is scheduled and has not started yet.",
+    "stagedNotPublished": "These prices have been staged but not yet published to Shopify.",
+    "campaignCannotRevert": "This campaign can no longer be reverted.",
+    "noRetryableActions": "No retryable revert actions remain.",
+    "variantNoLongerExists": "Variant no longer exists in Shopify",
+    "productNoLongerAccessible": "Product resource is no longer accessible",
+    "invalidShopifyId": "Invalid Shopify resource ID",
+    "shopifyResourceNotFound": "Shopify resource not found",
+    "productsReverted": "{count} products reverted. {unrecoverable} product(s) could not be reverted.",
+    "billingInactive": "An active subscription is required to perform this action.",
+    "billingUnknown": "Billing status could not be verified. Please refresh the app and try again."
   }
 }

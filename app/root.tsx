@@ -6,14 +6,16 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { isRouteErrorResponse, useRouteError } from "react-router";
+import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "react-router";
 
 import { AppProvider } from "@shopify/polaris";
-import { I18nextProvider } from "react-i18next";
 
 import globalStyles from "./styles/global.css?url";
 import { AppLaunchSplash } from "./components/AppLaunchSplash";
-import { t } from "./utils/i18n";
-import i18n from "./utils/i18n.client";
+import { t, setLocale } from "./utils/i18n";
+import shopify from "./shopify.server";
 
 export const links = () => [
   {
@@ -26,32 +28,59 @@ export const links = () => [
   },
 ];
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  try {
+    const { session } = await  shopify.authenticate.admin(request);
+
+    // Shopify sends BCP-47 locale e.g. "en", "es", "de", "fr", "ja"
+    // session.locale may be undefined for older installs — fall back to "en"
+    const locale: string = (session as any).locale ?? "en";
+
+    // Switch the active dictionary for this request
+    setLocale("es");
+
+    return json({ locale:"es" });
+  } catch {
+    // Not an authenticated request (e.g. auth redirect) — use default locale
+    setLocale("en");
+    return json({ locale: "en" });
+  }
+}
+
 export default function App() {
+  const { locale } = useLoaderData<typeof loader>();
+
   return (
-    <I18nextProvider i18n={i18n}>
-      <html lang="en">
-        <head>
-          <meta charSet="utf-8" />
-          <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <html lang={locale}>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-          <link rel="preconnect" href="https://cdn.shopify.com/" />
+        <link rel="preconnect" href="https://cdn.shopify.com/" />
 
-          {/* ✅ CRITICAL FIX */}
-          <script
-            src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
-            defer
-          ></script>
+        {/* Inject locale into window BEFORE any other scripts so the
+            client-side i18n module can pick it up on initialisation. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__LOCALE__ = "${locale}";`,
+          }}
+        />
 
-          <Meta />
-          <Links />
-        </head>
-        <body>
-          <Outlet />
-          <ScrollRestoration />
-          <Scripts />
-        </body>
-      </html>
-    </I18nextProvider>
+        {/* ✅ CRITICAL FIX */}
+        <script
+          src="https://cdn.shopify.com/shopifycloud/app-bridge.js"
+          defer
+        ></script>
+
+        <Meta />
+        <Links />
+      </head>
+      <body>
+        <Outlet />
+        <ScrollRestoration />
+        <Scripts />
+      </body>
+    </html>
   );
 }
 
