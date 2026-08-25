@@ -104,7 +104,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 failedCount: result.failedCount,
                 unrecoverableCount: result.unrecoverableCount,
                 results: result.results,
-                message: result.message,
+                message: result.message
+                    ? t("server.productsReverted")
+                        .replace("{count}", String(result.restoredCount))
+                        .replace("{unrecoverable}", String(result.unrecoverableCount))
+                    : null,
             }),
             { headers: { "Content-Type": "application/json" } },
         ));

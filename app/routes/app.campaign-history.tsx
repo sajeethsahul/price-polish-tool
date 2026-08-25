@@ -244,10 +244,10 @@ function resolveCampaignRuntimeStatus(campaign: CampaignHistoryItem, now: Date =
 
 function formatCampaignSourceLabel(source: string | null) {
   const normalized = normalizeCampaignSource(source);
-  if (normalized === "manual") return "Manual";
-  if (normalized === "scheduled") return "Scheduled";
-  if (normalized === "time-window") return "Time Window";
-  return source || "Unknown";
+  if (normalized === "manual") return t("dashboard.campaignHistory.manual");
+  if (normalized === "scheduled") return t("dashboard.campaignHistory.scheduled");
+  if (normalized === "time-window") return t("dashboard.campaignHistory.timeWindow");
+  return source || t("dashboard.campaignHistory.unknown");
 }
 
 function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
@@ -258,37 +258,39 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
   const end = campaign.windowEndAt ? new Date(campaign.windowEndAt).toLocaleString() : null;
 
   if (status === "scheduled-window" && start && end) {
-    return `Pricing will publish at ${start} and automatically restore at ${end}.`;
+    return t("campaignHistory.list.publishRestoreAt")
+      .replace("{start}", start)
+      .replace("{end}", end);
   }
   if (status === "publishing-window") {
-    return "Applying scheduled pricing...";
+    return t("campaignHistory.list.applyingScheduledPricingNotice");
   }
   if (status === "active-window" && end) {
-    return "Pricing currently active.";
+    return t("campaignHistory.list.pricingActive");
   }
   if (status === "restoring" || status === "expired-window") {
-    return "Restoring original storefront pricing...";
+    return t("campaignHistory.list.restoringOriginalPricingNotice");
   }
   if (status === "auto-restored") {
-    return "Original storefront pricing restored.";
+    return t("campaignHistory.list.originalPricingRestored");
   }
   if (status === "restore-failed") {
-    return "Scheduled pricing applied but automatic restore failed.";
+    return t("campaignHistory.list.autoRestoreFailed");
   }
   if (status === "window-stopped") {
-    return "Original storefront pricing was restored before the scheduled end time.";
+    return t("campaignHistory.list.originalPricingRestoredBeforeEnd");
   }
   if (status === "cancelled-window") {
-    return "This pricing window was cancelled before it started.";
+    return t("campaignHistory.list.windowCancelledBeforeStart");
   }
   if (status === "missed-during-uninstall") {
-    return "Schedule did not execute because the app was uninstalled during the execution window.";
+    return t("campaignHistory.list.scheduleMissedUninstall");
   }
   if (status === "failed") {
-    return "Scheduled pricing failed.";
+    return t("campaignHistory.list.scheduledPricingFailed");
   }
   if (status === "partial") {
-    return "Automatic restore needs attention for one or more tracked products.";
+    return t("campaignHistory.list.restoreNeedsAttention");
   }
 
   return null;
@@ -299,16 +301,17 @@ function formatScheduledPublishSummary(campaign: CampaignHistoryItem, now: Date 
   const status = resolveCampaignRuntimeStatus(campaign, now);
   const runAt = campaign.runAt ? new Date(campaign.runAt) : null;
   if (status === "scheduled" && runAt && !Number.isNaN(runAt.getTime())) {
-    return `Pricing will publish automatically at ${runAt.toLocaleTimeString([], {
+    const time = runAt.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
-    })}`;
+    });
+    return t("campaignHistory.list.publishesAtTime").replace("{time}", time);
   }
-  if (status === "publishing") return "Applying scheduled pricing...";
-  if (status === "published") return "Pricing was published successfully.";
-  if (status === "cancelled-publish") return "This scheduled publish was cancelled before it started.";
-  if (status === "missed-during-uninstall") return "Schedule did not execute because the app was uninstalled during the execution window.";
-  if (status === "failed") return "Scheduled pricing failed.";
+  if (status === "publishing") return t("campaignHistory.list.applyingScheduledPricingNotice");
+  if (status === "published") return t("campaignHistory.list.publishedSuccessfully");
+  if (status === "cancelled-publish") return t("campaignHistory.list.scheduledPublishCancelled");
+  if (status === "missed-during-uninstall") return t("campaignHistory.list.scheduleMissedUninstall");
+  if (status === "failed") return t("campaignHistory.list.scheduledPricingFailed");
   return null;
 }
 
@@ -479,33 +482,33 @@ export default function CampaignHistoryPage() {
 
   const campaignHistoryStatusOptions = useMemo(
     () => [
-      { label: `${SELECT_OPTION_PREFIX}All`, value: "all" },
-      { label: `${SELECT_OPTION_PREFIX}Active (${campaignHistoryCounts.active})`, value: "active" },
-      { label: `${SELECT_OPTION_PREFIX}Partial (${campaignHistoryCounts.partial})`, value: "partial" },
-      { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
-      { label: `${SELECT_OPTION_PREFIX}Closed`, value: "closed" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.all")}`, value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.activeWithCount").replace("{count}", String(campaignHistoryCounts.active))}`, value: "active" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.partialWithCount").replace("{count}", String(campaignHistoryCounts.partial))}`, value: "partial" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.scheduled")}`, value: "scheduled" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.closed")}`, value: "closed" },
     ],
     [campaignHistoryCounts.active, campaignHistoryCounts.partial]
   );
 
   const campaignHistorySourceOptions = useMemo(
     () => [
-      { label: `${SELECT_OPTION_PREFIX}All Sources`, value: "all" },
-      { label: `${SELECT_OPTION_PREFIX}Manual`, value: "manual" },
-      { label: `${SELECT_OPTION_PREFIX}Scheduled`, value: "scheduled" },
-      { label: `${SELECT_OPTION_PREFIX}Time Window`, value: "time-window" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.allSources")}`, value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.manual")}`, value: "manual" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.scheduled")}`, value: "scheduled" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.timeWindow")}`, value: "time-window" },
     ],
     []
   );
 
   const campaignHistoryTimeframeOptions = useMemo(
     () => [
-      { label: `${SELECT_OPTION_PREFIX}Current Week`, value: "week" },
-      { label: `${SELECT_OPTION_PREFIX}Current Month`, value: "month" },
-      { label: `${SELECT_OPTION_PREFIX}Last 3 Months`, value: "3_months" },
-      { label: `${SELECT_OPTION_PREFIX}Last 6 Months`, value: "6_months" },
-      { label: `${SELECT_OPTION_PREFIX}This Year`, value: "year" },
-      { label: `${SELECT_OPTION_PREFIX}All Time`, value: "all" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.currentWeek")}`, value: "week" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.currentMonth")}`, value: "month" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.last3Months")}`, value: "3_months" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.last6Months")}`, value: "6_months" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.thisYear")}`, value: "year" },
+      { label: `${SELECT_OPTION_PREFIX}${t("dashboard.campaignHistory.allTime")}`, value: "all" },
     ],
     []
   );
@@ -670,24 +673,27 @@ export default function CampaignHistoryPage() {
 
   const campaignStatusLabel = useCallback((status: string) => {
     const normalized = status.toLowerCase();
-    if (normalized === "scheduled") return "Scheduled";
-    if (normalized === "scheduled-window") return "Scheduled Window";
-    if (normalized === "publishing-window") return "Publishing Window";
-    if (normalized === "active-window") return "Active Window";
-    if (normalized === "restoring") return "Restoring";
-    if (normalized === "expired-window") return "Expired Window";
-    if (normalized === "auto-restored") return "Auto Restored";
-    if (normalized === "window-stopped") return "Window Stopped";
-    if (normalized === "cancelled-window") return "Cancelled Window";
-    if (normalized === "scheduled-publish") return "Scheduled Publish";
-    if (normalized === "cancelled-publish") return "Cancelled";
-    if (normalized === "publishing") return "Publishing";
-    if (normalized === "published") return "Published";
-    if (normalized === "failed") return "Failed";
-    if (normalized === "restore-failed") return "Restore Failed";
-    if (normalized === "missed-during-uninstall") return "Missed During Uninstall";
-    if (normalized === "unrecoverable") return "Unrecoverable";
-    return status;
+    const labels: Record<string, string> = {
+      scheduled: t("dashboard.campaignHistory.scheduled"),
+      "scheduled-window": t("dashboard.campaignHistory.scheduledWindow"),
+      "publishing-window": t("dashboard.campaignHistory.publishingWindow"),
+      "active-window": t("dashboard.campaignHistory.activeWindow"),
+      restoring: t("common.status.restoring"),
+      "expired-window": t("dashboard.campaignHistory.expiredWindow"),
+      "auto-restored": t("dashboard.campaignHistory.autoRestored"),
+      "window-stopped": t("dashboard.campaignHistory.windowStopped"),
+      "cancelled-window": t("dashboard.campaignHistory.cancelledWindow"),
+      "scheduled-publish": t("dashboard.campaignHistory.scheduledPublish"),
+      "cancelled-publish": t("dashboard.campaignHistory.cancelled"),
+      publishing: t("dashboard.campaignHistory.publishing"),
+      published: t("dashboard.campaignHistory.published"),
+      failed: t("dashboard.campaignHistory.failed"),
+      "restore-failed": t("common.status.restoreFailed"),
+      "missed-during-uninstall": t("common.status.missedDuringUninstall"),
+      unrecoverable: t("dashboard.campaignHistory.unrecoverable"),
+      draft: t("dashboard.campaignHistory.draft"),
+    };
+    return labels[normalized] ?? status;
   }, []);
 
   const resetRevertPreviewViewState = useCallback(() => {
@@ -760,153 +766,153 @@ export default function CampaignHistoryPage() {
     const milestones: CampaignTimelineMilestone[] = [
       {
         key: "created",
-        label: "Created",
+        label: t("timeline.created.label"),
         tone: "info",
-        badgeLabel: "Recorded",
+        badgeLabel: t("timeline.created.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.createdAt),
-        description: "Campaign record created and ready for lifecycle actions.",
+        description: t("timeline.created.description"),
       },
     ];
 
     if (normalizedStatus === "scheduled-window") {
       milestones.push({
         key: "window-scheduled",
-        label: "Window Scheduled",
+        label: t("timeline.windowScheduled.label"),
         tone: "warning",
-        badgeLabel: "Queued",
+        badgeLabel: t("timeline.windowScheduled.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
         description: selectedCampaignForDetail.windowEndAt
-          ? "Pricing will publish at the window start and automatically restore at the window end."
-          : "Pricing window is queued for publishing and automatic restore.",
+          ? t("timeline.windowScheduled.descriptionWithEnd")
+          : t("timeline.windowScheduled.descriptionNoEnd"),
       });
     } else if (normalizedStatus === "scheduled" || normalizedStatus === "pending") {
       milestones.push({
         key: "scheduled",
-        label: "Scheduled",
+        label: t("timeline.scheduled.label"),
         tone: "warning",
-        badgeLabel: "Queued",
-        description: "Campaign is queued for execution.",
+        badgeLabel: t("timeline.scheduled.badge"),
+        description: t("timeline.scheduled.description"),
       });
     }
 
     if (normalizedStatus === "active-window") {
       milestones.push({
         key: "window-activated",
-        label: "Window Activated",
+        label: t("timeline.windowActivated.label"),
         tone: "success",
-        badgeLabel: "Active",
+        badgeLabel: t("timeline.windowActivated.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
         description: selectedCampaignForDetail.windowEndAt
-          ? "Pricing is active now and will automatically restore at the scheduled end time."
-          : "Pricing is active now and waiting for automatic restore.",
+          ? t("timeline.windowActivated.descriptionWithEnd")
+          : t("timeline.windowActivated.descriptionNoEnd"),
       });
     }
 
     if (normalizedStatus === "published") {
       milestones.push({
         key: "published",
-        label: "Published",
+        label: t("timeline.published.label"),
         tone: failedCount > 0 ? "warning" : "success",
-        badgeLabel: failedCount > 0 ? "Partial" : "Success",
+        badgeLabel: failedCount > 0 ? t("timeline.published.badgePartial") : t("timeline.published.badgeSuccess"),
         description: failedCount > 0
-          ? "Pricing published with one or more failures."
-          : "Pricing published successfully.",
+          ? t("timeline.published.descriptionWithFailures")
+          : t("timeline.published.descriptionSuccess"),
       });
     } else if (normalizedStatus === "publishing") {
       milestones.push({
         key: "publishing",
-        label: "Publishing",
+        label: t("timeline.publishing.label"),
         tone: "attention",
-        badgeLabel: "Running",
-        description: "Pricing updates are currently being applied.",
+        badgeLabel: t("timeline.publishing.badge"),
+        description: t("timeline.publishing.description"),
       });
     }
 
     if (normalizedStatus === "auto-restored") {
       milestones.push({
         key: "auto-restored",
-        label: "Auto Restored",
+        label: t("timeline.autoRestored.label"),
         tone: "info",
-        badgeLabel: "Restored",
+        badgeLabel: t("timeline.autoRestored.badge"),
         timestamp: formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? null),
-        description: "Original pricing was automatically restored after the window ended.",
+        description: t("timeline.autoRestored.description"),
       });
     }
 
     if (normalizedStatus === "window-stopped") {
       milestones.push({
         key: "window-stopped",
-        label: "Window Stopped",
+        label: t("timeline.windowStopped.label"),
         tone: "info",
-        badgeLabel: "Stopped",
+        badgeLabel: t("timeline.windowStopped.badge"),
         timestamp: formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? null),
-        description: "Original pricing was restored before the scheduled window end.",
+        description: t("timeline.windowStopped.description"),
       });
     }
 
     if (normalizedStatus === "cancelled-window") {
       milestones.push({
         key: "cancelled-window",
-        label: "Cancelled",
+        label: t("timeline.cancelledWindow.label"),
         tone: "info",
-        badgeLabel: "Cancelled",
+        badgeLabel: t("timeline.cancelledWindow.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
-        description: "The scheduled pricing window was cancelled before it started.",
+        description: t("timeline.cancelledWindow.description"),
       });
     }
 
     if (normalizedStatus === "cancelled-publish") {
       milestones.push({
         key: "cancelled-publish",
-        label: "Cancelled",
+        label: t("timeline.cancelledPublish.label"),
         tone: "info",
-        badgeLabel: "Cancelled",
+        badgeLabel: t("timeline.cancelledPublish.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.runAt ?? null),
-        description: "The scheduled publish was cancelled before it started.",
+        description: t("timeline.cancelledPublish.description"),
       });
     }
 
     if (normalizedStatus === "failed") {
       milestones.push({
         key: "failed",
-        label: "Failed",
+        label: t("timeline.failed.label"),
         tone: "critical",
-        badgeLabel: "Needs attention",
-        description: "Campaign execution encountered failures and may require attention.",
+        badgeLabel: t("timeline.failed.badge"),
+        description: t("timeline.failed.description"),
       });
     }
 
     if (normalizedStatus === "partial") {
       milestones.push({
         key: "partial",
-        label: "Partial",
+        label: t("timeline.partial.label"),
         tone: "warning",
-        badgeLabel: "Needs attention",
-        description: "Campaign completed with partial results and requires attention.",
+        badgeLabel: t("timeline.partial.badge"),
+        description: t("timeline.partial.description"),
       });
     }
 
     if (normalizedStatus === "unrecoverable") {
       milestones.push({
         key: "unrecoverable",
-        label: "Unrecoverable",
+        label: t("timeline.unrecoverable.label"),
         tone: "critical",
-        badgeLabel: "Blocked",
+        badgeLabel: t("timeline.unrecoverable.badge"),
         timestamp: formatTimelineTimestamp(campaignDetail?.revertCompletedAt ?? null),
         description: selectedCampaignForDetail.unrecoverableReason
-          ? `This campaign can no longer be reverted. ${selectedCampaignForDetail.unrecoverableReason}`
-          : "This campaign can no longer be reverted.",
+          ? t("timeline.unrecoverable.descriptionWithReason").replace("{reason}", selectedCampaignForDetail.unrecoverableReason)
+          : t("timeline.unrecoverable.description"),
       });
     }
 
     if (normalizedStatus === "reverted") {
       milestones.push({
         key: "reverted",
-        label: "Reverted",
+        label: t("timeline.reverted.label"),
         tone: "success",
-        badgeLabel: "Restored",
+        badgeLabel: t("timeline.reverted.badge"),
         timestamp: revertCompletedTimestamp,
-        description: "Original pricing was restored for this campaign.",
+        description: t("timeline.reverted.description"),
       });
     }
 
@@ -1199,20 +1205,22 @@ export default function CampaignHistoryPage() {
       const terminalReason = selectedCampaignForRevert?.unrecoverableReason;
       if ((data as any)?.terminal === true) {
         const terminalMessage = terminalReason
-          ? `This campaign can no longer be reverted because ${terminalReason.toLowerCase()}.`
-          : ((data as any)?.message || "This campaign can no longer be reverted.");
+          ? t("server.revertTerminalWithReason").replace("{reason}", terminalReason.toLowerCase())
+          : ((data as any)?.message || t("server.revertTerminalGeneric"));
         (shopify as any)?.toast?.show?.(terminalMessage, { isError: true });
       } else if ((data as any)?.message) {
         const operationalMessage = terminalReason
-          ? `${(data as any).message} Reason: ${terminalReason}.`
+          ? t("server.revertOperationalWithReason")
+              .replace("{message}", (data as any).message)
+              .replace("{reason}", terminalReason)
           : (data as any).message;
         (shopify as any)?.toast?.show?.(operationalMessage);
       } else if ((data as any)?.restoredCount > 0) {
-        (shopify as any)?.toast?.show?.(`Restored ${(data as any).restoredCount} products`);
+        (shopify as any)?.toast?.show?.(t("server.revertRestoredCount").replace("{count}", String((data as any).restoredCount)));
       } else {
         const noRetryMessage = terminalReason
-          ? `No retryable revert actions remain because ${terminalReason.toLowerCase()}.`
-          : "No retryable revert actions remain.";
+          ? t("server.revertNoRetryWithReason").replace("{reason}", terminalReason.toLowerCase())
+          : t("server.revertNoRetryGeneric");
         (shopify as any)?.toast?.show?.(noRetryMessage, { isError: true });
       }
 
@@ -1337,7 +1345,6 @@ export default function CampaignHistoryPage() {
                       />
 
                       <Text as="p" variant="bodySm" tone="subdued">
-                        {`${t("campaignHistory.revertPreview.showingPrefix" in ({} as never) ? "" : "")}`}
                         {t("campaignHistory.list.showingPrefix")} {visibleCampaignHistory.length} {t("campaignHistory.list.ofSuffix")} {filteredCampaignHistory.length} {t("campaignHistory.list.matchingCampaignsSuffix")}
                       </Text>
                     </BlockStack>

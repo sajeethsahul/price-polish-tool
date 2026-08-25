@@ -229,6 +229,19 @@
       "restoringOriginalPricingNotice": "Restaurando precios originales de la tienda...",
       "restoresInPrefix": "Se restaura en",
       "autoRestoreScheduledForPrefix": "Restauración automática programada para",
+      "publishRestoreAt": "El precio se publicará a las {start} y se restaurará automáticamente a las {end}.",
+      "publishesAtTime": "El precio se publicará automáticamente a las {time}",
+      "pricingActive": "Los precios están actualmente activos.",
+      "originalPricingRestored": "Se restauraron los precios originales de la tienda.",
+      "autoRestoreFailed": "El precio programado se aplicó, pero falló la restauración automática.",
+      "originalPricingRestoredBeforeEnd": "Los precios originales de la tienda se restauraron antes de la hora de finalización programada.",
+      "windowCancelledBeforeStart": "Esta ventana de precios fue cancelada antes de iniciarse.",
+      "scheduleMissedUninstall": "El programa no se ejecutó porque la aplicación se desinstaló durante la ventana de ejecución.",
+      "scheduledPricingFailed": "El precio programado falló.",
+      "restoreNeedsAttention": "La restauración automática requiere atención para uno o más productos rastreados.",
+      "scheduledPublishCancelled": "Esta publicación programada fue cancelada antes de iniciarse.",
+      "publishedSuccessfully": "El precio se publicó correctamente.",
+
       "sourceLabel": "Origen:",
       "productsLabel": "Productos:",
       "trackedBadgePrefix": "Rastreado:",
@@ -758,7 +771,12 @@
       "reverted": "Revertido",
       "pending": "Pendiente",
       "oneTimePublish": "Publicación Única",
-      "unknown": "Desconocido"
+      "unknown": "Desconocido",
+      "all": "Todos",
+      "activeWithCount": "Activo ({count})",
+      "partialWithCount": "Parcial ({count})",
+      "publishingWindow": "Ventana de Publicación",
+      "draft": "Borrador"
     },
     "timeline": {
       "created": "Creado",
@@ -1272,7 +1290,90 @@
     "invalidShopifyId": "ID de recurso de Shopify no válido",
     "shopifyResourceNotFound": "Recurso de Shopify no encontrado",
     "productsReverted": "{count} productos revertidos. {unrecoverable} producto(s) no se pudieron revertir.",
+    "revertTerminalWithReason": "Esta campaña ya no se puede revertir porque {reason}.",
+    "revertTerminalGeneric": "Esta campaña ya no se puede revertir.",
+    "revertOperationalWithReason": "{message} Motivo: {reason}.",
+    "revertRestoredCount": "Se restauraron {count} productos",
+    "revertNoRetryWithReason": "No quedan acciones de reversión reintentables porque {reason}.",
+    "revertNoRetryGeneric": "No quedan acciones de reversión reintentables.",
     "billingInactive": "Se requiere una suscripción activa para realizar esta acción.",
     "billingUnknown": "No se pudo verificar el estado de la facturación. Actualice la aplicación e inténtelo de nuevo."
+  },
+  "timeline": {
+    "created": {
+      "label": "Creado",
+      "badge": "Registrado",
+      "description": "Registro de campaña creado y listo para acciones del ciclo de vida."
+    },
+    "windowScheduled": {
+      "label": "Ventana Programada",
+      "badge": "En cola",
+      "descriptionWithEnd": "Los precios se publicarán al inicio de la ventana y se restaurarán automáticamente al final.",
+      "descriptionNoEnd": "La ventana de precios está en cola para publicarse y restaurarse automáticamente."
+    },
+    "scheduled": {
+      "label": "Programado",
+      "badge": "En cola",
+      "description": "La campaña está en cola para ejecutarse."
+    },
+    "windowActivated": {
+      "label": "Ventana Activada",
+      "badge": "Activa",
+      "descriptionWithEnd": "Los precios están activos ahora y se restaurarán automáticamente a la hora final programada.",
+      "descriptionNoEnd": "Los precios están activos ahora y a la espera de restauración automática."
+    },
+    "published": {
+      "label": "Publicado",
+      "badgePartial": "Parcial",
+      "badgeSuccess": "Correcto",
+      "descriptionWithFailures": "Precios publicados con uno o más errores.",
+      "descriptionSuccess": "Precios publicados correctamente."
+    },
+    "publishing": {
+      "label": "Publicando",
+      "badge": "En ejecución",
+      "description": "Las actualizaciones de precios se están aplicando actualmente."
+    },
+    "autoRestored": {
+      "label": "Restaurado Automáticamente",
+      "badge": "Restaurado",
+      "description": "El precio original se restauró automáticamente cuando finalizó la ventana."
+    },
+    "windowStopped": {
+      "label": "Ventana Detenida",
+      "badge": "Detenido",
+      "description": "El precio original se restauró antes de que finalizara la ventana programada."
+    },
+    "cancelledWindow": {
+      "label": "Cancelado",
+      "badge": "Cancelado",
+      "description": "La ventana de precios programada se canceló antes de iniciarse."
+    },
+    "cancelledPublish": {
+      "label": "Cancelado",
+      "badge": "Cancelado",
+      "description": "La publicación programada se canceló antes de iniciarse."
+    },
+    "failed": {
+      "label": "Fallido",
+      "badge": "Requiere atención",
+      "description": "La ejecución de la campaña encontró errores y puede requerir atención."
+    },
+    "partial": {
+      "label": "Parcial",
+      "badge": "Requiere atención",
+      "description": "La campaña se completó con resultados parciales y requiere atención."
+    },
+    "unrecoverable": {
+      "label": "Irrecuperable",
+      "badge": "Bloqueado",
+      "descriptionWithReason": "Esta campaña ya no se puede revertir. {reason}",
+      "description": "Esta campaña ya no se puede revertir."
+    },
+    "reverted": {
+      "label": "Revertido",
+      "badge": "Restaurado",
+      "description": "El precio original se restauró para esta campaña."
+    }
   }
 }

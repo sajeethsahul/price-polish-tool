@@ -229,6 +229,19 @@
       "restoringOriginalPricingNotice": "Restoring original storefront pricing...",
       "restoresInPrefix": "Restores in",
       "autoRestoreScheduledForPrefix": "Auto restore scheduled for",
+      "publishRestoreAt": "Pricing will publish at {start} and automatically restore at {end}.",
+      "publishesAtTime": "Pricing will publish automatically at {time}",
+      "pricingActive": "Pricing currently active.",
+      "originalPricingRestored": "Original storefront pricing restored.",
+      "autoRestoreFailed": "Scheduled pricing applied but automatic restore failed.",
+      "originalPricingRestoredBeforeEnd": "Original storefront pricing was restored before the scheduled end time.",
+      "windowCancelledBeforeStart": "This pricing window was cancelled before it started.",
+      "scheduleMissedUninstall": "Schedule did not execute because the app was uninstalled during the execution window.",
+      "scheduledPricingFailed": "Scheduled pricing failed.",
+      "restoreNeedsAttention": "Automatic restore needs attention for one or more tracked products.",
+      "scheduledPublishCancelled": "This scheduled publish was cancelled before it started.",
+      "publishedSuccessfully": "Pricing was published successfully.",
+
       "sourceLabel": "Source:",
       "productsLabel": "Products:",
       "trackedBadgePrefix": "Tracked:",
@@ -758,7 +771,12 @@
       "reverted": "Reverted",
       "pending": "Pending",
       "oneTimePublish": "One-time Publish",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "all": "All",
+      "activeWithCount": "Active ({count})",
+      "partialWithCount": "Partial ({count})",
+      "publishingWindow": "Publishing Window",
+      "draft": "Draft"
     },
     "timeline": {
       "created": "Created",
@@ -1272,7 +1290,90 @@
     "invalidShopifyId": "Invalid Shopify resource ID",
     "shopifyResourceNotFound": "Shopify resource not found",
     "productsReverted": "{count} products reverted. {unrecoverable} product(s) could not be reverted.",
+    "revertTerminalWithReason": "This campaign can no longer be reverted because {reason}.",
+    "revertTerminalGeneric": "This campaign can no longer be reverted.",
+    "revertOperationalWithReason": "{message} Reason: {reason}.",
+    "revertRestoredCount": "Restored {count} products",
+    "revertNoRetryWithReason": "No retryable revert actions remain because {reason}.",
+    "revertNoRetryGeneric": "No retryable revert actions remain.",
     "billingInactive": "An active subscription is required to perform this action.",
     "billingUnknown": "Billing status could not be verified. Please refresh the app and try again."
+  },
+  "timeline": {
+    "created": {
+      "label": "Created",
+      "badge": "Recorded",
+      "description": "Campaign record created and ready for lifecycle actions."
+    },
+    "windowScheduled": {
+      "label": "Window Scheduled",
+      "badge": "Queued",
+      "descriptionWithEnd": "Pricing will publish at the window start and automatically restore at the window end.",
+      "descriptionNoEnd": "Pricing window is queued for publishing and automatic restore."
+    },
+    "scheduled": {
+      "label": "Scheduled",
+      "badge": "Queued",
+      "description": "Campaign is queued for execution."
+    },
+    "windowActivated": {
+      "label": "Window Activated",
+      "badge": "Active",
+      "descriptionWithEnd": "Pricing is active now and will automatically restore at the scheduled end time.",
+      "descriptionNoEnd": "Pricing is active now and waiting for automatic restore."
+    },
+    "published": {
+      "label": "Published",
+      "badgePartial": "Partial",
+      "badgeSuccess": "Success",
+      "descriptionWithFailures": "Pricing published with one or more failures.",
+      "descriptionSuccess": "Pricing published successfully."
+    },
+    "publishing": {
+      "label": "Publishing",
+      "badge": "Running",
+      "description": "Pricing updates are currently being applied."
+    },
+    "autoRestored": {
+      "label": "Auto Restored",
+      "badge": "Restored",
+      "description": "Original pricing was automatically restored after the window ended."
+    },
+    "windowStopped": {
+      "label": "Window Stopped",
+      "badge": "Stopped",
+      "description": "Original pricing was restored before the scheduled window end."
+    },
+    "cancelledWindow": {
+      "label": "Cancelled",
+      "badge": "Cancelled",
+      "description": "The scheduled pricing window was cancelled before it started."
+    },
+    "cancelledPublish": {
+      "label": "Cancelled",
+      "badge": "Cancelled",
+      "description": "The scheduled publish was cancelled before it started."
+    },
+    "failed": {
+      "label": "Failed",
+      "badge": "Needs attention",
+      "description": "Campaign execution encountered failures and may require attention."
+    },
+    "partial": {
+      "label": "Partial",
+      "badge": "Needs attention",
+      "description": "Campaign completed with partial results and requires attention."
+    },
+    "unrecoverable": {
+      "label": "Unrecoverable",
+      "badge": "Blocked",
+      "descriptionWithReason": "This campaign can no longer be reverted. {reason}",
+      "description": "This campaign can no longer be reverted."
+    },
+    "reverted": {
+      "label": "Reverted",
+      "badge": "Restored",
+      "description": "Original pricing was restored for this campaign."
+    }
   }
 }
