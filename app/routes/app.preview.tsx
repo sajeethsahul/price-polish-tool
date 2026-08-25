@@ -42,7 +42,11 @@ export default function PreviewPage() {
       try {
         const data = await appFetch("/api/preview-price");
         if (!active) return;
-        setPreviews(Array.isArray(data?.previews) ? (data.previews as PricingPreviewItem[]) : []);
+        setPreviews(
+          Array.isArray(data?.previews)
+            ? (data.previews as PricingPreviewItem[])
+            : [],
+        );
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -63,8 +67,11 @@ export default function PreviewPage() {
   const totalCount = previews.length;
   const hasMoreThanSample = totalCount > PREVIEW_SAMPLE_SIZE;
   const visiblePreviews = useMemo(
-    () => (showAll || !hasMoreThanSample ? previews : previews.slice(0, PREVIEW_SAMPLE_SIZE)),
-    [previews, showAll, hasMoreThanSample]
+    () =>
+      showAll || !hasMoreThanSample
+        ? previews
+        : previews.slice(0, PREVIEW_SAMPLE_SIZE),
+    [previews, showAll, hasMoreThanSample],
   );
   const visibleCount = visiblePreviews.length;
 
@@ -96,14 +103,14 @@ export default function PreviewPage() {
   const backActionProps = isFromOnboarding
     ? undefined
     : {
-        content: "Back to dashboard",
+        content: t("preview.backToDashboard"),
         onAction: () => navigate("/app"),
       };
 
   return (
     <Page
       title={t("common.nav.preview")}
-      subtitle={`Currency: ${currencyCode}`}
+      subtitle={t("preview.currency").replace("{currencyCode}", currencyCode)}
       backAction={backActionProps}
     >
       <BlockStack gap="400">
@@ -130,27 +137,27 @@ export default function PreviewPage() {
             </BlockStack>
           ) : previews.length === 0 ? (
             <EmptyState
-              heading="No products to preview yet"
+              heading={t("preview.empty.heading")}
               image=""
               action={{
-                content: "Adjust pricing rule",
+                content: t("preview.empty.action"),
                 onAction: () =>
                   navigate(
                     isFromOnboarding
                       ? `/app/rules?from=onboarding${revisitSuffix}`
-                      : "/app/rules"
+                      : "/app/rules",
                   ),
               }}
             >
-              <p>
-                Once you create or refine a pricing rule, we'll show a live preview of the new prices here so you can review them before applying.
-              </p>
+              <p>{t("preview.empty.body")}</p>
             </EmptyState>
           ) : (
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center" wrap>
                 <Text as="p" tone="subdued" variant="bodySm">
-                  {`Showing ${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} product${totalCount === 1 ? "" : "s"}`}
+                  {t("preview.showingCount")
+                    .replace("{visible}", visibleCount.toLocaleString())
+                    .replace("{total}", totalCount.toLocaleString())}
                 </Text>
                 {hasMoreThanSample ? (
                   <div ref={toggleButtonRef}>
@@ -159,11 +166,17 @@ export default function PreviewPage() {
                       onClick={handleTogglePreviewScope}
                       accessibilityLabel={
                         showAll
-                          ? `Collapse the preview list back to the first ${PREVIEW_SAMPLE_SIZE} products`
-                          : `Expand the preview to show all ${totalCount.toLocaleString()} products`
+                          ? t("preview.collapseAria").replace(
+                              "{count}",
+                              String(PREVIEW_SAMPLE_SIZE),
+                            )
+                          : t("preview.expandAria").replace(
+                              "{count}",
+                              totalCount.toLocaleString(),
+                            )
                       }
                     >
-                      {showAll ? "Show fewer" : "View Full Preview"}
+                      {showAll ? t("preview.showFewer") : t("preview.viewFull")}
                     </Button>
                   </div>
                 ) : null}
@@ -176,7 +189,9 @@ export default function PreviewPage() {
                         {p.title}
                       </Text>
                       <Text as="p" tone="subdued">
-                        Old: {p.oldPrice} → New: {p.newPrice}
+                        {t("preview.priceChange")
+                          .replace("{old}", String(p.oldPrice))
+                          .replace("{new}", String(p.newPrice))}
                       </Text>
                     </BlockStack>
                   </Card>
@@ -192,18 +207,18 @@ export default function PreviewPage() {
               onClick={() =>
                 navigate(`/app/welcome?step=create-rule${revisitSuffix}`)
               }
-              accessibilityLabel="Return to Step 1: Create Pricing Rule"
+              accessibilityLabel={t("preview.previousStepAria")}
             >
-              ← Previous Step
+              {t("preview.previousStep")}
             </Button>
             <Button
               variant="primary"
               onClick={() =>
                 navigate(`/app/welcome?step=apply-update${revisitSuffix}`)
               }
-              accessibilityLabel="Continue to Step 3: Apply Pricing"
+              accessibilityLabel={t("preview.continueAria")}
             >
-              Continue →
+              {t("preview.continue")}
             </Button>
           </InlineStack>
         ) : null}

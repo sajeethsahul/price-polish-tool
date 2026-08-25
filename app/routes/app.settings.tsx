@@ -8,8 +8,8 @@ export default function SettingsPage() {
         <Page title={t("settings.page.title")} backAction={{ onAction: () => navigate("/app") }}>
             <Card>
                 <BlockStack gap="400">
-                    <Text as="p" variant="bodyMd">
-                        Price Polish automatically uses your Shopify store currency. Advanced settings coming soon.
+                    <Text as="p" variant="bodyMd">                        
+                        {t("settings.page.description")}
                     </Text>
                 </BlockStack>
             </Card>

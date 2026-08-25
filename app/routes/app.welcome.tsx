@@ -156,7 +156,7 @@ export default function WelcomePage() {
               title={t("welcome.revisitTitle")}
             >
               <p>
-                Reopening the guide won't change your pricing rules, published prices, or any existing configuration. Feel free to review the steps and close this page whenever you're done.
+                {t("welcome.revisitDescription")}
               </p>
             </Banner>
           ) : null}
@@ -533,11 +533,10 @@ function PreviewPricesStep({
 function ApplyUpdateStep({
   hasApplied,
   onDone,
-  onSkip,
 }: {
   hasApplied: boolean;
   onDone: () => void;
-  onSkip: () => void;
+  onSkip?: () => void;
 }) {
   const navigate = useNavigate();
 
@@ -594,15 +593,17 @@ function ApplyUpdateStep({
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────────
 
-const WIZARD_STEP_ORDER: Array<{
+function getWizardStepOrder(): Array<{
   key: Exclude<WizardStep, "welcome">;
   label: string;
   completedKey: keyof OnboardingState;
-}> = [
-  { key: "create-rule", label: "Create Pricing Rule", completedKey: "hasRule" },
-  { key: "preview-prices", label: "Preview Prices", completedKey: "hasPreviewed" },
-  { key: "apply-update", label: "Apply Pricing", completedKey: "hasApplied" },
-];
+}> {
+  return [
+    { key: "create-rule", label: t("welcome.wizard.step1Label"), completedKey: "hasRule" },
+    { key: "preview-prices", label: t("welcome.wizard.step2Label"), completedKey: "hasPreviewed" },
+    { key: "apply-update", label: t("welcome.wizard.step3Label"), completedKey: "hasApplied" },
+  ];
+}
 
 function StepIndicator({
   step,
@@ -611,17 +612,20 @@ function StepIndicator({
   step: WizardStep;
   onboarding: OnboardingState;
 }) {
-  const activeIndex = WIZARD_STEP_ORDER.findIndex((entry) => entry.key === step);
+  const wizardSteps = getWizardStepOrder();
+  const activeIndex = wizardSteps.findIndex((entry) => entry.key === step);
   const currentIndex = activeIndex >= 0 ? activeIndex : 0;
-  const currentEntry = WIZARD_STEP_ORDER[currentIndex];
-  const totalSteps = WIZARD_STEP_ORDER.length;
+  const currentEntry = wizardSteps[currentIndex];
+  const totalSteps = wizardSteps.length;
 
   return (
     <Card>
       <BlockStack gap="200">
         <InlineStack align="space-between" blockAlign="center" wrap={false}>
           <Text as="p" variant="bodySm" tone="subdued">
-            {`Step ${currentIndex + 1} of ${totalSteps}`}
+            {t("welcome.wizard.stepOf")
+              .replace("{current}", String(currentIndex + 1))
+              .replace("{total}", String(totalSteps))}
           </Text>
           <Text as="p" variant="bodySm" fontWeight="semibold">
             {currentEntry.label}
@@ -632,9 +636,12 @@ function StepIndicator({
           gap="200"
           blockAlign="center"
           wrap
-          aria-label={`Onboarding progress. Currently on step ${currentIndex + 1} of ${totalSteps}: ${currentEntry.label}.`}
+          aria-label={t("welcome.wizard.ariaLabel")
+            .replace("{current}", String(currentIndex + 1))
+            .replace("{total}", String(totalSteps))
+            .replace("{label}", currentEntry.label)}
         >
-          {WIZARD_STEP_ORDER.map((entry, index) => {
+          {wizardSteps.map((entry, index) => {
             const isCompleted = Boolean(onboarding[entry.completedKey]);
             const isActive = index === currentIndex;
             const progress: "complete" | "partiallyComplete" | "incomplete" = isCompleted
@@ -654,7 +661,9 @@ function StepIndicator({
                 progress={progress}
                 tone={tone}
               >
-                {`Step ${index + 1}: ${entry.label}`}
+                {t("welcome.wizard.stepBadge")
+                  .replace("{index}", String(index + 1))
+                  .replace("{label}", entry.label)}
               </Badge>
             );
           })}

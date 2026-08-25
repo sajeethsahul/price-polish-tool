@@ -10,9 +10,40 @@
     "accessRestored": "Access restored successfully.",
     "bannerTitleInactive": "Your subscription is inactive.",
     "bannerBodyInactive": "Reactivate billing to continue using Price Polish without interruption.",
-    "bannerCtaActivateSubscription": "Activate Subscription"
+    "bannerCtaActivateSubscription": "Activate Subscription",
+    "page": {
+      "subscriptionOverview": "Subscription Overview",
+      "shop": "Shop",
+      "plan": "Plan",
+      "status": "Status",
+      "activatedAt": "Activated At",
+      "testBilling": "Test Billing",
+      "healthTitle": "Billing Health",
+      "healthActive": "Active",
+      "healthInactive": "Inactive",
+      "healthActiveDesc": "Subscription is present and the shop is installed.",
+      "healthInactiveDesc": "Subscription is missing, inactive, or the shop is uninstalled.",
+      "lifecycleTitle": "Shop Lifecycle",
+      "lifecycleInstalled": "Installed",
+      "lifecycleUninstalled": "Uninstalled",
+      "lifecycleInstalledDesc": "App is currently installed.",
+      "lifecycleUninstalledDesc": "App is currently uninstalled.",
+      "installedAt": "Installed At",
+      "uninstalledAt": "Uninstalled At",
+      "diagnosticsTitle": "Billing Diagnostics",
+      "hide": "Hide",
+      "show": "Show",
+      "subscriptionId": "Subscription ID",
+      "chargeId": "Charge ID",
+      "updatedAt": "Updated At",
+      "futureTitle": "Future",
+      "futureDesc": "Upgrade flows and plan management will be added in a future release.",
+      "upgradePlan": "Upgrade Plan"
+    }
   },
   "common": {
+    "yes": "Yes",
+    "no": "No",
     "save": "Save",
     "cancel": "Cancel",
     "apply": "Apply",
@@ -57,7 +88,22 @@
       "restoreFailed": "Restore Failed",
       "completed": "Completed",
       "failed": "Failed",
+      "windowStopped": "Window Stopped",
+      "cancelled": "Cancelled",
       "comingSoon": "Coming Soon"
+    },
+    "time": {
+      "invalidDate": "Invalid date",
+      "unknownTiming": "Unknown timing",
+      "now": "Now",
+      "inMinutes": "In {count} min",
+      "minutesAgo": "{count} min ago",
+      "inHours": "In {count} hr",
+      "hoursAgo": "{count} hr ago",
+      "inDaysOne": "In 1 day",
+      "inDaysMany": "In {count} days",
+      "daysAgoOne": "1 day ago",
+      "daysAgoMany": "{count} days ago"
     },
     "error": {
       "appError": "App Error",
@@ -75,6 +121,7 @@
     "networkErrorTryAgain": "Network error. Please try again.",
     "noProductsToApply": "No products to apply",
     "campaignTitleRequired": "Campaign title is required before applying pricing.",
+    "campaignTitleRequiredScheduled": "Campaign title is required for scheduled pricing.",
     "pricingApplied": "Pricing applied successfully",
     "pricesLiveUpdated": "Prices updated and live on storefront",
     "failedLoadCampaignDetails": "Failed to load campaign details",
@@ -88,7 +135,9 @@
     "scheduleConfigureRules": "Configure pricing rules before scheduling.",
     "scheduleActivatePlan": "Activate a plan to schedule pricing operations.",
     "scheduleNoProductsForScope": "No products available for the selected scheduling scope.",
-    "schedulingFailed": "Scheduling failed"
+    "schedulingFailed": "Scheduling failed",
+    "pricesScheduledTimeWindow": "{count} prices scheduled with automatic restore",
+    "pricesScheduledStaged": "{count} prices staged and scheduled successfully"
   },
   "rules": {
     "pageTitle": "Pricing Rules",
@@ -101,6 +150,7 @@
     "fixedAmount": "Fixed amount",
     "increase": "Increase",
     "decrease": "Decrease",
+    "unknown": "Unknown",
     "valueHelpPercentage": "Example: 10 means 10%",
     "valueHelpFixed": "Example: 5 means $5",
     "priceEnding": "Price Ending",
@@ -231,6 +281,8 @@
       "autoRestoreScheduledForPrefix": "Auto restore scheduled for",
       "publishRestoreAt": "Pricing will publish at {start} and automatically restore at {end}.",
       "publishesAtTime": "Pricing will publish automatically at {time}",
+      "restoreAt": "Restores {time}",
+      "publishAt": "Publishes {time}",
       "pricingActive": "Pricing currently active.",
       "originalPricingRestored": "Original storefront pricing restored.",
       "autoRestoreFailed": "Scheduled pricing applied but automatic restore failed.",
@@ -275,6 +327,15 @@
   "welcome": {
     "pageTitle": "Get Started",
     "revisitTitle": "You're revisiting the setup guide",
+    "revisitDescription": "Reopening the guide won't change your pricing rules, published prices, or any existing configuration. Feel free to review the steps and close this page whenever you're done.",
+    "wizard": {
+      "stepOf": "Step {current} of {total}",
+      "stepBadge": "Step {index}: {label}",
+      "ariaLabel": "Onboarding progress. Currently on step {current} of {total}: {label}.",
+      "step1Label": "Create Pricing Rule",
+      "step2Label": "Preview Prices",
+      "step3Label": "Apply Pricing"
+    },
     "hero": {
       "title": "Welcome to Price Polish",
       "primary": "Get started",
@@ -534,9 +595,13 @@
         "oneTimePublishBadge": "One-time Publish",
         "scheduleTypeLabel": "Schedule type",
         "pricingScopeLabel": "Pricing scope",
+        "windowCompleted": "Window completed",
         "selectScopeOption": "Select scope",
         "selectedProductsOption": "Selected products",
         "allProductsOption": "All products",
+        "filteredProductsOption": "Filtered products",
+        "catalogAffectNotice": "⚠ Affects entire catalog",
+        "catalogAffectNoticeWithCount": "⚠ Affects entire catalog ({count} products)",
         "selectScopeToEnableNotice": "Select a scope to enable scheduling.",
         "noProductsSelectedNotice": "No products selected.",
         "campaignTitleLabel": "Campaign title",
@@ -545,6 +610,19 @@
         "publishAtLabel": "Publish at",
         "windowEndLabel": "Window End",
         "historyFilterLabel": "History filter",
+        "windowRangeSeparator": "to",
+        "applyModeRequiredNotice": "Select a pricing scope before scheduling.",
+        "selectProductsForScopeNotice": "Select products on the dashboard, or choose All Products.",
+        "scheduleRunTimeNotice": "Choose when this schedule should run.",
+        "validRestoreTimeNotice": "Choose a valid restore time.",
+        "startEndTimeDifferentNotice": "Start and end times need to be different.",
+        "historyFilterAll": "All",
+        "historyFilterUpcoming": "Upcoming",
+        "historyFilterActiveWindows": "Active windows",
+        "historyFilterCompleted": "Completed",
+        "historyFilterAutoRestored": "Auto restored",
+        "historyFilterFailed": "Failed",
+        "historyFilterOverdue": "Overdue",
         "loadingHistoryLabel": "Loading schedule history",
         "noRecordsTitle": "No schedule records for this filter",
         "noRecordsBody": "Try a different filter, or create a new scheduled pricing run.",
@@ -822,7 +900,16 @@
       "revertMostVisible": "This revert restores pricing across most visible products.",
       "revertSignificantMovement": "Some products contain significant pricing movement.",
       "revertVeryLargeScope": "This revert restores pricing across a large campaign set.",
-      "revertStorefrontMajor": "Storefront-wide revert scope includes major pricing movement."
+      "revertStorefrontMajor": "Storefront-wide revert scope includes major pricing movement.",
+      "revertNearlyAllStorefront": "This revert restores pricing across nearly all storefront products.",
+      "revertVeryLargeDetected": "Very large revert operation detected.",
+      "scheduleLargeOperation": "Large pricing operation detected.",
+      "scheduleMostVisible": "This action affects most visible products.",
+      "scheduleSignificantMovement": "Some products contain significant pricing movement.",
+      "scheduleVeryLargeOperation": "Extremely large scheduled operation detected.",
+      "scheduleStorefrontMajorMovement": "Storefront-wide scheduled run includes major pricing movement.",
+      "scheduleWindowDuration": "This pricing window runs for more than one day before automatic restore.",
+      "scheduleStorefrontWideWindow": "Most storefront products will stay in this window until automatic restore."
     },
     "campaignTitle": {
       "duplicate": "A campaign with this title already exists. Choose a unique title."
@@ -889,7 +976,9 @@
     "liveStoreSync": "Live Store Sync",
     "labels": {
       "finalPrice": "Final price",
-      "recentChanges": "Recent Changes"
+      "recentChanges": "Recent Changes",
+      "lastUpdated": "Last updated:",
+      "endingValue": "Ending .{endingValue}"
     }
   },
   "errors": {

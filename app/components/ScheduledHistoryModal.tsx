@@ -24,7 +24,6 @@ import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflict
 import { t } from "../utils/i18n";
 import type {
   OperationalSafeguardNotice,
-  OperationalSafeguardSeverity,
   PricingPreviewItem,
   ScheduledProductSnapshot,
 } from "../types/pricing";
@@ -51,20 +50,25 @@ const VERY_LARGE_SCHEDULE_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
 const SIGNIFICANT_MOVEMENT_THRESHOLD = 25;
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: t("common.status.pending"),
-  processing: t("common.status.processing"),
-  "missed-during-uninstall": t("common.status.missedDuringUninstall"),
-  "active-window": t("common.status.activeWindow"),
-  restoring: t("common.status.restoring"),
-  "auto-restored": t("common.status.autoRestored"),
-  "restore-failed": t("common.status.restoreFailed"),
-  done: t("common.status.completed"),
-  success: t("common.status.completed"),
-  completed: t("common.status.completed"),
-  failed: t("common.status.failed"),
-  error: t("common.status.failed"),
-};
+function getStatusLabel(status: string): string {
+  const map: Record<string, string> = {
+    pending: t("common.status.pending"),
+    processing: t("common.status.processing"),
+    "missed-during-uninstall": t("common.status.missedDuringUninstall"),
+    "active-window": t("common.status.activeWindow"),
+    restoring: t("common.status.restoring"),
+    "auto-restored": t("common.status.autoRestored"),
+    "restore-failed": t("common.status.restoreFailed"),
+    done: t("common.status.completed"),
+    success: t("common.status.completed"),
+    completed: t("common.status.completed"),
+    failed: t("common.status.failed"),
+    error: t("common.status.failed"),
+    "window-stopped": t("common.status.windowStopped"),
+    cancelled: t("common.status.cancelled"),
+  };
+  return map[status.toLowerCase()] ?? status;
+}
 
 function normalizeMeaningfulVariantTitle(value: string | null | undefined, productTitle?: string | null) {
   const trimmed = (value ?? "").trim();
@@ -350,17 +354,18 @@ export function ScheduledHistoryModal({
   }, [previews, selectedItems]);
 
   const scheduleScopeLabel = useMemo(() => {
-    if (scheduleApplyMode === "selected") return "Selected Products";
-    if (scheduleApplyMode === "all") return "All Products";
-    if (scheduleApplyMode === "filtered") return "Filtered Products";
-    return "Select Scope";
+    if (scheduleApplyMode === "selected") return t("dashboard.Schedule.center.selectedProductsOption");
+    if (scheduleApplyMode === "all") return t("dashboard.Schedule.center.allProductsOption");
+    if (scheduleApplyMode === "filtered") return t("dashboard.Schedule.center.filteredProductsOption");
+    return t("dashboard.Schedule.center.selectScopeOption");
   }, [scheduleApplyMode]);
 
   const scheduleScopeWarning = useMemo(() => {
     if (scheduleApplyMode !== "all") return null;
     const total = previews.length;
-    if (total > 0) return `⚠ Affects entire catalog (${total} products)`;
-    return "⚠ Affects entire catalog";
+    if (total > 0)
+      return t("dashboard.Schedule.center.catalogAffectNoticeWithCount").replace("{count}", String(total));
+    return t("dashboard.Schedule.center.catalogAffectNotice");
   }, [previews.length, scheduleApplyMode]);
 
   const normalizedExistingScheduleTitles = useMemo(() => {
@@ -402,7 +407,7 @@ export function ScheduledHistoryModal({
       notices.push({
         id: "schedule-large-operation",
         severity: "informational",
-        message: "Large pricing operation detected.",
+        message: t("dashboard.safeguardNotices.scheduleLargeOperation"),
       });
     }
 
@@ -410,7 +415,7 @@ export function ScheduledHistoryModal({
       notices.push({
         id: "schedule-most-visible",
         severity: "informational",
-        message: "This action affects most visible products.",
+        message: t("dashboard.safeguardNotices.scheduleMostVisible"),
       });
     }
 
@@ -418,7 +423,7 @@ export function ScheduledHistoryModal({
       notices.push({
         id: "schedule-significant-movement",
         severity: "informational",
-        message: "Some products contain significant pricing movement.",
+        message: t("dashboard.safeguardNotices.scheduleSignificantMovement"),
       });
     }
 
@@ -426,7 +431,7 @@ export function ScheduledHistoryModal({
       notices.push({
         id: "schedule-very-large-operation",
         severity: "warning",
-        message: "Extremely large scheduled operation detected.",
+        message: t("dashboard.safeguardNotices.scheduleVeryLargeOperation"),
       });
     }
 
@@ -434,7 +439,7 @@ export function ScheduledHistoryModal({
       notices.push({
         id: "schedule-storefront-major-movement",
         severity: "warning",
-        message: "Storefront-wide scheduled run includes major pricing movement.",
+        message: t("dashboard.safeguardNotices.scheduleStorefrontMajorMovement"),
       });
     }
 
@@ -447,14 +452,14 @@ export function ScheduledHistoryModal({
           notices.push({
             id: "schedule-window-duration",
             severity: "informational",
-            message: "This pricing window runs for more than one day before automatic restore.",
+            message: t("dashboard.safeguardNotices.scheduleWindowDuration"),
           });
         }
         if (storefrontWide && durationHours >= 12) {
           notices.push({
             id: "schedule-storefront-wide-window",
             severity: "warning",
-            message: "Most storefront products will stay in this window until automatic restore.",
+            message: t("dashboard.safeguardNotices.scheduleStorefrontWideWindow"),
           });
         }
       }
@@ -796,7 +801,7 @@ export function ScheduledHistoryModal({
 
   const getStatusBadge = (status: string) => {
     const normalized = status.toLowerCase();
-    const label = STATUS_LABELS[normalized] ?? status;
+    const label = getStatusLabel(normalized);
 
     switch (normalized) {
       case "pending":
@@ -820,24 +825,28 @@ export function ScheduledHistoryModal({
       case "failed":
       case "error":
         return <Badge tone="critical">{label}</Badge>;
+      case "window-stopped":
+        return <Badge tone="info">{label}</Badge>;
+      case "cancelled":
+        return <Badge tone="attention">{label}</Badge>;
       default:
         return <Badge>{label}</Badge>;
     }
   };
 
   const historyFilterOptions = [
-    { label: `${SELECT_OPTION_PREFIX}All`, value: "all" },
-    { label: `${SELECT_OPTION_PREFIX}Upcoming`, value: "upcoming" },
-    { label: `${SELECT_OPTION_PREFIX}Active windows`, value: "active" },
-    { label: `${SELECT_OPTION_PREFIX}Completed`, value: "completed" },
-    { label: `${SELECT_OPTION_PREFIX}Auto restored`, value: "restored" },
-    { label: `${SELECT_OPTION_PREFIX}Failed`, value: "failed" },
-    { label: `${SELECT_OPTION_PREFIX}Overdue`, value: "overdue" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterAll")}`, value: "all" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterUpcoming")}`, value: "upcoming" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterActiveWindows")}`, value: "active" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterCompleted")}`, value: "completed" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterAutoRestored")}`, value: "restored" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterFailed")}`, value: "failed" },
+    { label: `${SELECT_OPTION_PREFIX}${t("dashboard.Schedule.center.historyFilterOverdue")}`, value: "overdue" },
   ];
 
   function formatDateTime(dateString: string) {
     const parsed = new Date(dateString);
-    if (Number.isNaN(parsed.getTime())) return "Invalid date";
+    if (Number.isNaN(parsed.getTime())) return t("common.time.invalidDate");
     return parsed.toLocaleString(undefined, {
       month: "short",
       day: "numeric",
@@ -850,21 +859,33 @@ export function ScheduledHistoryModal({
   function formatRelativeTime(dateString: string) {
     const nowMs = Date.now();
     const targetMs = new Date(dateString).getTime();
-    if (Number.isNaN(targetMs)) return "Unknown timing";
+    if (Number.isNaN(targetMs)) return t("common.time.unknownTiming");
 
     const deltaMs = targetMs - nowMs;
     const absMinutes = Math.round(Math.abs(deltaMs) / (1000 * 60));
 
-    if (absMinutes < 1) return "Now";
-    if (absMinutes < 60) return deltaMs >= 0 ? `In ${absMinutes} min` : `${absMinutes} min ago`;
+    if (absMinutes < 1) return t("common.time.now");
+    if (absMinutes < 60) {
+      return deltaMs >= 0
+        ? t("common.time.inMinutes").replace("{count}", String(absMinutes))
+        : t("common.time.minutesAgo").replace("{count}", String(absMinutes));
+    }
 
     const absHours = Math.round(absMinutes / 60);
-    if (absHours < 24) return deltaMs >= 0 ? `In ${absHours} hr` : `${absHours} hr ago`;
+    if (absHours < 24) {
+      return deltaMs >= 0
+        ? t("common.time.inHours").replace("{count}", String(absHours))
+        : t("common.time.hoursAgo").replace("{count}", String(absHours));
+    }
 
     const absDays = Math.round(absHours / 24);
     return deltaMs >= 0
-      ? `In ${absDays} day${absDays > 1 ? "s" : ""}`
-      : `${absDays} day${absDays > 1 ? "s" : ""} ago`;
+      ? absDays === 1
+        ? t("common.time.inDaysOne")
+        : t("common.time.inDaysMany").replace("{count}", String(absDays))
+      : absDays === 1
+        ? t("common.time.daysAgoOne")
+        : t("common.time.daysAgoMany").replace("{count}", String(absDays));
   }
 
   const formatScheduleWindow = (job: ScheduledJob) => {
@@ -872,18 +893,20 @@ export function ScheduledHistoryModal({
       return formatDateTime(job.runAt);
     }
 
-    return `${formatDateTime(job.runAt)} to ${formatDateTime(job.windowEndAt)}`;
+    return `${formatDateTime(job.runAt)} ${t(
+      "dashboard.Schedule.center.windowRangeSeparator"
+    )} ${formatDateTime(job.windowEndAt)}`;
   };
 
   const formatScheduleTiming = (job: ScheduledJob & { normalizedStatus?: string }) => {
     if (job.mode === "time-window") {
       if (job.normalizedStatus === "active-window" && job.windowEndAt) {
-        return `Restores ${formatRelativeTime(job.windowEndAt)}`;
+        return t("campaignHistory.list.restoreAt").replace("{time}", formatRelativeTime(job.windowEndAt));
       }
       if (job.normalizedStatus === "auto-restored") {
-        return "Window completed";
+        return t("dashboard.Schedule.center.windowCompleted");
       }
-      return `Publishes ${formatRelativeTime(job.runAt)}`;
+      return t("campaignHistory.list.publishAt").replace("{time}", formatRelativeTime(job.runAt));
     }
 
     return formatRelativeTime(job.runAt);
@@ -911,12 +934,12 @@ export function ScheduledHistoryModal({
 
   const preflightSchedule = () => {
     if (scheduleApplyMode === "none") {
-      setScheduleApplyModeError("Select a pricing scope before scheduling.");
+      setScheduleApplyModeError(t("dashboard.Schedule.center.applyModeRequiredNotice"));
       return;
     }
 
     if (scheduleApplyMode === "selected" && selectedScopeCount === 0) {
-      setScheduleApplyModeError("Select products on the dashboard, or choose All Products.");
+      setScheduleApplyModeError(t("dashboard.Schedule.center.selectProductsForScopeNotice"));
       return;
     }
 
@@ -924,13 +947,13 @@ export function ScheduledHistoryModal({
 
     const normalizedTitle = scheduleTitle.trim();
     if (!normalizedTitle) {
-      setScheduleTitleError("Campaign title is required for scheduled pricing.");
+      setScheduleTitleError(t("toast.campaignTitleRequiredScheduled"));
       return;
     }
 
     const normalizedKey = normalizedTitle.replace(/\s+/g, " ").toLowerCase();
     if (normalizedExistingScheduleTitles.has(normalizedKey)) {
-      setScheduleTitleError("A campaign with this title already exists. Choose a unique title.");
+      setScheduleTitleError(t("dashboard.campaignTitle.duplicate"));
       return;
     }
 
@@ -939,19 +962,19 @@ export function ScheduledHistoryModal({
     if (!scheduleTime) {
       setScheduleTimeError(
         scheduleMode === "time-window"
-          ? "Choose when pricing should publish."
-          : "Choose when this schedule should run."
+          ? t("server.choosePublishTime")
+          : t("dashboard.Schedule.center.scheduleRunTimeNotice")
       );
       return;
     }
 
     const scheduleStartMs = new Date(scheduleTime).getTime();
     if (Number.isNaN(scheduleStartMs)) {
-      setScheduleTimeError("Choose a valid publish time.");
+      setScheduleTimeError(t("server.chooseValidPublishTime"));
       return;
     }
     if (scheduleStartMs <= Date.now()) {
-      setScheduleTimeError("Choose a future start time before scheduling.");
+      setScheduleTimeError(t("server.chooseFutureStart"));
       return;
     }
 
@@ -959,20 +982,20 @@ export function ScheduledHistoryModal({
 
     if (scheduleMode === "time-window") {
       if (!windowEndTime) {
-        setWindowEndTimeError("Choose when original pricing should restore.");
+        setWindowEndTimeError(t("server.chooseRestoreTime"));
         return;
       }
       const scheduleEndMs = new Date(windowEndTime).getTime();
       if (Number.isNaN(scheduleEndMs)) {
-        setWindowEndTimeError("Choose a valid restore time.");
+        setWindowEndTimeError(t("dashboard.Schedule.center.validRestoreTimeNotice"));
         return;
       }
       if (scheduleEndMs === scheduleStartMs) {
-        setWindowEndTimeError("Start and end times need to be different.");
+        setWindowEndTimeError(t("dashboard.Schedule.center.startEndTimeDifferentNotice"));
         return;
       }
       if (scheduleEndMs <= scheduleStartMs) {
-        setWindowEndTimeError("Window end must be after the start time.");
+        setWindowEndTimeError(t("server.windowEndAfterStart"));
         return;
       }
       setWindowEndTimeError(undefined);
@@ -990,13 +1013,13 @@ export function ScheduledHistoryModal({
   const submitSchedule = async () => {
     const normalizedTitle = scheduleTitle.trim();
     if (!normalizedTitle) {
-      setScheduleTitleError("Campaign title is required for scheduled pricing.");
+      setScheduleTitleError(t("toast.campaignTitleRequiredScheduled"));
       return;
     }
 
     const normalizedKey = normalizedTitle.replace(/\s+/g, " ").toLowerCase();
     if (normalizedExistingScheduleTitles.has(normalizedKey)) {
-      setScheduleTitleError("A campaign with this title already exists. Choose a unique title.");
+      setScheduleTitleError(t("dashboard.campaignTitle.duplicate"));
       return;
     }
 
@@ -1005,38 +1028,38 @@ export function ScheduledHistoryModal({
     if (!scheduleTime) {
       setScheduleTimeError(
         scheduleMode === "time-window"
-          ? "Choose when pricing should publish."
-          : "Choose when this schedule should run."
+          ? t("server.choosePublishTime")
+          : t("dashboard.Schedule.center.scheduleRunTimeNotice")
       );
       return;
     }
     const scheduleStartMs = new Date(scheduleTime).getTime();
     if (Number.isNaN(scheduleStartMs)) {
-      setScheduleTimeError("Choose a valid publish time.");
+      setScheduleTimeError(t("server.chooseValidPublishTime"));
       return;
     }
     if (scheduleStartMs <= Date.now()) {
-      setScheduleTimeError("Choose a future start time before scheduling.");
+      setScheduleTimeError(t("server.chooseFutureStart"));
       return;
     }
     setScheduleTimeError(undefined);
 
     if (scheduleMode === "time-window") {
       if (!windowEndTime) {
-        setWindowEndTimeError("Choose when original pricing should restore.");
+        setWindowEndTimeError(t("server.chooseRestoreTime"));
         return;
       }
       const scheduleEndMs = new Date(windowEndTime).getTime();
       if (Number.isNaN(scheduleEndMs)) {
-        setWindowEndTimeError("Choose a valid restore time.");
+        setWindowEndTimeError(t("dashboard.Schedule.center.validRestoreTimeNotice"));
         return;
       }
       if (scheduleEndMs === scheduleStartMs) {
-        setWindowEndTimeError("Start and end times need to be different.");
+        setWindowEndTimeError(t("dashboard.Schedule.center.startEndTimeDifferentNotice"));
         return;
       }
       if (scheduleEndMs <= scheduleStartMs) {
-        setWindowEndTimeError("Window end must be after the start time.");
+        setWindowEndTimeError(t("server.windowEndAfterStart"));
         return;
       }
       setWindowEndTimeError(undefined);
@@ -1119,8 +1142,8 @@ export function ScheduledHistoryModal({
       const count = result.stagedCount || scopedItemsForSchedule.length;
       shopify.toast.show(
         scheduleMode === "time-window"
-          ? `${count} prices scheduled with automatic restore`
-          : `${count} prices staged and scheduled successfully`
+          ? t("toast.pricesScheduledTimeWindow").replace("{count}", String(count))
+          : t("toast.pricesScheduledStaged").replace("{count}", String(count))
       );
       setScheduleTime("");
       setWindowEndTime("");

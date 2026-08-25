@@ -26,6 +26,10 @@ export type PricingPreviewItem = PricingOperationSnapshot & {
   oldPrice: string;
   newPrice: string;
   originalBasePrice: string;
+  inventory?: number | string | null;
+  inventoryQuantity?: number | null;
+  productType?: string | null;
+  vendor?: string | null;
 };
 
 export type PricingEngineInput = {

@@ -120,8 +120,8 @@ type RevertPreviewMovementFilter = "all" | "increase" | "decrease" | "large_move
 
 const OPERATIONAL_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25];
 const SELECT_OPTION_PREFIX = "\u2002";
-const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
-const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px";
+const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 110px 160px 120px";
+const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 110px 160px";
 const REVERT_PREVIEW_DEFAULT_PAGE_SIZE = 15;
 const REVERT_PREVIEW_LARGE_MOVEMENT_THRESHOLD = 15;
 const LARGE_OPERATION_THRESHOLD = 100;
@@ -1017,8 +1017,8 @@ export default function CampaignHistoryPage() {
       }
       (shopify as any)?.toast?.show?.(
         action === "cancel-schedule"
-          ? "Pricing window cancelled"
-          : "Original pricing restored and window stopped"
+          ? t("dashboard.windowLifecycle.cancelled")
+          : t("dashboard.windowLifecycle.stopped")
       );
       const nextStatus = action === "cancel-schedule" ? "cancelled-window" : (data as any).status ?? "window-stopped";
       setCampaignHistory((current) =>
@@ -1044,8 +1044,8 @@ export default function CampaignHistoryPage() {
     } catch {
       (shopify as any)?.toast?.show?.(
         action === "cancel-schedule"
-          ? "Unable to cancel pricing window"
-          : "Unable to stop pricing window",
+          ? t("dashboard.windowLifecycle.unableCancelWindow")
+          : t("dashboard.windowLifecycle.unableStopWindow"),
         { isError: true }
       );
     } finally {
@@ -1140,7 +1140,7 @@ export default function CampaignHistoryPage() {
       notices.push({
         id: "revert-large-scope",
         severity: "informational",
-        message: "Large revert operation detected.",
+        message: t("dashboard.safeguardNotices.revertLargeScope"),
       });
     }
 
@@ -1148,7 +1148,7 @@ export default function CampaignHistoryPage() {
       notices.push({
         id: "revert-most-visible",
         severity: "informational",
-        message: "This revert restores pricing across most visible products.",
+        message: t("dashboard.safeguardNotices.revertMostVisible"),
       });
     }
 
@@ -1156,7 +1156,7 @@ export default function CampaignHistoryPage() {
       notices.push({
         id: "revert-storefront-wide",
         severity: "informational",
-        message: "This revert restores pricing across nearly all storefront products.",
+        message: t("dashboard.safeguardNotices.revertNearlyAllStorefront"),
       });
     }
 
@@ -1164,7 +1164,7 @@ export default function CampaignHistoryPage() {
       notices.push({
         id: "revert-significant-movement",
         severity: "informational",
-        message: "Some products contain significant pricing movement.",
+        message: t("dashboard.safeguardNotices.revertSignificantMovement"),
       });
     }
 
@@ -1172,7 +1172,7 @@ export default function CampaignHistoryPage() {
       notices.push({
         id: "revert-very-large-scope",
         severity: "warning",
-        message: "Very large revert operation detected.",
+        message: t("dashboard.safeguardNotices.revertVeryLargeDetected"),
       });
     }
 
@@ -1633,6 +1633,7 @@ export default function CampaignHistoryPage() {
 
       <Modal
         open={campaignDetailOpen}
+        size="large"
         onClose={() => {
           setCampaignDetailOpen(false);
           setCampaignDetail(null);
@@ -2001,6 +2002,7 @@ export default function CampaignHistoryPage() {
 
       <Modal
         open={revertPreviewOpen}
+        size="large"
         onClose={() => {
           if (isProcessing) return;
           setRevertPreviewOpen(false);
@@ -2189,12 +2191,12 @@ export default function CampaignHistoryPage() {
                       }}
                     >
                       <Text as="p" variant="bodySm" fontWeight="medium">{t("campaignHistory.revertPreview.tableHeaderProduct")}</Text>
-                      <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      <div style={{ fontVariantNumeric: "tabular-nums" }}>
                         <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
                           {t("campaignHistory.revertPreview.tableHeaderCurrent")}
                         </Text>
                       </div>
-                      <div style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      <div style={{ fontVariantNumeric: "tabular-nums" }}>
                         <Text as="p" variant="bodySm" fontWeight="medium" alignment="end">
                           {t("campaignHistory.revertPreview.tableHeaderRevertTarget")}
                         </Text>

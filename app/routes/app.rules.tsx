@@ -272,7 +272,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
 
     const initialType = String(loaderData.adjustmentType ?? "percentage").toLowerCase();
     const derivedDirection = (Number(loaderData.markupPercent ?? 0) < 0) ? "decrease" : "increase";
-    
+
     const [adjustmentType, setAdjustmentType] = useState(initialType);
     const [adjustmentDirection, setAdjustmentDirection] = useState(
         initialType === "percentage" ? derivedDirection : String(loaderData.adjustmentDirection ?? "increase").toLowerCase()
@@ -286,7 +286,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     const [roundingPrecision, setRoundingPrecision] = useState(String(loaderData.roundingPrecision ?? "standard").toLowerCase());
     const [minPrice, setMinPrice] = useState(loaderData.minPrice === null ? "" : String(loaderData.minPrice));
     const [maxPrice, setMaxPrice] = useState(loaderData.maxPrice === null ? "" : String(loaderData.maxPrice));
-    
+
     const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
     const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
 
@@ -301,13 +301,13 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
             : (type === "percentage" ? String(Math.abs(Number(loaderData.markupPercent ?? 0))) : String(loaderData.adjustmentValue ?? 0));
         const ending = String(actionData?.endingOption ?? loaderData.endingOption ?? "0.99").toLowerCase();
         const precision = String(actionData?.roundingPrecision ?? loaderData.roundingPrecision ?? "standard").toLowerCase();
-        
-        const minVal = actionData?.minPrice !== undefined 
-            ? String(actionData.minPrice ?? "") 
+
+        const minVal = actionData?.minPrice !== undefined
+            ? String(actionData.minPrice ?? "")
             : (loaderData.minPrice === null ? "" : String(loaderData.minPrice));
-            
-        const maxVal = actionData?.maxPrice !== undefined 
-            ? String(actionData.maxPrice ?? "") 
+
+        const maxVal = actionData?.maxPrice !== undefined
+            ? String(actionData.maxPrice ?? "")
             : (loaderData.maxPrice === null ? "" : String(loaderData.maxPrice));
 
         return {
@@ -610,8 +610,8 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                             </BlockStack>
 
                             {loaderData.updatedAt && (
-                                <Text as="span" tone="subdued">
-                                    Last updated: {new Date(loaderData.updatedAt).toLocaleString()}
+                                                                <Text as="span" tone="subdued">
+                                    {t("pricing.labels.lastUpdated")}
                                 </Text>
                             )}
 
@@ -639,7 +639,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                                 <BlockStack gap="100">
                                                     <InlineStack gap="200" wrap>
                                                         <Badge tone={dir === "decrease" ? "attention" : "success"}>
-                                                            {dir === "decrease" ? "Decrease" : "Increase"}
+                                                            {dir === "decrease" ? t("rules.decrease") : t("rules.increase")}
                                                         </Badge>
                                                         <Text as="span" variant="bodyMd" fontWeight="medium">
                                                             {type === "percentage"
@@ -647,7 +647,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                                                 : `${currencyCode} ${value.toFixed(2)}`}
                                                         </Text>
                                                         {ending !== "none" && (
-                                                            <Badge tone="info">{`Ending .${ending.split(".")[1] ?? "00"}`}</Badge>
+                                                            <Badge tone="info">{t("pricing.labels.endingValue").replace("{endingValue}", ending.split(".")[1] ?? "00")}</Badge>
                                                         )}
                                                     </InlineStack>
                                                     <Text as="span" tone="subdued" variant="bodySm">

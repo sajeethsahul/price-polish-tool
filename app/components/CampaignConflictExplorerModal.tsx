@@ -11,9 +11,9 @@ function severityTone(severity: CampaignConflictSeverity) {
 }
 
 function formatScheduleType(value: CampaignConflictCampaign["scheduleType"]) {
-  if (value === "time-window") return "Time Window";
-  if (value === "one-time") return "One-time";
-  return "Unknown";
+  if (value === "time-window") return t("dashboard.Schedule.center.timeWindowBadge");
+  if (value === "one-time") return t("dashboard.Schedule.center.oneTimePublishBadge");
+  return t("rules.unknown");
 }
 
 function formatConflictType(value: CampaignConflictType) {

@@ -35,7 +35,9 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CheckIcon,
-  SearchIcon, XCircleIcon
+  SearchIcon,
+  XCircleIcon,
+  PlayIcon,
 } from "@shopify/polaris-icons";
 import {
   formatMoney,
@@ -78,8 +80,8 @@ const PAGE_SIZE = 15;
 /** Number of staged variants processed per publish API call for client-side progress tracking. */
 const PUBLISH_BATCH_SIZE = 50;
 const CAMPAIGN_DETAIL_COMPARISON_GRID =
-  "minmax(0, 1fr) 132px 132px minmax(96px, auto)";
-const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 132px 132px";
+  "minmax(0, 1fr) 110px 160px 120px";
+const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 110px 160px";
 const LARGE_OPERATION_THRESHOLD = 100;
 const VERY_LARGE_OPERATION_THRESHOLD = 250;
 const MOST_VISIBLE_SCOPE_RATIO = 0.8;
@@ -684,7 +686,7 @@ function DashboardContent({
   const [showGoLiveModal, setShowGoLiveModal] = useState(false); // UPDATED
   const [showStopModal, setShowStopModal] = useState(false); // UPDATED
   const [message, setMessage] = useState<{
-    type: "success" | "critical" | "warning";
+    type: "success" | "critical" | "warning" | "info";
     text: string;
     details?: string;
   } | null>(null);
@@ -994,7 +996,7 @@ function DashboardContent({
           typeof result?.campaignId === "string" && result.campaignId.length > 0
             ? result.campaignId
             : null;
-        setActiveCampaignId(stagingCampaignId);  
+        setActiveCampaignId(stagingCampaignId);
 
         if (!response.ok) {
           const billingError =
@@ -1100,7 +1102,8 @@ function DashboardContent({
       selectedPreviewItems,
       immediateApplySingleItem,
     ],
-  );  const immediateApplyScopeLabel =
+  );
+  const immediateApplyScopeLabel =
     immediateApplyScope === "all"
       ? t("dashboard.scopeLabels.products")
       : immediateApplyScope === "single"
@@ -1217,42 +1220,48 @@ function DashboardContent({
     ) {
       notices.push({
         id: "immediate-large-operation",
-        severity: "informational",        message: t("dashboard.safeguardNotices.largeOperation"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.largeOperation"),
       });
     }
 
     if (affectsMostVisible) {
       notices.push({
         id: "immediate-most-visible",
-        severity: "informational",        message: t("dashboard.safeguardNotices.mostVisible"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.mostVisible"),
       });
     }
 
     if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "immediate-significant-movement",
-        severity: "informational",        message: t("dashboard.safeguardNotices.significantMovement"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.significantMovement"),
       });
     }
 
     if (immediateApplyContextItems.length >= VERY_LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "immediate-very-large-operation",
-        severity: "warning",        message: t("dashboard.safeguardNotices.veryLargeOperation"),
+        severity: "warning",
+        message: t("dashboard.safeguardNotices.veryLargeOperation"),
       });
     }
 
     if (isStorefrontWide) {
       notices.push({
         id: "immediate-storefront-wide",
-        severity: "warning",        message: t("dashboard.safeguardNotices.storefrontWide"),
+        severity: "warning",
+        message: t("dashboard.safeguardNotices.storefrontWide"),
       });
     }
 
     if (isAllProductsScope && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "immediate-all-products-major-movement",
-        severity: "warning",        message: t("dashboard.safeguardNotices.allProductsMajorMovement"),
+        severity: "warning",
+        message: t("dashboard.safeguardNotices.allProductsMajorMovement"),
       });
     }
 
@@ -1282,7 +1291,7 @@ function DashboardContent({
       const normalized = normalizeCampaignTitle(title);
       if (!normalized) return undefined;
       if (existingCampaignTitleSet.has(normalized)) {
-        return "A campaign with this title already exists. Choose a unique title.";
+        return t("dashboard.campaignTitle.duplicate");
       }
       return undefined;
     },
@@ -1406,35 +1415,40 @@ function DashboardContent({
     if (productCount >= LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "revert-large-scope",
-        severity: "informational",        message: t("dashboard.safeguardNotices.revertLargeScope"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.revertLargeScope"),
       });
     }
 
     if (affectsMostVisible) {
       notices.push({
         id: "revert-most-visible",
-        severity: "informational",        message: t("dashboard.safeguardNotices.revertMostVisible"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.revertMostVisible"),
       });
     }
 
     if (largestMovement >= SIGNIFICANT_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "revert-significant-movement",
-        severity: "informational",        message: t("dashboard.safeguardNotices.revertSignificantMovement"),
+        severity: "informational",
+        message: t("dashboard.safeguardNotices.revertSignificantMovement"),
       });
     }
 
     if (productCount >= VERY_LARGE_OPERATION_THRESHOLD) {
       notices.push({
         id: "revert-very-large-scope",
-        severity: "warning",        message: t("dashboard.safeguardNotices.revertVeryLargeScope"),
+        severity: "warning",
+        message: t("dashboard.safeguardNotices.revertVeryLargeScope"),
       });
     }
 
     if (storefrontWide && largestMovement >= MAJOR_MOVEMENT_THRESHOLD) {
       notices.push({
         id: "revert-storefront-major-movement",
-        severity: "warning",        message: t("dashboard.safeguardNotices.revertStorefrontMajor"),
+        severity: "warning",
+        message: t("dashboard.safeguardNotices.revertStorefrontMajor"),
       });
     }
 
@@ -1457,20 +1471,20 @@ const revertPreviewFilteredRows = useMemo(() => {
     // 🔹 1. Robust Extended Search Logic
     if (normalizedQuery) {
       const title = (row.productTitle || "").toLowerCase();
-      
+
       // Fallback matching logic for multiple common Shopify object schemas
       const type = (
-        (row as any).productType || 
-        (row as any).type || 
-        (row as any).product_type || 
-        (row as any).productVariant?.product?.productType || 
+        (row as any).productType ||
+        (row as any).type ||
+        (row as any).product_type ||
+        (row as any).productVariant?.product?.productType ||
         ""
       ).toLowerCase();
 
       const vendor = (
-        (row as any).vendor || 
-        (row as any).vendorName || 
-        (row as any).brand || 
+        (row as any).vendor ||
+        (row as any).vendorName ||
+        (row as any).brand ||
         (row as any).productVariant?.product?.vendor ||
         ""
       ).toLowerCase();
@@ -1486,9 +1500,9 @@ const revertPreviewFilteredRows = useMemo(() => {
 
     // 🔹 2. Movement Filters (Ensure dependency matches your exact state naming, e.g., activeFilter)
     if (activeFilter === "all") return true;
-    
+
     if (row.currentPrice == null || row.currentPrice <= 0) {
-      return activeFilter === "high_impact" ? false : true; 
+      return activeFilter === "high_impact" ? false : true;
     }
 
     const delta = row.revertTargetPrice - row.currentPrice;
@@ -1571,27 +1585,27 @@ const filteredPreviews = useMemo(() => {
   let result = derived.filter((p) => {
     // 🔹 1. Extended Multi-Field Search (Title, Product Type, and Vendor)
     let matchesSearch = normalizedQuery.length === 0;
-    
+
     if (!matchesSearch) {
       const title = (p.title || "").toLowerCase();
-      
+
       // Dynamic property mapping for variant/product types & vendors
       const type = (
-        (p as any).productType || 
-        (p as any).type || 
-        (p as any).product_type || 
+        (p as any).productType ||
+        (p as any).type ||
+        (p as any).product_type ||
         ""
       ).toLowerCase();
 
       const vendor = (
-        (p as any).vendor || 
-        (p as any).vendorName || 
+        (p as any).vendor ||
+        (p as any).vendorName ||
         ""
       ).toLowerCase();
 
-      matchesSearch = 
-        title.includes(normalizedQuery) || 
-        type.includes(normalizedQuery) || 
+      matchesSearch =
+        title.includes(normalizedQuery) ||
+        type.includes(normalizedQuery) ||
         vendor.includes(normalizedQuery);
     }
 
@@ -1751,7 +1765,12 @@ const filteredPreviews = useMemo(() => {
 
       if (res.ok) {
         if (shopify)
-          shopify.toast.show(`Restored ${data.restoredCount} products`);
+          shopify.toast.show(
+            t("dashboard.undo.restored").replace(
+              "{count}",
+              String(data.restoredCount),
+            ),
+          );
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
         await handlePreview();
         setSelectedItems(new Set());
@@ -1783,7 +1802,7 @@ const filteredPreviews = useMemo(() => {
         setBillingBlockModalCode(code);
         setBillingBlockModalOpen(true);
       } else if (shopify) {
-        shopify.toast.show(message || "Failed to undo changes", {
+        shopify.toast.show(message || t("dashboard.undo.failed"), {
           isError: true,
         });
       } else {
@@ -1942,24 +1961,37 @@ const filteredPreviews = useMemo(() => {
       const terminalReason = selectedCampaignForRevert?.unrecoverableReason;
       if (data?.terminal === true) {
         const terminalMessage = terminalReason
-          ? `This campaign can no longer be reverted because ${terminalReason.toLowerCase()}.`
-          : data?.message || "This campaign can no longer be reverted.";
+          ? t("server.revertTerminalWithReason").replace(
+              "{reason}",
+              terminalReason.toLowerCase(),
+            )
+          : data?.message || t("server.revertTerminalGeneric");
         if (shopify) shopify.toast.show(terminalMessage, { isError: true });
         else console.warn(`BYPASS: ${terminalMessage}`);
       } else if (data?.message) {
         const operationalMessage = terminalReason
-          ? `${data.message} Reason: ${terminalReason}.`
+          ? t("server.revertOperationalWithReason")
+              .replace("{message}", data.message)
+              .replace("{reason}", terminalReason)
           : data.message;
         if (shopify) shopify.toast.show(operationalMessage);
         else console.log(`BYPASS: ${operationalMessage}`);
       } else if (data?.restoredCount > 0) {
         if (shopify)
-          shopify.toast.show(`Restored ${data.restoredCount} products`);
+          shopify.toast.show(
+            t("server.revertRestoredCount").replace(
+              "{count}",
+              String(data.restoredCount),
+            ),
+          );
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
       } else {
         const noRetryMessage = terminalReason
-          ? `No retryable revert actions remain because ${terminalReason.toLowerCase()}.`
-          : "No retryable revert actions remain.";
+          ? t("server.revertNoRetryWithReason").replace(
+              "{reason}",
+              terminalReason.toLowerCase(),
+            )
+          : t("server.revertNoRetryGeneric");
         if (shopify) shopify.toast.show(noRetryMessage, { isError: true });
         else console.warn(`BYPASS: ${noRetryMessage}`);
       }
@@ -1986,7 +2018,7 @@ const filteredPreviews = useMemo(() => {
         setBillingBlockModalCode(code);
         setBillingBlockModalOpen(true);
       } else if (shopify) {
-        shopify.toast.show(message || "Failed to revert campaign", {
+        shopify.toast.show(message || t("toast.failedRevertCampaign"), {
           isError: true,
         });
       } else {
@@ -2058,8 +2090,8 @@ const filteredPreviews = useMemo(() => {
         if (shopify) {
           shopify.toast.show(
             action === "cancel-schedule"
-              ? "Pricing window cancelled"
-              : "Original pricing restored and window stopped",
+              ? t("dashboard.windowLifecycle.cancelled")
+              : t("dashboard.windowLifecycle.stopped"),
           );
         }
         const nextStatus =
@@ -2121,8 +2153,8 @@ const filteredPreviews = useMemo(() => {
         if (shopify) {
           shopify.toast.show(
             action === "cancel-schedule"
-              ? "Unable to cancel pricing window"
-              : "Unable to stop pricing window",
+              ? t("dashboard.windowLifecycle.unableCancelWindow")
+              : t("dashboard.windowLifecycle.unableStopWindow"),
             { isError: true },
           );
         }
@@ -2285,7 +2317,7 @@ const filteredPreviews = useMemo(() => {
           const data = await res.json();
           if (res.ok) {
             if (shopify)
-              shopify.toast.show("Storefront prices restored successfully");
+              shopify.toast.show(t("dashboard.pushStorefront.restored"));
             else console.log("BYPASS: Storefront prices restored successfully");
             setMetrics((prev) => ({ ...prev, isLive: false }));
             await handlePreview();
@@ -2294,7 +2326,7 @@ const filteredPreviews = useMemo(() => {
               throw new Error(
                 data.message ??
                 data.error ??
-                "Failed to stop live pricing."
+                t("dashboard.pushStorefront.failedStop"),
               );
             }
           }
@@ -2302,7 +2334,7 @@ const filteredPreviews = useMemo(() => {
           const errorMessage =
             err instanceof Error
               ? err.message
-              : "Failed to update storefront pricing state.";
+              : t("dashboard.pushStorefront.failedState");
           if (shopify) shopify.toast.show(errorMessage, { isError: true });
           else console.error("BYPASS:", errorMessage);
         } finally {
@@ -2345,7 +2377,7 @@ const filteredPreviews = useMemo(() => {
               throw new Error(
                 data.message ??
                 data.error ??
-                "Failed to publish prices."
+                t("dashboard.pushStorefront.failedPublish"),
               );
             }
 
@@ -2364,7 +2396,7 @@ const filteredPreviews = useMemo(() => {
 
         setProgress(100);
         if (shopify)
-          shopify.toast.show("Prices are now live on your storefront");
+          shopify.toast.show(t("dashboard.pushStorefront.live"));
         else console.log("BYPASS: Prices are now live on your storefront");
         setMetrics((prev) => ({ ...prev, isLive: true }));
         setActiveCampaignId(null);
@@ -2373,7 +2405,7 @@ const filteredPreviews = useMemo(() => {
         const errorMessage =
           err instanceof Error
             ? err.message
-            : "Failed to update storefront pricing state.";
+            : t("dashboard.pushStorefront.failedState");
         if (shopify) shopify.toast.show(errorMessage, { isError: true });
         else console.error("BYPASS:", errorMessage);
       } finally {
@@ -2423,19 +2455,27 @@ const filteredPreviews = useMemo(() => {
 
   const campaignStatusLabel = useCallback((status: string) => {
     const normalized = status.toLowerCase();
-    if (normalized === "scheduled-window") return "Scheduled Window";
-    if (normalized === "active-window") return "Active Window";
-    if (normalized === "expired-window") return "Expired Window";
-    if (normalized === "auto-restored") return "Auto Restored";
-    if (normalized === "window-stopped") return "Window Stopped";
-    if (normalized === "cancelled-window") return "Cancelled Window";
-    if (normalized === "scheduled-publish") return "Scheduled Publish";
-    if (normalized === "cancelled-publish") return "Cancelled";
-    if (normalized === "publishing") return "Publishing";
-    if (normalized === "published") return "Published";
-    if (normalized === "failed") return "Failed";
-    if (normalized === "unrecoverable") return "Unrecoverable";
-    return status;
+    const labels: Record<string, string> = {
+      scheduled: t("dashboard.campaignHistory.scheduled"),
+      "scheduled-window": t("dashboard.campaignHistory.scheduledWindow"),
+      "publishing-window": t("dashboard.campaignHistory.publishingWindow"),
+      "active-window": t("dashboard.campaignHistory.activeWindow"),
+      restoring: t("common.status.restoring"),
+      "expired-window": t("dashboard.campaignHistory.expiredWindow"),
+      "auto-restored": t("dashboard.campaignHistory.autoRestored"),
+      "window-stopped": t("dashboard.campaignHistory.windowStopped"),
+      "cancelled-window": t("dashboard.campaignHistory.cancelledWindow"),
+      "scheduled-publish": t("dashboard.campaignHistory.scheduledPublish"),
+      "cancelled-publish": t("dashboard.campaignHistory.cancelled"),
+      publishing: t("dashboard.campaignHistory.publishing"),
+      published: t("dashboard.campaignHistory.published"),
+      failed: t("dashboard.campaignHistory.failed"),
+      "restore-failed": t("common.status.restoreFailed"),
+      "missed-during-uninstall": t("common.status.missedDuringUninstall"),
+      unrecoverable: t("dashboard.campaignHistory.unrecoverable"),
+      draft: t("dashboard.campaignHistory.draft"),
+    };
+    return labels[normalized] ?? status;
   }, []);
 
   const detailStatusTone = useCallback((status?: string | null) => {
@@ -2448,16 +2488,16 @@ const filteredPreviews = useMemo(() => {
 
   const detailStatusLabel = useCallback((status?: string | null) => {
     const normalized = (status ?? "pending").toLowerCase();
-    if (normalized === "reverted") return "Reverted";
-    if (normalized === "failed") return "Failed";
-    if (normalized === "unrecoverable") return "Unrecoverable";
-    if (normalized === "scheduled") return "Scheduled";
-    return "Pending";
+    if (normalized === "reverted") return t("dashboard.campaignHistory.reverted");
+    if (normalized === "failed") return t("dashboard.campaignHistory.failed");
+    if (normalized === "unrecoverable") return t("dashboard.campaignHistory.unrecoverable");
+    if (normalized === "scheduled") return t("dashboard.campaignHistory.scheduled");
+    return t("dashboard.campaignHistory.pending");
   }, []);
 
   const formatDetailScheduleType = useCallback((type?: string | null) => {
-    if (type === "time-window") return "Time Window";
-    return "One-time Publish";
+    if (type === "time-window") return t("dashboard.Schedule.center.timeWindowBadge");
+    return t("dashboard.Schedule.center.oneTimePublishBadge");
   }, []);
 
   const formatTimelineTimestamp = useCallback((value?: string | null) => {
@@ -2485,26 +2525,26 @@ const filteredPreviews = useMemo(() => {
     const milestones: CampaignTimelineMilestone[] = [
       {
         key: "created",
-        label: "Created",
+        label: t("timeline.created.label"),
         tone: "info",
-        badgeLabel: "Recorded",
+        badgeLabel: t("timeline.created.badge"),
         timestamp: formatTimelineTimestamp(selectedCampaignForDetail.createdAt),
-        description: "Campaign record created and ready for lifecycle actions.",
+        description: t("timeline.created.description"),
       },
     ];
 
     if (normalizedStatus === "scheduled-window") {
       milestones.push({
         key: "window-scheduled",
-        label: "Window Scheduled",
+        label: t("timeline.windowScheduled.label"),
         tone: "warning",
-        badgeLabel: "Queued",
+        badgeLabel: t("timeline.windowScheduled.badge"),
         timestamp: formatTimelineTimestamp(
           selectedCampaignForDetail.runAt ?? null,
         ),
         description: selectedCampaignForDetail.windowEndAt
-          ? "Pricing will publish at the window start and automatically restore at the window end."
-          : "Pricing window is queued for publishing and automatic restore.",
+          ? t("timeline.windowScheduled.descriptionWithEnd")
+          : t("timeline.windowScheduled.descriptionNoEnd"),
       });
     } else if (
       normalizedStatus === "scheduled" ||
@@ -2512,91 +2552,150 @@ const filteredPreviews = useMemo(() => {
     ) {
       milestones.push({
         key: "scheduled",
-        label: "Scheduled",
+        label: t("timeline.scheduled.label"),
         tone: "warning",
-        badgeLabel: "Queued",
-        description: "Campaign is queued for execution.",
+        badgeLabel: t("timeline.scheduled.badge"),
+        description: t("timeline.scheduled.description"),
       });
     }
 
     if (normalizedStatus === "active-window") {
       milestones.push({
         key: "window-activated",
-        label: "Window Activated",
+        label: t("timeline.windowActivated.label"),
         tone: "success",
-        badgeLabel: "Active",
+        badgeLabel: t("timeline.windowActivated.badge"),
         timestamp: formatTimelineTimestamp(
           selectedCampaignForDetail.runAt ?? null,
         ),
         description: selectedCampaignForDetail.windowEndAt
-          ? "Pricing is active now and will automatically restore at the scheduled end time."
-          : "Pricing is active now and waiting for automatic restore.",
-      });
-    } else if (
-      [
-        "active",
-        "partial",
-        "reverted",
-        "unrecoverable",
-        "auto-restored",
-      ].includes(normalizedStatus)
-    ) {
-      milestones.push({
-        key: "applied",
-        label: "Applied",
-        tone: "success",
-        badgeLabel: "Completed",
-        description: "Pricing updates were applied to tracked items.",
+          ? t("timeline.windowActivated.descriptionWithEnd")
+          : t("timeline.windowActivated.descriptionNoEnd"),
       });
     }
 
-    if (normalizedStatus === "partial" || failedCount > 0) {
+    if (normalizedStatus === "published") {
       milestones.push({
-        key: "partial-failure",
-        label: "Partial Failure",
-        tone: "warning",
-        badgeLabel: "Attention",
-        description: "Some items failed to complete rollback operations.",
-      });
-    }
-
-    if (normalizedStatus === "reverted") {
-      milestones.push({
-        key: "reverted",
-        label: "Reverted",
-        tone: "success",
-        badgeLabel: "Completed",
-        timestamp: revertCompletedTimestamp,
+        key: "published",
+        label: t("timeline.published.label"),
+        tone: failedCount > 0 ? "warning" : "success",
+        badgeLabel:
+          failedCount > 0
+            ? t("timeline.published.badgePartial")
+            : t("timeline.published.badgeSuccess"),
         description:
-          "Pricing successfully restored to original storefront values.",
+          failedCount > 0
+            ? t("timeline.published.descriptionWithFailures")
+            : t("timeline.published.descriptionSuccess"),
+      });
+    } else if (normalizedStatus === "publishing") {
+      milestones.push({
+        key: "publishing",
+        label: t("timeline.publishing.label"),
+        tone: "attention",
+        badgeLabel: t("timeline.publishing.badge"),
+        description: t("timeline.publishing.description"),
       });
     }
 
     if (normalizedStatus === "auto-restored") {
       milestones.push({
         key: "auto-restored",
-        label: "Auto Restored",
-        tone: "success",
-        badgeLabel: "Completed",
+        label: t("timeline.autoRestored.label"),
+        tone: "info",
+        badgeLabel: t("timeline.autoRestored.badge"),
         timestamp: formatTimelineTimestamp(
-          campaignDetail?.revertCompletedAt ??
-            selectedCampaignForDetail.windowEndAt ??
-            null,
+          campaignDetail?.revertCompletedAt ?? null,
         ),
-        description:
-          "Original storefront pricing was automatically restored after the window ended.",
+        description: t("timeline.autoRestored.description"),
+      });
+    }
+
+    if (normalizedStatus === "window-stopped") {
+      milestones.push({
+        key: "window-stopped",
+        label: t("timeline.windowStopped.label"),
+        tone: "info",
+        badgeLabel: t("timeline.windowStopped.badge"),
+        timestamp: formatTimelineTimestamp(
+          campaignDetail?.revertCompletedAt ?? null,
+        ),
+        description: t("timeline.windowStopped.description"),
+      });
+    }
+
+    if (normalizedStatus === "cancelled-window") {
+      milestones.push({
+        key: "cancelled-window",
+        label: t("timeline.cancelledWindow.label"),
+        tone: "info",
+        badgeLabel: t("timeline.cancelledWindow.badge"),
+        timestamp: formatTimelineTimestamp(
+          selectedCampaignForDetail.runAt ?? null,
+        ),
+        description: t("timeline.cancelledWindow.description"),
+      });
+    }
+
+    if (normalizedStatus === "cancelled-publish") {
+      milestones.push({
+        key: "cancelled-publish",
+        label: t("timeline.cancelledPublish.label"),
+        tone: "info",
+        badgeLabel: t("timeline.cancelledPublish.badge"),
+        timestamp: formatTimelineTimestamp(
+          selectedCampaignForDetail.runAt ?? null,
+        ),
+        description: t("timeline.cancelledPublish.description"),
+      });
+    }
+
+    if (normalizedStatus === "failed") {
+      milestones.push({
+        key: "failed",
+        label: t("timeline.failed.label"),
+        tone: "critical",
+        badgeLabel: t("timeline.failed.badge"),
+        description: t("timeline.failed.description"),
+      });
+    }
+
+    if (normalizedStatus === "partial") {
+      milestones.push({
+        key: "partial",
+        label: t("timeline.partial.label"),
+        tone: "warning",
+        badgeLabel: t("timeline.partial.badge"),
+        description: t("timeline.partial.description"),
       });
     }
 
     if (normalizedStatus === "unrecoverable") {
       milestones.push({
         key: "unrecoverable",
-        label: "Unrecoverable",
+        label: t("timeline.unrecoverable.label"),
         tone: "critical",
-        badgeLabel: "Terminal",
-        description:
-          selectedCampaignForDetail.unrecoverableReason ??
-          "Rollback is terminal for one or more items and cannot be retried.",
+        badgeLabel: t("timeline.unrecoverable.badge"),
+        timestamp: formatTimelineTimestamp(
+          campaignDetail?.revertCompletedAt ?? null,
+        ),
+        description: selectedCampaignForDetail.unrecoverableReason
+          ? t("timeline.unrecoverable.descriptionWithReason").replace(
+              "{reason}",
+              selectedCampaignForDetail.unrecoverableReason,
+            )
+          : t("timeline.unrecoverable.description"),
+      });
+    }
+
+    if (normalizedStatus === "reverted") {
+      milestones.push({
+        key: "reverted",
+        label: t("timeline.reverted.label"),
+        tone: "success",
+        badgeLabel: t("timeline.reverted.badge"),
+        timestamp: revertCompletedTimestamp,
+        description: t("timeline.reverted.description"),
       });
     }
 
@@ -2992,11 +3091,11 @@ const filteredPreviews = useMemo(() => {
           --pp-card: #ffffff;
           --pp-border: #e5e7eb;
         }
-        
+
         .Polaris-Page { background-color: var(--pp-bg); }
         .Polaris-Card { border: 1px solid var(--pp-border) !important; background-color: var(--pp-card) !important; color: var(--pp-text) !important; }
         .Polaris-Text--headingLg { color: var(--pp-text); font-weight: 700; }
-        
+
         .Polaris-Button--toneSuccess.Polaris-Button--variantPrimary { background: var(--pp-success) !important; }
         .Polaris-Button--toneCritical.Polaris-Button--variantPrimary { background: var(--pp-danger) !important; }
 
@@ -3354,7 +3453,7 @@ const filteredPreviews = useMemo(() => {
               {/* Dashboard Top Row */}
               <Grid>
                 {/* 1. RECENT ACTIVITY CARD */}
-                <Grid.Cell columnSpan={{ xs: 12, sm: 12, md: 8, lg: 8, xl: 8 }}>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 4, lg: 4, xl: 4 }}>
                   <Card>
                     <BlockStack gap="200">
                       <InlineStack align="space-between" blockAlign="center">
@@ -3408,7 +3507,7 @@ const filteredPreviews = useMemo(() => {
                                     : c.status === "partial"
                                       ? "attention"
                                       : c.status === "closed"
-                                        ? "subdued"
+                                        ? undefined
                                         : "info";
                               return (
                                 <div key={c.campaignId}>
@@ -3467,7 +3566,7 @@ const filteredPreviews = useMemo(() => {
                 </Grid.Cell>
 
                 {/* 2. QUICK ACTIONS CARD */}
-                <Grid.Cell columnSpan={{ xs: 12, sm: 12, md: 4, lg: 4, xl: 4 }}>
+                <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 2, lg: 2, xl: 2 }}>
                   <Card>
                     <BlockStack gap="200">
                       <div
@@ -3570,7 +3669,7 @@ const filteredPreviews = useMemo(() => {
                       padding: "16px 20px",
                     }}
                   >
-                    <BlockStack gap="250">
+                    <BlockStack gap="200">
                       {/* Top Info Header Line */}
                       <InlineStack
                         align="space-between"
@@ -3715,7 +3814,7 @@ const filteredPreviews = useMemo(() => {
 
 
 <Card padding="300">
-  <BlockStack gap="250">
+  <BlockStack gap="200">
     {/* Clean, low-profile header row */}
     <InlineStack align="space-between" blockAlign="center">
       <Text as="h3" variant="headingSm" fontWeight="semibold" tone="subdued">
@@ -3724,9 +3823,9 @@ const filteredPreviews = useMemo(() => {
     </InlineStack>
 
     {/* Anchored Control Bar with a subtle background to pop on the screen */}
-    <Box 
-      background="bg-surface-secondary" 
-      padding="300" 
+    <Box
+      background="bg-surface-secondary"
+      padding="300"
       borderRadius="200"
     >
       <InlineStack
@@ -3868,7 +3967,7 @@ const filteredPreviews = useMemo(() => {
                     <Card>
   <Box padding="400">
     <BlockStack gap="300">
-      
+
       {/* Header Summary Metadata Row */}
       <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
         <Text as="h3" variant="headingSm" fontWeight="semibold">
@@ -3878,7 +3977,7 @@ const filteredPreviews = useMemo(() => {
           {(() => {
             const productCount = Number(previewImpactSummary.totalCount ?? 0);
             const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
-            
+
             if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
               return t("dashboard.previewSummary.basedOnProductsVariants")
                 .replace("{count}", String(productCount))
@@ -3898,21 +3997,20 @@ const filteredPreviews = useMemo(() => {
           padding="300"
           background="bg-surface-secondary"
           borderRadius="200"
-          textAlign="center"
         >
-          <Text as="p" variant="bodySm" tone="subdued">
+          <Text as="p" variant="bodySm" tone="subdued" alignment="center">
             {t("dashboard.previewSummary.noChanges")}
           </Text>
         </Box>
       ) : (
         /* Pure Flexbox Grid: 100% immune to Polaris appendChild lifecycle errors */
-        <div style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
           gap: '12px',
-          width: '100%' 
+          width: '100%'
         }}>
-          
+
           {/* Card 1: Products Affected */}
           <div style={{ flex: '1 1 180px', minWidth: '0' }}>
             <Box
@@ -3938,19 +4036,19 @@ const filteredPreviews = useMemo(() => {
           <div style={{ flex: '1 1 180px', minWidth: '0' }}>
             <Box
               padding="300"
-              background={previewImpactSummary.averageDelta >= 0 ? "bg-surface-success-subdued" : "bg-surface-critical-subdued"}
+              background={previewImpactSummary.averageDelta >= 0 ? "bg-surface-success" : "bg-surface-critical"}
               borderRadius="200"
               borderStyle="solid"
               borderWidth="025"
-              borderColor={previewImpactSummary.averageDelta >= 0 ? "border-success-subdued" : "border-critical-subdued"}
+              borderColor={previewImpactSummary.averageDelta >= 0 ? "border-success" : "border-critical"}
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
                   {t("dashboard.previewSummary.averageChange")}
                 </Text>
-                <Text 
-                  as="p" 
-                  variant="headingMd" 
+                <Text
+                  as="p"
+                  variant="headingMd"
                   fontWeight="bold"
                   tone={previewImpactSummary.averageDelta >= 0 ? "success" : "critical"}
                 >
@@ -3964,18 +4062,18 @@ const filteredPreviews = useMemo(() => {
           <div style={{ flex: '1 1 180px', minWidth: '0' }}>
             <Box
               padding="300"
-              background={previewImpactSummary.hasIncrease ? "bg-surface-success-subdued" : "bg-surface-secondary"}
+              background={previewImpactSummary.hasIncrease ? "bg-surface-success" : "bg-surface-secondary"}
               borderRadius="200"
               borderStyle="solid"
               borderWidth="025"
-              borderColor={previewImpactSummary.hasIncrease ? "border-success-subdued" : "border-secondary"}
+              borderColor={previewImpactSummary.hasIncrease ? "border-success" : "border-secondary"}
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
                   {t("dashboard.previewSummary.largestIncrease")}
                 </Text>
-                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasIncrease ? "success" : "default"}>
-                  {previewImpactSummary.hasIncrease 
+                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasIncrease ? "success" : undefined}>
+                  {previewImpactSummary.hasIncrease
                     ? `+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`
                     : "—"
                   }
@@ -3988,18 +4086,18 @@ const filteredPreviews = useMemo(() => {
           <div style={{ flex: '1 1 180px', minWidth: '0' }}>
             <Box
               padding="300"
-              background={previewImpactSummary.hasDecrease ? "bg-surface-critical-subdued" : "bg-surface-secondary"}
+              background={previewImpactSummary.hasDecrease ? "bg-surface-critical" : "bg-surface-secondary"}
               borderRadius="200"
               borderStyle="solid"
               borderWidth="025"
-              borderColor={previewImpactSummary.hasDecrease ? "border-critical-subdued" : "border-secondary"}
+              borderColor={previewImpactSummary.hasDecrease ? "border-critical" : "border-secondary"}
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
                   {t("dashboard.previewSummary.largestDecrease")}
                 </Text>
-                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasDecrease ? "critical" : "default"}>
-                  {previewImpactSummary.hasDecrease 
+                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasDecrease ? "critical" : undefined}>
+                  {previewImpactSummary.hasDecrease
                     ? formatMoney(previewImpactSummary.maxDecreaseDelta, currencyCode)
                     : "—"
                   }
@@ -4027,13 +4125,13 @@ const filteredPreviews = useMemo(() => {
                     {formatMoney(previewImpactSummary.averageFinalPrice, currencyCode)}
                   </Text>
                   {previewImpactSummary.safeguardAdjustedCount > 0 && (
-                    <Box 
-                      background="bg-surface-warning-subdued" 
-                      paddingInline="150" 
-                      paddingBlock="050" 
+                    <Box
+                      background="bg-surface-warning"
+                      paddingInline="150"
+                      paddingBlock="050"
                       borderRadius="100"
                     >
-                      <Text as="span" variant="bodyXs" fontWeight="semibold" tone="warning">
+                      <Text as="span" variant="bodyXs" fontWeight="semibold" tone="caution">
                         {`${previewImpactSummary.safeguardAdjustedCount} ${t("dashboard.previewSummary.locked")}`}
                       </Text>
                     </Box>
@@ -4086,7 +4184,6 @@ const filteredPreviews = useMemo(() => {
                             {/* Premium High-Contrast Apply Selected Button */}
                             <div
                               style={{
-                                /* Safely wraps the native component with a professional theme without breaking DOM rendering */
                                 backgroundColor:
                                   selectedPreviewItems.length > 0
                                     ? "rgba(10, 128, 93, 0.12)"
@@ -4099,16 +4196,8 @@ const filteredPreviews = useMemo(() => {
                             >
                               <Button
                                 size="slim"
-                                variant={
-                                  selectedPreviewItems.length > 0
-                                    ? "mono"
-                                    : "secondary"
-                                }
-                                icon={
-                                  typeof CheckIcon !== "undefined"
-                                    ? CheckIcon
-                                    : undefined
-                                }
+                                variant="secondary"
+                                icon={CheckIcon}
                                 onClick={() =>
                                   openImmediateApplyModal("selected")
                                 }
@@ -4119,20 +4208,7 @@ const filteredPreviews = useMemo(() => {
                                   selectedPreviewItems.length === 0
                                 }
                               >
-                                <span
-                                  style={{
-                                    color:
-                                      selectedPreviewItems.length > 0
-                                        ? "#0a805d"
-                                        : "inherit",
-                                    fontWeight:
-                                      selectedPreviewItems.length > 0
-                                        ? "600"
-                                        : "400",
-                                  }}
-                                >
-                                  {t("dashboard.actionBar.applySelected").replace("{count}", String(selectedPreviewItems.length))}
-                                </span>
+                                {t("dashboard.actionBar.applySelected").replace("{count}", String(selectedPreviewItems.length))}
                               </Button>
                             </div>
 
@@ -4141,14 +4217,7 @@ const filteredPreviews = useMemo(() => {
                             <Button
                               variant="primary"
                               size="slim"
-                              /* Safely checks for standard icons or falls back to undefined if not imported */
-                              icon={
-                                typeof PlayIcon !== "undefined"
-                                  ? PlayIcon
-                                  : typeof ExportIcon !== "undefined"
-                                    ? ExportIcon
-                                    : undefined
-                              }
+                              icon={PlayIcon}
                               onClick={() => openImmediateApplyModal("all")}
                               disabled={
                                 !hasActivePlan ||
@@ -4637,8 +4706,8 @@ const filteredPreviews = useMemo(() => {
             <Box>
               <BlockStack gap="0" inlineAlign="start">
                 <Text as="span" variant="bodyMd" tone="subdued">
-                  {p.inventory !== undefined && p.inventory !== null
-                    ? p.inventory
+                  {(p.inventory ?? p.inventoryQuantity) !== undefined && (p.inventory ?? p.inventoryQuantity) !== null
+                    ? String(p.inventory ?? p.inventoryQuantity)
                     : "—"}
                 </Text>
               </BlockStack>
@@ -4862,7 +4931,7 @@ const filteredPreviews = useMemo(() => {
          }}
          onDirtyChange={setIsImmediateApplyDirty}
        />
-       
+
         )}
 
         {shopify && (
@@ -4886,6 +4955,7 @@ const filteredPreviews = useMemo(() => {
 
         <Modal
           open={campaignDetailOpen}
+          size="large"
           onClose={() => {
             setCampaignDetailOpen(false);
             setCampaignDetail(null);
@@ -5458,6 +5528,7 @@ const filteredPreviews = useMemo(() => {
         </Modal>
         <Modal
           open={revertPreviewOpen}
+          size="large"
           onClose={() => {
             if (isProcessing) return;
             setRevertPreviewOpen(false);
@@ -5700,7 +5771,6 @@ const filteredPreviews = useMemo(() => {
                         <div
                           style={{
                             fontVariantNumeric: "tabular-nums",
-                            whiteSpace: "nowrap",
                           }}
                         >
                           <Text
@@ -5715,7 +5785,6 @@ const filteredPreviews = useMemo(() => {
                         <div
                           style={{
                             fontVariantNumeric: "tabular-nums",
-                            whiteSpace: "nowrap",
                           }}
                         >
                           <Text

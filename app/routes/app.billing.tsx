@@ -105,7 +105,7 @@ export default function BillingPage() {
   const billingHealthTone = billingHealth === "active" ? ("success" as const) : ("critical" as const);
 
   const testBillingValue = useMemo(() => {
-    return "Yes";
+    return t("common.yes");
   }, []);
 
   const toggleDiagnostics = useCallback(() => {
@@ -119,32 +119,32 @@ export default function BillingPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Subscription Overview
+                {t("billing.page.subscriptionOverview")}
               </Text>
               <Divider />
               <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, columnGap: 16 }}>
                 <Text as="p" tone="subdued">
-                  Shop
+                  {t("billing.page.shop")}
                 </Text>
                 <Text as="p">{data.shop}</Text>
 
                 <Text as="p" tone="subdued">
-                  Plan
+                  {t("billing.page.plan")}
                 </Text>
                 <Text as="p">{data.subscription?.plan ?? "—"}</Text>
 
                 <Text as="p" tone="subdued">
-                  Status
+                  {t("billing.page.status")}
                 </Text>
                 <Text as="p">{data.subscription?.status ?? "—"}</Text>
 
                 <Text as="p" tone="subdued">
-                  Activated At
+                  {t("billing.page.activatedAt")}
                 </Text>
                 <Text as="p">{formatDateTime(data.subscription?.createdAt ?? null)}</Text>
 
                 <Text as="p" tone="subdued">
-                  Test Billing
+                  {t("billing.page.testBilling")}
                 </Text>
                 <Text as="p">{testBillingValue}</Text>
               </div>
@@ -156,14 +156,14 @@ export default function BillingPage() {
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
-                    Billing Health
+                    {t("billing.page.healthTitle")}
                   </Text>
                   <InlineStack gap="200" blockAlign="center">
-                    <Badge tone={billingHealthTone}>{billingHealth === "active" ? "Active" : "Inactive"}</Badge>
+                    <Badge tone={billingHealthTone}>{billingHealth === "active" ? t("billing.page.healthActive") : t("billing.page.healthInactive")}</Badge>
                     <Text as="p" tone="subdued">
                       {billingHealth === "active"
-                        ? "Subscription is present and the shop is installed."
-                        : "Subscription is missing, inactive, or the shop is uninstalled."}
+                        ? t("billing.page.healthActiveDesc")
+                        : t("billing.page.healthInactiveDesc")}
                     </Text>
                   </InlineStack>
                 </BlockStack>
@@ -174,23 +174,23 @@ export default function BillingPage() {
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
-                    Shop Lifecycle
+                    {t("billing.page.lifecycleTitle")}
                   </Text>
                   <InlineStack gap="200" blockAlign="center">
-                    <Badge tone={installed ? "success" : "critical"}>{installed ? "Installed" : "Uninstalled"}</Badge>
+                    <Badge tone={installed ? "success" : "critical"}>{installed ? t("billing.page.lifecycleInstalled") : t("billing.page.lifecycleUninstalled")}</Badge>
                     <Text as="p" tone="subdued">
-                      {installed ? "App is currently installed." : "App is currently uninstalled."}
+                      {installed ? t("billing.page.lifecycleInstalledDesc") : t("billing.page.lifecycleUninstalledDesc")}
                     </Text>
                   </InlineStack>
                   <Divider />
                   <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, columnGap: 16 }}>
                     <Text as="p" tone="subdued">
-                      Installed At
+                      {t("billing.page.installedAt")}
                     </Text>
                     <Text as="p">{formatDateTime(data.shopLifecycle?.installedAt ?? null)}</Text>
 
                     <Text as="p" tone="subdued">
-                      Uninstalled At
+                      {t("billing.page.uninstalledAt")}
                     </Text>
                     <Text as="p">{formatDateTime(data.shopLifecycle?.uninstalledAt ?? null)}</Text>
                   </div>
@@ -203,37 +203,37 @@ export default function BillingPage() {
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center" wrap>
                 <Text as="h2" variant="headingMd">
-                  Billing Diagnostics
+                  {t("billing.page.diagnosticsTitle")}
                 </Text>
                 <Button variant="tertiary" onClick={toggleDiagnostics} disclosure={diagnosticsOpen ? "up" : "down"}>
-                  {diagnosticsOpen ? "Hide" : "Show"}
+                  {diagnosticsOpen ? t("billing.page.hide") : t("billing.page.show")}
                 </Button>
               </InlineStack>
               <Collapsible open={diagnosticsOpen} id="billing-diagnostics" transition={{ duration: "150ms", timingFunction: "ease" }}>
                 <Box paddingBlockStart="300">
                   <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, columnGap: 16 }}>
                     <Text as="p" tone="subdued">
-                      Subscription ID
+                      {t("billing.page.subscriptionId")}
                     </Text>
                     <Text as="p">{data.subscription?.id ?? "—"}</Text>
 
                     <Text as="p" tone="subdued">
-                      Charge ID
+                      {t("billing.page.chargeId")}
                     </Text>
                     <Text as="p">{data.subscription?.chargeId ?? "—"}</Text>
 
                     <Text as="p" tone="subdued">
-                      Activated At
+                      {t("billing.page.activatedAt")}
                     </Text>
                     <Text as="p">{formatDateTime(data.subscription?.createdAt ?? null)}</Text>
 
                     <Text as="p" tone="subdued">
-                      Updated At
+                      {t("billing.page.updatedAt")}
                     </Text>
                     <Text as="p">{formatDateTime(data.subscription?.updatedAt ?? null)}</Text>
 
                     <Text as="p" tone="subdued">
-                      Test Billing
+                      {t("billing.page.testBilling")}
                     </Text>
                     <Text as="p">{testBillingValue}</Text>
                   </div>
@@ -245,14 +245,14 @@ export default function BillingPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Future
+                {t("billing.page.futureTitle")}
               </Text>
               <Text as="p" tone="subdued">
-                Upgrade flows and plan management will be added in a future release.
+                {t("billing.page.futureDesc")}
               </Text>
               <InlineStack gap="200" blockAlign="center" wrap>
                 <Button variant="primary" disabled>
-                  Upgrade Plan
+                  {t("billing.page.upgradePlan")}
                 </Button>
                 <Badge tone="info">{t("common.status.comingSoon")}</Badge>
               </InlineStack>
