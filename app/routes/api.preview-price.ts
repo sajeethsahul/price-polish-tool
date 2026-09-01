@@ -44,59 +44,130 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           ? Math.abs(markupPercent)
           : (rule?.adjustmentValue ?? 0);
 
-        const response = await admin.graphql(`
-        {
-          products(first: 250) {
-            nodes {
-              id
-              title
-              status
-              productType 
-              vendor      
-              featuredImage {
-                url
-              }
-              variants(first: 1) {
-                nodes {
-                  id
-                  title
-                  sku
-                  price
-                  compareAtPrice
-                  inventoryQuantity
-                }
-              }
+        const MAX_PAGES = 20;
+        const PAGE_SIZE = 100;
+        const TIMEOUT_MS = 25000;
+
+        let cursor: string | null = null;
+        let hasNextPage = true;
+        let pageCount = 0;
+        let truncated = false;
+        const allProducts: any[] = [];
+        let totalCount = 0;
+
+        while (hasNextPage && pageCount < MAX_PAGES) {
+            if (Date.now() - previewStartMs > TIMEOUT_MS) {
+                console.warn("[PREVIEW] preview.timeout.warning", {
+                    shop,
+                    pageCount,
+                    totalFetched: allProducts.length,
+                    durationMs: Date.now() - previewStartMs,
+                    reason: "Hard timeout guard (25s) reached",
+                });
+                truncated = true;
+                break;
             }
-          }
-          productsCount {
-            count
-          }
+
+            pageCount++;
+
+            const response = await admin.graphql(
+                `query GetPreviewProducts($cursor: String) {
+                  products(first: ${PAGE_SIZE}, after: $cursor) {
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                    nodes {
+                      id
+                      title
+                      status
+                      productType
+                      vendor
+                      featuredImage {
+                        url
+                      }
+                      variants(first: 100) {
+                        nodes {
+                          id
+                          title
+                          sku
+                          price
+                          compareAtPrice
+                          inventoryQuantity
+                        }
+                      }
+                    }
+                  }
+                  productsCount {
+                    count
+                  }
+                }`,
+                {
+                    variables: {
+                        cursor,
+                    },
+                }
+            );
+
+            const data: any = await response.json();
+
+            if (data.errors) {
+                console.error("[PREVIEW] preview.graphql.error", { shop, errors: data.errors });
+            }
+
+            if (totalCount === 0 && data?.data?.productsCount?.count != null) {
+                totalCount = data.data.productsCount.count;
+            }
+
+            const pageNodes = data?.data?.products?.nodes || [];
+            allProducts.push(...pageNodes);
+
+            const pageInfo = data?.data?.products?.pageInfo;
+            hasNextPage = pageInfo?.hasNextPage ?? false;
+            cursor = pageInfo?.endCursor ?? null;
+
+            if (!hasNextPage || !cursor) {
+                break;
+            }
+
+            if (pageCount >= MAX_PAGES && hasNextPage) {
+                console.warn("[PREVIEW] preview.page_limit.warning", {
+                    shop,
+                    pageCount,
+                    totalFetched: allProducts.length,
+                    reason: "Max 20 pages reached (2,000 products cap)",
+                });
+                truncated = true;
+                break;
+            }
         }
-      `);
 
-        const data: any = await response.json();
+        const totalFetched = allProducts.length;
 
-        if (data.errors) {
-            console.error("[PREVIEW] preview.graphql.error", { shop, errors: data.errors });
+        if (totalCount > 0 && totalFetched === 0) {
+            console.warn("[PREVIEW] preview.access.warning", { shop, totalCount, accessibleCount: totalFetched, reason: "products exist but are not accessible to this app" });
         }
 
-        const totalCount = data?.data?.productsCount?.count ?? 0;
-        const nodes = data?.data?.products?.nodes || [];
-
-        if (totalCount > 0 && nodes.length === 0) {
-            console.warn("[PREVIEW] preview.access.warning", { shop, totalCount, accessibleCount: nodes.length, reason: "products exist but are not accessible to this app" });
-        }
-
-        // ✅ REPLACED: Promise.all with N+1 queries. 
+        // ✅ REPLACED: Promise.all with N+1 queries.
         // 🚀 OPTIMIZATION: Fetch history in bulk
-        const variantIds = nodes
-            .map((p: any) => p.variants.nodes[0]?.id)
-            .filter(Boolean);
+        const variantIds: string[] = [];
+        for (const product of allProducts) {
+            const variantNodes = product?.variants?.nodes || [];
+            for (const variant of variantNodes) {
+                if (variant?.id) {
+                    variantIds.push(variant.id);
+                }
+            }
+        }
 
-        const histories = await prisma.priceHistory.findMany({
-            where: { variantId: { in: variantIds }, shop },
-            orderBy: { createdAt: "desc" },
-        });
+        const uniqueVariantIds = Array.from(new Set(variantIds));
+
+        const histories = uniqueVariantIds.length > 0
+            ? await prisma.priceHistory.findMany({
+                where: { variantId: { in: uniqueVariantIds }, shop },
+                orderBy: { createdAt: "desc" },
+            })
+            : [];
 
         // Create a map for the LATEST history per variant
         const latestHistoryMap: Record<string, any> = {};
@@ -111,55 +182,59 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             orderBy: { createdAt: "desc" },
         });
 
-        const previews: PricingPreviewItem[] = nodes.map((product: any) => {
-            const variant = product.variants.nodes[0];
-            const variantId = variant?.id || "";
-            const currentPrice = parseFloat(variant?.price ?? "0");
-            const compareAtPrice = Number(variant?.compareAtPrice ?? NaN);
+        const previews: PricingPreviewItem[] = [];
 
-            const history = latestHistoryMap[variantId];
-            const historyOld = history ? parseFloat(String(history.oldPrice)) : NaN;
-            const historyNew = history ? parseFloat(String(history.newPrice)) : NaN;
+        for (const product of allProducts) {
+            const variantNodes = product?.variants?.nodes || [];
+            for (const variant of variantNodes) {
+                const variantId = variant?.id || "";
+                const currentPrice = parseFloat(variant?.price ?? "0");
+                const compareAtPrice = Number(variant?.compareAtPrice ?? NaN);
 
-            // Baseline rules:
-            // - Normal (rule-based) applies keep using the prior baseline (history.oldPrice) to avoid compounding.
-            // - Manual applies become the NEW storefront baseline once Shopify reflects the manual value.
-            const basePrice =
-                history &&
-                history.isManual === true &&
-                isFinite(historyNew) &&
-                currentPrice === historyNew
-                    ? currentPrice
-                    : (isFinite(historyOld) ? historyOld : currentPrice);
+                const history = latestHistoryMap[variantId];
+                const historyOld = history ? parseFloat(String(history.oldPrice)) : NaN;
+                const historyNew = history ? parseFloat(String(history.newPrice)) : NaN;
 
-            const newPrice = calculatePrice(basePrice, {
-                adjustmentType,
-                adjustmentDirection,
-                adjustmentValue,
-                endingOption,
-                roundingPrecision,
-                minPrice,
-                maxPrice,
-            });
+                // Baseline rules:
+                // - Normal (rule-based) applies keep using the prior baseline (history.oldPrice) to avoid compounding.
+                // - Manual applies become the NEW storefront baseline once Shopify reflects the manual value.
+                const basePrice =
+                    history &&
+                    history.isManual === true &&
+                    isFinite(historyNew) &&
+                    currentPrice === historyNew
+                        ? currentPrice
+                        : (isFinite(historyOld) ? historyOld : currentPrice);
 
-            return {
-                productId: product.id,
-                title: product.title,
-                variantTitle: variant?.title ?? "",
-                sku: variant?.sku ?? null,
-                image: product.featuredImage?.url ?? "",
-                variantId: variantId,
-                oldPrice: currentPrice.toFixed(2),
-                newPrice: newPrice.toFixed(2),
-                originalBasePrice: basePrice.toFixed(2),
-                compareAtPrice: Number.isFinite(compareAtPrice) ? compareAtPrice.toFixed(2) : null,
-                storefrontVariantPrice: currentPrice.toFixed(2),
-                originalVariantPrice: basePrice.toFixed(2),
-                productType: product.productType ?? "",
-                vendor: product.vendor ?? "",
-                inventoryQuantity: variant?.inventoryQuantity ?? 0,
-            };
-        });
+                const newPrice = calculatePrice(basePrice, {
+                    adjustmentType,
+                    adjustmentDirection,
+                    adjustmentValue,
+                    endingOption,
+                    roundingPrecision,
+                    minPrice,
+                    maxPrice,
+                });
+
+                previews.push({
+                    productId: product.id,
+                    title: product.title,
+                    variantTitle: variant?.title ?? "",
+                    sku: variant?.sku ?? null,
+                    image: product.featuredImage?.url ?? "",
+                    variantId: variantId,
+                    oldPrice: currentPrice.toFixed(2),
+                    newPrice: newPrice.toFixed(2),
+                    originalBasePrice: basePrice.toFixed(2),
+                    compareAtPrice: Number.isFinite(compareAtPrice) ? compareAtPrice.toFixed(2) : null,
+                    storefrontVariantPrice: currentPrice.toFixed(2),
+                    originalVariantPrice: basePrice.toFixed(2),
+                    productType: product.productType ?? "",
+                    vendor: product.vendor ?? "",
+                    inventoryQuantity: variant?.inventoryQuantity ?? 0,
+                });
+            }
+        }
 
         // ruleExists: true only when a real PricingRule DB row exists for this shop
         // (previews are always returned using defaults if no rule exists)
@@ -180,10 +255,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           });
         }
 
-        console.log("[PREVIEW] preview.completed", { shop, productCount: previews.length, ruleExists, durationMs: Date.now() - previewStartMs });
+        console.log("[PREVIEW] preview.completed", {
+            shop,
+            totalFetched,
+            truncated,
+            productCount: previews.length,
+            ruleExists,
+            durationMs: Date.now() - previewStartMs,
+        });
 
         return cors(new Response(JSON.stringify({
             previews,
+            truncated,
+            totalFetched,
             markupPercent,
             roundingStep,
             charmPricing,
