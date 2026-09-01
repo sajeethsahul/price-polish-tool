@@ -75,6 +75,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         productId: item.productId ?? null,
         variantId: item.variantId,
         oldPrice: parseFloat(item.oldPrice),
+        oldCompareAtPrice: item.compareAtPrice
+          ? parseFloat(String(item.compareAtPrice))
+          : null,
         newPrice: parseFloat(item.newPrice),
         isManual: item.isManual || false,
         batchId,

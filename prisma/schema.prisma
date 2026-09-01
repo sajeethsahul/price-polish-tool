@@ -84,6 +84,7 @@ model PriceHistory {
   shop                String
   variantId           String
   oldPrice            Float
+  oldCompareAtPrice   Float?    // compare-at price before campaign ran
   newPrice            Float
   batchId             String
   createdAt           DateTime  @default(now())

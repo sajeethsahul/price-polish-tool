@@ -1,12 +1,15 @@
 import prisma from "../db.server";
 
-type HistoryRecord = {
+export type HistoryRecord = {
   id: string;
   variantId: string;
   oldPrice: number;
+  newPrice?: number | null;
+  productId?: string | null;
+  oldCompareAtPrice?: number | null;
 };
 
-type RevertResultRow = {
+export type RevertResultRow = {
   id: string;
   variantId: string;
   success: boolean;
@@ -14,7 +17,7 @@ type RevertResultRow = {
   unrecoverableReason?: string;
 };
 
-type RevertCampaignPricesOptions = {
+export type RevertCampaignPricesOptions = {
   admin: any;
   shop: string;
   campaignId?: string;
@@ -33,6 +36,101 @@ export type RevertCampaignPricesResult = {
   results: RevertResultRow[];
   message: string | null;
 };
+
+export function decideRestore(
+  oldPrice: number,
+  campaignPrice: number | null,
+  currentPrice: number,
+): { action: "restore" | "skip" | "flag"; reason?: string } {
+  const tolerance = 0.01;
+
+  // If we don't know what campaign wrote, fall back safely
+  if (campaignPrice === null) {
+    return { action: "restore", reason: "no_campaign_price_fallback" };
+  }
+
+  // Current price matches what campaign wrote — safe to restore
+  if (Math.abs(currentPrice - campaignPrice) <= tolerance) {
+    return { action: "restore" };
+  }
+
+  // Current price already matches old price — already at target
+  if (Math.abs(currentPrice - oldPrice) <= tolerance) {
+    return { action: "skip", reason: "already_at_target" };
+  }
+
+  // Price differs from both — external change detected
+  return {
+    action: "flag",
+    reason: `drift_detected: expected ${campaignPrice}, found ${currentPrice}`,
+  };
+}
+
+type LiveVariantPrice = {
+  price: number;
+  compareAtPrice: number | null;
+  productId?: string | null;
+};
+
+async function fetchLiveVariantPrices(
+  admin: any,
+  variantGids: string[],
+): Promise<Map<string, LiveVariantPrice>> {
+  const priceMap = new Map<string, LiveVariantPrice>();
+  const BATCH_SIZE = 50;
+
+  for (let i = 0; i < variantGids.length; i += BATCH_SIZE) {
+    const batch = variantGids.slice(i, i + BATCH_SIZE);
+    try {
+      const response = await admin.graphql(
+        `query GetCurrentVariantPrices($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on ProductVariant {
+              id
+              price
+              compareAtPrice
+              product {
+                id
+              }
+            }
+          }
+        }`,
+        {
+          variables: { ids: batch },
+        }
+      );
+
+      const data: any = await response.json();
+      const nodes = data?.data?.nodes ?? [];
+
+      for (const node of nodes) {
+        if (!node || !node.id) continue;
+        const parsedPrice = node.price != null ? parseFloat(String(node.price)) : NaN;
+        const parsedCompareAt =
+          node.compareAtPrice != null && node.compareAtPrice !== ""
+            ? parseFloat(String(node.compareAtPrice))
+            : null;
+
+        if (!Number.isNaN(parsedPrice)) {
+          const info: LiveVariantPrice = {
+            price: parsedPrice,
+            compareAtPrice: Number.isNaN(parsedCompareAt) ? null : parsedCompareAt,
+            productId: node.product?.id ?? null,
+          };
+          priceMap.set(node.id, info);
+          priceMap.set(toVariantGid(node.id), info);
+        }
+      }
+    } catch (error: any) {
+      console.warn(
+        `[REVERT] ⚠️ Failed to fetch live prices batch (${batch.length} variants), falling back to Level 1 behavior:`,
+        error?.message || error
+      );
+    }
+  }
+
+  return priceMap;
+}
 
 function classifyUnrecoverableReason(message: unknown): string | null {
   const normalized = typeof message === "string" ? message.toLowerCase() : "";
@@ -114,6 +212,9 @@ export async function revertCampaignPrices({
       id: true,
       variantId: true,
       oldPrice: true,
+      newPrice: true,
+      productId: true,
+      oldCompareAtPrice: true,
     },
   });
 
@@ -145,9 +246,20 @@ export async function revertCampaignPrices({
     throw new Error(useCampaignPath ? "No history found for this campaign" : "No history found for this batch");
   }
 
+  // Pre-fetch live Shopify prices for drift detection and compareAtPrice restore
+  const uniqueVariantGids = Array.from(
+    new Set(history.map((record) => toVariantGid(record.variantId)))
+  );
+  const livePricesMap = await fetchLiveVariantPrices(admin, uniqueVariantGids);
+
   const mutation = `
     mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
       productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        productVariants {
+          id
+          price
+          compareAtPrice
+        }
         userErrors {
           field
           message
@@ -159,19 +271,77 @@ export async function revertCampaignPrices({
   const results: RevertResultRow[] = [];
 
   for (const record of history as HistoryRecord[]) {
+    const variantGid = toVariantGid(record.variantId);
+    const liveVariant = livePricesMap.get(variantGid);
+
+    let currentPrice: number;
+    let fallbackToLevel1 = false;
+
+    if (!liveVariant || Number.isNaN(liveVariant.price)) {
+      console.warn(
+        `[REVERT] ⚠️ Live price not found for variant ${record.variantId} (${variantGid}), falling back to Level 1 restore behavior`
+      );
+      fallbackToLevel1 = true;
+      currentPrice = record.oldPrice;
+    } else {
+      currentPrice = liveVariant.price;
+    }
+
+    const campaignPrice =
+      record.newPrice != null && Number.isFinite(record.newPrice)
+        ? Number(record.newPrice)
+        : null;
+
+    const decision = fallbackToLevel1
+      ? { action: "restore" as const, reason: "live_price_fetch_fallback" }
+      : decideRestore(record.oldPrice, campaignPrice, currentPrice);
+
+    console.log("[REVERT] variant decision", {
+      variantId: record.variantId,
+      action: decision.action,
+      reason: decision.reason,
+      oldPrice: record.oldPrice,
+      campaignPrice,
+      currentPrice: fallbackToLevel1 ? null : currentPrice,
+    });
+
+    if (decision.action === "skip") {
+      results.push({
+        id: record.id,
+        variantId: record.variantId,
+        success: true,
+      });
+      continue;
+    }
+
+    if (decision.action === "flag") {
+      const driftReason = `Price drift detected. Expected ${campaignPrice}, found ${currentPrice}. Manual review required.`;
+      results.push({
+        id: record.id,
+        variantId: record.variantId,
+        success: false,
+        error: driftReason,
+      });
+      continue;
+    }
+
+    // action is "restore"
     try {
-      const variantQuery = await admin.graphql(`
-        {
-          productVariant(id: "${toVariantGid(record.variantId)}") {
-            product {
-              id
+      let productId = record.productId || liveVariant?.productId;
+      if (!productId) {
+        const variantQuery = await admin.graphql(`
+          {
+            productVariant(id: "${variantGid}") {
+              product {
+                id
+              }
             }
           }
-        }
-      `);
+        `);
 
-      const variantData = await variantQuery.json();
-      const productId = variantData.data.productVariant?.product?.id;
+        const variantData = await variantQuery.json();
+        productId = variantData?.data?.productVariant?.product?.id;
+      }
 
       if (!productId) {
         const reason = "Product resource is no longer accessible";
@@ -185,18 +355,36 @@ export async function revertCampaignPrices({
         continue;
       }
 
+      const hasOldCompareAtPrice =
+        record.oldCompareAtPrice != null &&
+        Number.isFinite(record.oldCompareAtPrice);
+
+      if (!hasOldCompareAtPrice) {
+        console.log("[REVERT] compareAtPrice not available — price only restored");
+      }
+
+      const variantInput: {
+        id: string;
+        price: string;
+        compareAtPrice?: string | null;
+      } = {
+        id: variantGid,
+        price: record.oldPrice.toFixed(2),
+      };
+
+      if (hasOldCompareAtPrice) {
+        variantInput.compareAtPrice = Number(record.oldCompareAtPrice).toFixed(2);
+      }
+
       const response = await admin.graphql(mutation, {
         variables: {
           productId,
-          variants: [{
-            id: toVariantGid(record.variantId),
-            price: record.oldPrice.toFixed(2),
-          }],
+          variants: [variantInput],
         },
       });
 
       const data = await response.json();
-      const userErrors = data.data.productVariantsBulkUpdate.userErrors;
+      const userErrors = data?.data?.productVariantsBulkUpdate?.userErrors;
 
       if (userErrors && userErrors.length > 0) {
         const rawError = userErrors[0].message;
@@ -237,9 +425,10 @@ export async function revertCampaignPrices({
     }
   }
   const unrecoverableHistoryIds = [...unrecoverableByHistoryId.keys()];
-  const failedHistoryIds = results
-    .filter((row) => !row.success && !unrecoverableByHistoryId.has(row.id))
-    .map((row) => row.id);
+  const failedResults = results.filter(
+    (row) => !row.success && !unrecoverableByHistoryId.has(row.id)
+  );
+  const failedHistoryIds = failedResults.map((row) => row.id);
 
   if (successfulHistoryIds.length > 0) {
     await prisma.priceHistory.updateMany({
@@ -247,15 +436,27 @@ export async function revertCampaignPrices({
       data: {
         revertStatus: "reverted",
         revertedAt: new Date(),
+        revertFailureReason: null,
       },
     });
   }
 
-  if (failedHistoryIds.length > 0) {
-    await prisma.priceHistory.updateMany({
-      where: { id: { in: failedHistoryIds } },
-      data: { revertStatus: "failed" },
-    });
+  for (const failedRow of failedResults) {
+    const reason = failedRow.error ?? "Failed to revert price";
+    try {
+      await prisma.priceHistory.update({
+        where: { id: failedRow.id },
+        data: {
+          revertStatus: "failed",
+          revertFailureReason: reason,
+        },
+      });
+    } catch {
+      await prisma.priceHistory.updateMany({
+        where: { id: failedRow.id },
+        data: { revertStatus: "failed" },
+      });
+    }
   }
 
   for (const historyId of unrecoverableHistoryIds) {
@@ -278,9 +479,9 @@ export async function revertCampaignPrices({
     }
   }
 
-  if (campaignId && (successCount > 0 || unrecoverableHistoryIds.length > 0)) {
+  if (campaignId && (successCount > 0 || unrecoverableHistoryIds.length > 0 || failedHistoryIds.length > 0)) {
     const nextCampaignStatus =
-      unrecoverableHistoryIds.length > 0 && failedHistoryIds.length === 0
+      unrecoverableHistoryIds.length > 0 && failedHistoryIds.length === 0 && successCount === 0
         ? "unrecoverable"
         : failCount > 0
           ? "partial"

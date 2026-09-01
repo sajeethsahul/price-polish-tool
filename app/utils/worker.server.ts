@@ -34,6 +34,7 @@ type WorkerPriceItem = {
     productId: string | null;
     stagedPrice: number;
     originalPrice: number;
+    compareAtPrice?: number | null;
     isManual: boolean;
 };
 
@@ -57,6 +58,9 @@ function toWorkerPriceItem(snapshot: ScheduledProductSnapshot): WorkerPriceItem 
             snapshot.originalBasePrice,
             snapshot.oldPrice
         ),
+        compareAtPrice: snapshot.compareAtPrice
+            ? parseFloat(String(snapshot.compareAtPrice))
+            : null,
         isManual: snapshot.isManual === true,
     };
 }
@@ -558,7 +562,7 @@ export function startWorker() {
 
                     // ── STEP 1: Fetch products from snapshot (or fallback) ──
                     let itemsToProcess: WorkerPriceItem[] = [];
-                    
+
                     if (job.products && Array.isArray(job.products) && job.products.length > 0) {
                         console.log(`[Worker] 📚 Job ${jobId} using snapshot products (${job.products.length})`);
                         // Use frozen snapshot from schedule creation
@@ -692,6 +696,9 @@ export function startWorker() {
                                     productId: item.productId,
                                     variantId: item.variantId,
                                     oldPrice: item.originalPrice,
+                                    oldCompareAtPrice: item.compareAtPrice
+                                        ? parseFloat(String(item.compareAtPrice))
+                                        : null,
                                     newPrice: item.stagedPrice,
                                     isManual: item.isManual === true,
                                     batchId,
