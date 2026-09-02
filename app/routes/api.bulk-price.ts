@@ -3,7 +3,6 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
-import { requireActiveBilling } from "../utils/billing-protection.server";
 import { applyLocaleFromSession, t } from "../utils/i18n";
 
 const BATCH_SIZE = 50;
@@ -35,19 +34,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { admin, session } = auth;
   const shop = session.shop;
+
+  const sub = await prisma.subscription.findFirst({
+    where: { shop },
+    select: { status: true },
+  });
+
+  const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+  const isActive = sub && activeStates.includes(sub.status);
+
+  if (!isActive) {
+    return cors(
+      new Response(
+        JSON.stringify({ error: "Subscription required. Restore your subscription to continue." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    );
+  }
+
   applyLocaleFromSession(session);
 
   console.log("[BULK] SESSION", { shop });
-
-  const billingError = await requireActiveBilling(shop);
-  if (billingError) {
-    return cors(
-      new Response(JSON.stringify(billingError), {
-        status: 403,
-        headers: { "Content-Type": "application/json" },
-      })
-    );
-  }
 
   // ================= MAIN LOGIC =================
   try {

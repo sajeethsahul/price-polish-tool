@@ -27,6 +27,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, admin } = auth;
   const shop = session.shop;
   const body = await request.json().catch(() => ({}));
+
+  // EXCEPTION: Restore actions (e.g. stop-window / restore) must NOT be blocked by billing
+  const isRestoreAction = body?.mode === "restore" || body?.action === "stop-window";
+
+  if (!isRestoreAction) {
+    const sub = await prisma.subscription.findFirst({
+      where: { shop },
+      select: { status: true },
+    });
+
+    const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+    const isActive = sub && activeStates.includes(sub.status);
+
+    if (!isActive) {
+      return cors(
+        new Response(
+          JSON.stringify({ error: "Subscription required. Restore your subscription to continue." }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+    }
+  }
+
   const campaignId =
     typeof body?.campaignId === "string" && body.campaignId.length > 0
       ? body.campaignId

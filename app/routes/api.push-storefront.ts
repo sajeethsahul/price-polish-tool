@@ -3,7 +3,6 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
-import { requireActiveBilling } from "../utils/billing-protection.server";
 import { withShopifyRetry } from "../utils/shopify-graphql.server";
 import { applyLocaleFromSession, t } from "../utils/i18n";
 
@@ -31,10 +30,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { session, admin } = auth;
   const shop = session.shop;
-  applyLocaleFromSession(session);
 
-  const billingError = await requireActiveBilling(shop);
-  if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
+  const sub = await prisma.subscription.findFirst({
+    where: { shop },
+    select: { status: true },
+  });
+
+  const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+  const isActive = sub && activeStates.includes(sub.status);
+
+  if (!isActive) {
+    return cors(
+      new Response(
+        JSON.stringify({ error: "Subscription required. Restore your subscription to continue." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    );
+  }
+
+  applyLocaleFromSession(session);
 
   let activeJobId: string | undefined;
 
@@ -62,7 +79,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         : null;
 
 
-    
+
 
     // ============================
     // 🛑 STOP LIVE (REVERT)
@@ -348,6 +365,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             productId: item.productId,
             variantId: item.variantId,
             oldPrice: item.originalPrice,
+            oldCompareAtPrice: (item as any).compareAtPrice
+              ? parseFloat(String((item as any).compareAtPrice))
+              : null,
             newPrice: item.stagedPrice,
             isManual: manualVariantIdSet.has(normalizeId(item.variantId)),
             batchId,

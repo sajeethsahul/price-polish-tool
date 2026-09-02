@@ -22,6 +22,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!auth?.session) throw new Response("Unauthorized", { status: 401 });
 
   const shop = auth.session.shop;
+
+  const sub = await prisma.subscription.findFirst({
+    where: { shop },
+    select: { status: true },
+  });
+
+  const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+  const isActive = sub && activeStates.includes(sub.status);
+
+  if (!isActive) {
+    return cors(
+      new Response(
+        JSON.stringify({ error: "Subscription required. Restore your subscription to continue." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      )
+    );
+  }
+
   applyLocaleFromSession(auth.session);
   const body = await request.json().catch(() => ({}));
   const campaignId =

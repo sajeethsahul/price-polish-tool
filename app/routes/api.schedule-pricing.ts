@@ -2,7 +2,6 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { stagePrices } from "../utils/staging.server";
-import { requireActiveBilling } from "../utils/billing-protection.server";
 import type { ScheduledProductSnapshot } from "../types/pricing";
 import { applyLocaleFromSession, t } from "../utils/i18n";
 
@@ -44,10 +43,23 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const { session } = auth;
     const shop = session.shop;
-    applyLocaleFromSession(session);
 
-    const billingError = await requireActiveBilling(shop);
-    if (billingError) return Response.json(billingError, { status: 403 });
+    const sub = await prisma.subscription.findFirst({
+        where: { shop },
+        select: { status: true },
+    });
+
+    const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+    const isActive = sub && activeStates.includes(sub.status);
+
+    if (!isActive) {
+        return Response.json(
+            { error: "Subscription required. Restore your subscription to continue." },
+            { status: 403 }
+        );
+    }
+
+    applyLocaleFromSession(session);
 
     const body = await request.json().catch(() => ({}));
     const { runAt, title } = body;

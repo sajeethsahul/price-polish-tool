@@ -3,7 +3,6 @@ import { authenticate } from "../shopify.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { revertCampaignPrices } from "../utils/revert.server";
-import { requireActiveBilling } from "../utils/billing-protection.server";
 import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -30,9 +29,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { admin, session } = auth;
     const shop = session.shop;
     applyLocaleFromSession(session);
-
-    const billingError = await requireActiveBilling(shop);
-    if (billingError) return cors(new Response(JSON.stringify(billingError), { status: 403, headers: { "Content-Type": "application/json" } }));
 
     console.log("[UNDO] SESSION", { shop });
 

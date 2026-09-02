@@ -224,30 +224,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // This is non-fatal: persistence errors never block the app from loading.
   console.log(`[BILLING RECONCILIATION] shop=${shop}`);
 
-  // Inline extraction — mirrors billing-persistence.server.ts logic without sharing server-only code.
+  // Inline extraction — mirrors billing-status.server.ts logic
   const rawBillingResult = billingResponse as unknown as Record<string, unknown>;
   const billingStatus: BillingStatusValue = normalizeBillingFromResult(rawBillingResult);
 
-  try {
-    const { persistBillingStateFromShopify } = await import(
-      "../utils/billing-persistence.server"
-    );
-    await persistBillingStateFromShopify({
-      shop,
-      billingResult: rawBillingResult,
-      expectedPlanName: "basic",
-      isTest: true,
-    });
-    console.log(`[BILLING RECONCILIATION SYNC] shop=${shop} billingStatus=${billingStatus}`);
-  } catch (err) {
-    console.error(
-      `[BILLING RECONCILIATION ERROR] shop=${shop} error=${
-        err instanceof Error ? err.message : String(err)
-      }`
-    );
-  }
-
-  // ✅ hasActivePlan reflects enforcement gate (always true — no billing gating in this phase).
+  // ✅ hasActivePlan reflects enforcement gate.
   const hasActivePlan = isBillingActive(billingStatus);
 
   // 💱 CURRENCY
