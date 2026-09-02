@@ -2,7 +2,9 @@ import "@shopify/shopify-app-react-router/adapters/node";
 import {
   ApiVersion,
   AppDistribution,
-  shopifyApp,BillingInterval
+  shopifyApp,
+  BillingInterval,
+  DeliveryMethod,
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
@@ -55,6 +57,13 @@ billing: {
       },
     ],
     trialDays: 7,
+  },
+},
+
+webhooks: {
+  APP_SUBSCRIPTIONS_UPDATE: {
+    deliveryMethod: DeliveryMethod.Http,
+    callbackUrl: "/webhooks/app/subscriptions-update",
   },
 },
   // 🔥 REQUIRED for iframe (Render + Shopify)
