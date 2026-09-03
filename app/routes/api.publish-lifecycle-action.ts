@@ -25,10 +25,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const sub = await prisma.subscription.findFirst({
     where: { shop },
-    select: { status: true },
+    select: { status: true, plan: true },
   });
 
-  const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+  const activeStates = ["ACTIVE", "PENDING", "active", "trialing", "free"];
   const isActive = sub && activeStates.includes(sub.status);
 
   if (!isActive) {
@@ -41,6 +41,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       )
     );
+  }
+
+  // Free plan limit check — enforcement pending (post-beta)
+  const plan = sub?.plan ?? "free";
+  if (plan === "free") {
+    console.log("[BILLING] Free plan limit check — enforcement pending", {
+      shop, action: "publish_lifecycle"
+    });
+    // TODO: enforce campaignsPerMonth: 2 limit after beta
   }
 
   applyLocaleFromSession(auth.session);

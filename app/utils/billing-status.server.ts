@@ -5,13 +5,14 @@ import prisma from "../db.server";
 export type BillingStatusValue =
   | "active"
   | "trialing"
+  | "free"
   | "cancelled"
   | "frozen"
   | "expired"
   | "none"
   | "unknown";
 
-const ACTIVE_STATUSES = new Set(["active", "trialing"]);
+const ACTIVE_STATUSES = new Set(["active", "trialing", "free"]);
 
 // ─── Normalization ─────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ export function normalizeBillingStatus(
 
   if (s === "active" || s === "accepted" || s === "approved") return "active";
   if (s === "trialing" || s === "trial") return "trialing";
+  if (s === "free") return "free";
   if (s === "cancelled" || s === "canceled") return "cancelled";
   if (s === "frozen") return "frozen";
   if (s === "expired" || s === "declined" || s === "pending") return "expired";

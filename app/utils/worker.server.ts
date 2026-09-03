@@ -5,6 +5,32 @@ import { isWindowExpired } from "./window-lifecycle";
 import type { ScheduledProductSnapshot } from "../types/pricing";
 import { withShopifyRetry } from "./shopify-graphql.server";
 
+// ─── Subscription & Billing Helper ──────────────────────────────────────────
+
+async function isSubscriptionActive(shop: string): Promise<boolean> {
+  try {
+    const sub = await prisma.subscription.findFirst({
+      where: { shop },
+      select: { status: true, plan: true },
+    });
+    // Active billing states from Shopify:
+    // ACTIVE = paid and active
+    // PENDING = in trial period
+    // "free" = free plan subscription (valid active state)
+    if (!sub) {
+      console.warn("[WORKER] No subscription record found", { shop });
+      return false;
+    }
+    const activeStates = ["ACTIVE", "PENDING", "active", "trialing", "free"];
+    return activeStates.includes(sub.status);
+  } catch (err) {
+    console.error("[WORKER] Billing check failed — defaulting to blocked", {
+      shop, err
+    });
+    return false;
+  }
+}
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 /**
@@ -340,6 +366,26 @@ export function startWorker() {
             await recoverStuckJobs();
             await failTimedOutPublishes();
 
+            // ── Phase 0.5: Recover paused jobs if billing is now active ───────
+            const pausedJobs = await (prisma.scheduledJob as any).findMany({
+                where: { status: "paused-billing-inactive" },
+                select: { id: true, shop: true },
+            });
+
+            for (const paused of pausedJobs) {
+                const isActive = await isSubscriptionActive(paused.shop);
+                if (isActive) {
+                    await (prisma.scheduledJob as any).update({
+                        where: { id: paused.id },
+                        data: { status: "pending" },
+                    });
+                    console.log("[WORKER] Job restored to pending — billing reactivated", {
+                        shop: paused.shop,
+                        jobId: paused.id,
+                    });
+                }
+            }
+
             let restoredWindowCount = 0;
             let expiredWindow: ClaimedJob | null;
             while ((expiredWindow = await claimExpiredWindow()) !== null) {
@@ -459,6 +505,8 @@ export function startWorker() {
             // The while-loop ensures all due jobs are drained in a single tick,
             // matching the original findMany behaviour — but now race-condition-free.
             let processedCount = 0;
+            let skippedBillingCount = 0;
+            let errorCount = 0;
             let job: ClaimedJob | null;
 
             while ((job = await claimNextJob()) !== null) {
@@ -482,6 +530,33 @@ export function startWorker() {
                         data: { status: "pending" },
                     });
                     continue;
+                }
+
+                // ── Billing Check ──────────────────────────────────────────
+                const isRestoreOperation =
+                    job.mode === "time-window" &&
+                    (job.status === "restoring" || job.status === "active-window");
+
+                if (isRestoreOperation) {
+                    // Skip billing check — safety operation always runs
+                    console.log("[WORKER] Restore operation — billing check skipped", {
+                        shop: job.shop,
+                        jobId: job.id,
+                    });
+                } else {
+                    const isBillingValid = await isSubscriptionActive(shop);
+                    if (!isBillingValid) {
+                        console.warn("[WORKER] Skipping job due to inactive subscription", {
+                            shop,
+                            jobId: job.id,
+                        });
+                        await (prisma.scheduledJob as any).update({
+                            where: { id: job.id },
+                            data: { status: "paused-billing-inactive" },
+                        });
+                        skippedBillingCount++;
+                        continue;
+                    }
                 }
 
                 processedCount++;
@@ -829,6 +904,7 @@ export function startWorker() {
 
                 } catch (jobError) {
                     // Unhandled error mid-job → mark failed (processing → failed)
+                    errorCount++;
                     console.error(`[Worker] ❌ Job ${jobId} threw an unhandled error:`, jobError);
                     if (job.mode !== "time-window") {
                         await failOneTimePublish(
@@ -845,6 +921,13 @@ export function startWorker() {
                     }
                 }
             } // end while
+
+            console.log("[WORKER] Tick complete", {
+                processed: processedCount,
+                skipped_billing: skippedBillingCount,
+                errors: errorCount,
+                timestamp: new Date().toISOString(),
+            });
 
             if (processedCount > 0) {
                 console.log(`[Worker] ✅ Tick complete — processed ${processedCount} job(s)`);

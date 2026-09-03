@@ -4,6 +4,7 @@ import { t } from "../utils/i18n";
 export type BillingStatusValue =
   | "active"
   | "trialing"
+  | "free"
   | "cancelled"
   | "frozen"
   | "expired"
@@ -16,7 +17,7 @@ export type BillingStatusValue =
  * but are not blocked from any feature.
  */
 export function isBillingActive(status: BillingStatusValue): boolean {
-  return status === "active" || status === "trialing";
+  return status === "active" || status === "trialing" || status === "free";
 }
 
 interface BillingStatusBannerProps {

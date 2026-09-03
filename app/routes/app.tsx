@@ -23,7 +23,7 @@ import {
 } from "@shopify/shopify-app-react-router/react";
 
 import { NavMenu } from "@shopify/app-bridge-react";
-import { authenticate } from "../shopify.server";
+import { authenticate, registerWebhooks } from "../shopify.server";
 import { recordShopInstall } from "../utils/shop-lifecycle.server";
 import {
   BillingStatusBanner,
@@ -74,6 +74,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   const shop = session.shop;
+
+  await registerWebhooks({ session });
 
   await recordShopInstall({ shop });
 
@@ -200,11 +202,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
   const billingResponse = await billing.require({
-    plans: ["basic"],
+    plans: ["free", "basic"],
     isTest: true,
     onFailure: async () =>
       billing.request({
-        plan: "basic",
+        plan: "free", // default new merchants to free plan
         isTest: true,
       }),
   });

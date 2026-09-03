@@ -34,10 +34,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!isRestoreAction) {
     const sub = await prisma.subscription.findFirst({
       where: { shop },
-      select: { status: true },
+      select: { status: true, plan: true },
     });
 
-    const activeStates = ["ACTIVE", "PENDING", "active", "trialing"];
+    const activeStates = ["ACTIVE", "PENDING", "active", "trialing", "free"];
     const isActive = sub && activeStates.includes(sub.status);
 
     if (!isActive) {

@@ -1,9 +1,24 @@
 export const BILLING_PLANS = {
-  BASIC: {
-    name: "basic",
-    amount: 6.99,
+  FREE: {
+    name: "free" as const,
+    amount: 0,
     currencyCode: "USD",
     interval: "Every30Days",
-    trialDays: 7,
+    trialDays: 0,
+    limits: {
+      campaignsPerMonth: 2,
+      productsPerCampaign: 50,
+    },
+  },
+  BASIC: {
+    name: "basic" as const,
+    amount: 9.99,
+    currencyCode: "USD",
+    interval: "Every30Days",
+    trialDays: 14,
+    limits: {
+      campaignsPerMonth: null, // unlimited
+      productsPerCampaign: 1000,
+    },
   },
 };
