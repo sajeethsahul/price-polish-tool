@@ -41,3 +41,4 @@ extensions/**/assets/*.gif
 # TREA local workspace
 .trae/
 *.bat
+seed.mjs
