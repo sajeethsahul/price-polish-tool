@@ -4,6 +4,7 @@ import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { applyLocaleFromSession, t } from "../utils/i18n";
+import { parseShopifyPrice } from "../utils/price-utils";
 
 const BATCH_SIZE = 50;
 const DELAY_MS = 300;
@@ -93,11 +94,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         shop,
         productId: item.productId ?? null,
         variantId: item.variantId,
-        oldPrice: parseFloat(item.oldPrice),
+        oldPrice: parseShopifyPrice(item.oldPrice),
         oldCompareAtPrice: item.compareAtPrice
-          ? parseFloat(String(item.compareAtPrice))
+          ? parseShopifyPrice(item.compareAtPrice)
           : null,
-        newPrice: parseFloat(item.newPrice),
+        newPrice: parseShopifyPrice(item.newPrice),
         isManual: item.isManual || false,
         batchId,
       })),

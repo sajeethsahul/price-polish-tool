@@ -708,6 +708,7 @@
       "hoursAgo": "hora(s) atrás",
       "daysAgo": "día(s) atrás"
     },
+    "marketsWarning": "Price Polish actualiza los precios de tu moneda base. Shopify Markets aplicará automáticamente tus tasas de cambio por mercado. Los precios de vista previa se muestran en tu moneda base.",
     "billingUpsell": {
       "title": "Comience su Prueba Gratuita de 7 Días",
       "body": "Aplique precios inteligentes, aumente las ganancias y gestione actualizaciones masivas de forma segura.",

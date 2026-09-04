@@ -251,12 +251,46 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.error("Currency fetch failed:", err);
   }
 
+  // 🌍 SHOPIFY MARKETS DETECTION
+  // Price Polish only manages base-currency prices. When the store has more
+  // than one enabled market, Shopify converts base prices per market and the
+  // admin previews (base currency) won't match localized storefront prices.
+  // Detect once here and surface a warning banner in the dashboard.
+  let hasMultipleMarkets = false;
+  try {
+    const marketsResponse = await admin.graphql(`
+      query {
+        markets(first: 5) {
+          nodes {
+            id
+            name
+            enabled
+            primary
+          }
+        }
+      }
+    `);
+    const marketsData = await marketsResponse.json();
+    const marketNodes: Array<{ enabled?: boolean; primary?: boolean }> =
+      marketsData?.data?.markets?.nodes ?? [];
+    hasMultipleMarkets = marketNodes.some(
+      (m) => m.enabled && !m.primary
+    );
+  } catch (marketsErr: any) {
+    console.warn("[MARKETS] detection failed — assuming single market", {
+      shop,
+      message: marketsErr?.message ?? "unknown",
+    });
+    hasMultipleMarkets = false;
+  }
+
   return {
     apiKey: process.env.SHOPIFY_API_KEY ?? null,
     shop,
     host,
     currencyCode,
     hasActivePlan,
+    hasMultipleMarkets,
     billingStatus,
     isOnboarded,
   };
@@ -266,7 +300,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function AppLayout() {
   const data = useLoaderData() as any;
 
-  const { apiKey, shop, host, currencyCode, hasActivePlan, billingStatus, isOnboarded } = data;
+  const { apiKey, shop, host, currencyCode, hasActivePlan, hasMultipleMarkets, billingStatus, isOnboarded } = data;
   const [toastContent, setToastContent] = useState<string | null>(null);
 
   useEffect(() => {
@@ -330,7 +364,7 @@ export default function AppLayout() {
               </Card>
             </Page>
           ) : (
-            <Outlet context={{ currencyCode, hasActivePlan, shop, host }} />
+            <Outlet context={{ currencyCode, hasActivePlan, hasMultipleMarkets, shop, host }} />
           )}
         </>
       </Frame>

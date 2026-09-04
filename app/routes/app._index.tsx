@@ -44,6 +44,7 @@ import {
   getCurrencySymbol,
 } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
+import { parseShopifyPrice } from "../utils/price-utils";
 import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
 import {
   ImmediateApplyConfirmationModal,
@@ -674,11 +675,13 @@ export default function Dashboard() {
     currencyCode = "USD",
     shop = "",
     host = "",
+    hasMultipleMarkets = false,
     isBypass,
   } = useOutletContext<{
     currencyCode?: string;
     shop?: string;
     host?: string;
+    hasMultipleMarkets?: boolean;
     isBypass?: boolean;
   }>() || {};
 
@@ -689,12 +692,18 @@ export default function Dashboard() {
         currencyCode={currencyCode}
         shop={shop}
         host={host}
+        hasMultipleMarkets={hasMultipleMarkets}
       />
     );
   }
 
   return (
-    <DashboardWithBridge currencyCode={currencyCode} shop={shop} host={host} />
+    <DashboardWithBridge
+      currencyCode={currencyCode}
+      shop={shop}
+      host={host}
+      hasMultipleMarkets={hasMultipleMarkets}
+    />
   );
 }
 
@@ -702,10 +711,12 @@ function DashboardWithBridge({
   currencyCode,
   shop,
   host,
+  hasMultipleMarkets,
 }: {
   currencyCode: string;
   shop: string;
   host: string;
+  hasMultipleMarkets: boolean;
 }) {
   const shopify = useAppBridge();
   return (
@@ -714,6 +725,7 @@ function DashboardWithBridge({
       currencyCode={currencyCode}
       shop={shop}
       host={host}
+      hasMultipleMarkets={hasMultipleMarkets}
     />
   );
 }
@@ -724,12 +736,14 @@ function DashboardContent({
   currencyCode,
   shop,
   host,
+  hasMultipleMarkets,
 }: {
   shopify?: any;
   isBypass?: boolean;
   currencyCode: string;
   shop: string;
   host: string;
+  hasMultipleMarkets?: boolean;
 }) {
   const [previews, setPreviews] = useState<PreviewItem[]>([]);
   // ruleExists = null → not yet fetched; true/false comes from backend DB check
@@ -1196,12 +1210,12 @@ function DashboardContent({
       let validPercentCount = 0;
 
       for (const item of immediateApplyContextItems) {
-        const oldPrice = Number.parseFloat(item.oldPrice);
+        const oldPrice = parseShopifyPrice(item.oldPrice);
         const proposedRaw =
           item.overriddenPrice !== undefined
             ? item.overriddenPrice
             : item.newPrice;
-        const proposedPrice = Number(proposedRaw);
+        const proposedPrice = parseShopifyPrice(proposedRaw);
 
         if (
           !Number.isFinite(oldPrice) ||
@@ -1625,15 +1639,15 @@ function DashboardContent({
       `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
     );
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
-    const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
+    const parsedMin = minPrice === "" ? null : parseShopifyPrice(minPrice);
+    const parsedMax = maxPrice === "" ? null : parseShopifyPrice(maxPrice);
 
     const derived = previews.map((p) => {
-      const livePrice = parseFloat(p.oldPrice);
+      const livePrice = parseShopifyPrice(p.oldPrice);
       const finalPrice =
         p.overriddenPrice !== undefined
-          ? Number(p.overriddenPrice) || 0
-          : parseFloat(p.newPrice);
+          ? parseShopifyPrice(p.overriddenPrice)
+          : parseShopifyPrice(p.newPrice);
       const delta = finalPrice - livePrice;
       const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
       return {
@@ -1723,11 +1737,11 @@ function DashboardContent({
       if (item.productId) productIds.add(String(item.productId));
       if (item.variantId) variantIds.add(String(item.variantId));
 
-      const oldP = parseFloat(item.oldPrice);
+      const oldP = parseShopifyPrice(item.oldPrice);
       const finalP =
         item.overriddenPrice !== undefined
-          ? Number(item.overriddenPrice) || 0
-          : parseFloat(item.newPrice);
+          ? parseShopifyPrice(item.overriddenPrice)
+          : parseShopifyPrice(item.newPrice);
 
       if (!isFinite(oldP) || !isFinite(finalP)) continue;
       sumFinal += finalP;
@@ -1750,7 +1764,7 @@ function DashboardContent({
     if (previewPricingRule) {
       for (const item of rows) {
         if (item.overriddenPrice !== undefined) continue;
-        const base = parseFloat(item.originalBasePrice);
+        const base = parseShopifyPrice(item.originalBasePrice);
         if (!isFinite(base)) continue;
 
         const unclamped = calculatePrice(base, {
@@ -2290,8 +2304,8 @@ function DashboardContent({
     // Columns: Product | SKU | Price Before | Adjustment | Rounding | New Price | Price Change
     // (Variant ID removed — merchants don't need raw Shopify GIDs.)
     const rows = previews.map((p) => {
-      const base = parseFloat(p.originalBasePrice);
-      const final = Number(
+      const base = parseShopifyPrice(p.originalBasePrice);
+      const final = parseShopifyPrice(
         p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice,
       );
       const markupAdded = base * (activeMarkup / 100);
@@ -3053,11 +3067,11 @@ function DashboardContent({
     let count = 0;
 
     previews.forEach((p) => {
-      const oldP = parseFloat(p.oldPrice);
+      const oldP = parseShopifyPrice(p.oldPrice);
       const newP =
         p.overriddenPrice !== undefined
-          ? Number(p.overriddenPrice) || 0
-          : parseFloat(p.newPrice);
+          ? parseShopifyPrice(p.overriddenPrice)
+          : parseShopifyPrice(p.newPrice);
       if (oldP !== newP) {
         totalOld += oldP;
         totalNew += newP;
@@ -3269,6 +3283,13 @@ function DashboardContent({
               </>
             )}
 
+            {/* Shopify Markets warning — base currency only */}
+            {hasMultipleMarkets && (
+              <Banner tone="warning">
+                <p>{t("dashboard.marketsWarning")}</p>
+              </Banner>
+            )}
+
             {/* Billing Upsell */}
             {!hasActivePlan && (
               <Card>
@@ -3426,8 +3447,8 @@ function DashboardContent({
                           previews.reduce(
                             (sum, p) =>
                               sum +
-                              (Number(p.overriddenPrice || p.newPrice) -
-                                parseFloat(p.originalBasePrice)),
+                              (parseShopifyPrice(p.overriddenPrice || p.newPrice) -
+                                parseShopifyPrice(p.originalBasePrice)),
                             0,
                           ) >= 0
                             ? "bg-surface-success"
@@ -3447,8 +3468,8 @@ function DashboardContent({
                               previews.reduce(
                                 (sum, p) =>
                                   sum +
-                                  (Number(p.overriddenPrice || p.newPrice) -
-                                    parseFloat(p.originalBasePrice)),
+                                  (parseShopifyPrice(p.overriddenPrice || p.newPrice) -
+                                    parseShopifyPrice(p.originalBasePrice)),
                                 0,
                               ) >= 0
                                 ? "success"
@@ -3459,8 +3480,8 @@ function DashboardContent({
                               const lift = previews.reduce(
                                 (sum, p) =>
                                   sum +
-                                  (Number(p.overriddenPrice || p.newPrice) -
-                                    parseFloat(p.originalBasePrice)),
+                                  (parseShopifyPrice(p.overriddenPrice || p.newPrice) -
+                                    parseShopifyPrice(p.originalBasePrice)),
                                 0,
                               );
                               const sign = lift > 0 ? "+" : lift < 0 ? "-" : "";
@@ -4848,12 +4869,12 @@ function DashboardContent({
                         )}
 
                         {paginatedPreviews.map((p) => {
-                          const currentPrice = parseFloat(p.oldPrice);
-                          const originalPrice = parseFloat(p.originalBasePrice);
+                          const currentPrice = parseShopifyPrice(p.oldPrice);
+                          const originalPrice = parseShopifyPrice(p.originalBasePrice);
                           const isManual = p.overriddenPrice !== undefined;
                           const targetPrice = isManual
-                            ? Number(p.overriddenPrice!) || 0
-                            : parseFloat(p.newPrice);
+                            ? parseShopifyPrice(p.overriddenPrice!)
+                            : parseShopifyPrice(p.newPrice);
                           const isPolished = currentPrice !== originalPrice;
                           const isChanged = currentPrice !== targetPrice;
                           const diffFromOriginal =
@@ -5147,7 +5168,7 @@ function DashboardContent({
                                           tone="subdued"
                                         >
                                           {formatMoney(
-                                            parseFloat(p.originalBasePrice),
+                                            parseShopifyPrice(p.originalBasePrice),
                                             currencyCode,
                                           )}
                                         </Text>
@@ -5172,7 +5193,7 @@ function DashboardContent({
                                           }
                                         >
                                           {formatMoney(
-                                            parseFloat(p.oldPrice),
+                                            parseShopifyPrice(p.oldPrice),
                                             currencyCode,
                                           )}
                                         </Text>

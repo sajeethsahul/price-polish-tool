@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { parseShopifyPrice } from "./price-utils";
 
 export type HistoryRecord = {
   id: string;
@@ -105,10 +106,10 @@ async function fetchLiveVariantPrices(
 
       for (const node of nodes) {
         if (!node || !node.id) continue;
-        const parsedPrice = node.price != null ? parseFloat(String(node.price)) : NaN;
+        const parsedPrice = node.price != null ? parseShopifyPrice(String(node.price)) : NaN;
         const parsedCompareAt =
           node.compareAtPrice != null && node.compareAtPrice !== ""
-            ? parseFloat(String(node.compareAtPrice))
+            ? parseShopifyPrice(String(node.compareAtPrice))
             : null;
 
         if (!Number.isNaN(parsedPrice)) {

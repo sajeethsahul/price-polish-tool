@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import prisma from "../../db.server";
 import { authenticate } from "../../shopify.server";
 import { requireActiveBilling } from "../../utils/billing-protection.server";
+import { parseShopifyPrice } from "../../utils/price-utils";
 
 export async function action({ request }: ActionFunctionArgs) {
   const auth = await authenticate.admin(request);
@@ -55,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
       data?.data?.collection?.products?.edges?.flatMap((p: any) =>
         p.node.variants.edges.map((v: any) => ({
           variantId: v.node.id.split("/").pop(),
-          oldPrice: parseFloat(v.node.price),
+          oldPrice: parseShopifyPrice(v.node.price),
         }))
       ) || [];
 
@@ -80,8 +81,8 @@ export async function action({ request }: ActionFunctionArgs) {
     data: finalItems.map((i: any) => ({
       shop,
       variantId: i.variantId,
-      stagedPrice: parseFloat(i.newPrice ?? i.stagedPrice),
-      originalPrice: parseFloat(i.oldPrice ?? i.originalPrice),
+      stagedPrice: parseShopifyPrice(i.newPrice ?? i.stagedPrice),
+      originalPrice: parseShopifyPrice(i.oldPrice ?? i.originalPrice),
     })),
   });
 

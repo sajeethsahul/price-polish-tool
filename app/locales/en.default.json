@@ -708,6 +708,7 @@
       "hoursAgo": "hour(s) ago",
       "daysAgo": "day(s) ago"
     },
+    "marketsWarning": "Price Polish updates your base currency prices. Shopify Markets will apply your market exchange rates automatically. Preview prices are shown in your base currency.",
     "billingUpsell": {
       "title": "Start Your 7-Day Free Trial",
       "body": "Apply smart pricing, increase profits, and manage bulk updates safely.",

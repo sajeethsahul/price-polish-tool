@@ -22,6 +22,7 @@ import { BillingBlockModal, type BillingBlockModalCode } from "./BillingBlockMod
 import { DiscardChangesModal } from "../components/DiscardChangesModal";
 import { computeConflictsForCandidateSchedule } from "../utils/campaign-conflicts";
 import { t } from "../utils/i18n";
+import { parseShopifyPrice } from "../utils/price-utils";
 import type {
   OperationalSafeguardNotice,
   PricingPreviewItem,
@@ -396,9 +397,9 @@ export function ScheduledHistoryModal({
     let largestMovement = 0;
 
     for (const item of scopedItemsForSchedule) {
-      const oldPrice = Number.parseFloat(item.oldPrice);
+      const oldPrice = parseShopifyPrice(item.oldPrice);
       const proposedRaw = item.overriddenPrice !== undefined ? item.overriddenPrice : item.newPrice;
-      const proposedPrice = Number(proposedRaw);
+      const proposedPrice = parseShopifyPrice(proposedRaw);
       if (!Number.isFinite(oldPrice) || !Number.isFinite(proposedPrice) || oldPrice <= 0) continue;
       const deltaPercent = ((proposedPrice - oldPrice) / oldPrice) * 100;
       largestMovement = Math.max(largestMovement, Math.abs(deltaPercent));

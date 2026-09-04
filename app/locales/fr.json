@@ -707,6 +707,7 @@
       "hoursAgo": "il y a {count} heure(s)",
       "daysAgo": "il y a {count} jour(s)"
     },
+    "marketsWarning": "Price Polish met à jour les prix de votre devise de base. Shopify Markets appliquera automatiquement vos taux de change par marché. Les prix d'aperçu sont affichés dans votre devise de base.",
     "billingUpsell": {
       "title": "Démarrez votre essai gratuit de 7 jours",
       "body": "Appliquez une tarification intelligente, augmentez les bénéfices et gérez les mises à jour en masse en toute sécurité.",

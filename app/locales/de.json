@@ -707,6 +707,7 @@
       "hoursAgo": "vor {count} Stunde(n)",
       "daysAgo": "vor {count} Tag(en)"
     },
+    "marketsWarning": "Price Polish aktualisiert Ihre Preise in der Basiswährung. Shopify Markets wendet Ihre Marktkurse automatisch an. Vorschaukosten werden in Ihrer Basiswährung angezeigt.",
     "billingUpsell": {
       "title": "Starten Sie Ihre 7-tägige kostenlose Testversion",
       "body": "Setzen Sie intelligente Preise ein, steigern Sie Gewinne und verwalten Sie Massenaktualisierungen sicher.",

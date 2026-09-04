@@ -4,6 +4,7 @@ import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { withShopifyRetry } from "../utils/shopify-graphql.server";
+import { parseShopifyPrice } from "../utils/price-utils";
 import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -375,7 +376,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             variantId: item.variantId,
             oldPrice: item.originalPrice,
             oldCompareAtPrice: (item as any).compareAtPrice
-              ? parseFloat(String((item as any).compareAtPrice))
+              ? parseShopifyPrice((item as any).compareAtPrice)
               : null,
             newPrice: item.stagedPrice,
             isManual: manualVariantIdSet.has(normalizeId(item.variantId)),

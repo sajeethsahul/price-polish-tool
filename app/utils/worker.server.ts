@@ -4,6 +4,7 @@ import { revertCampaignPrices } from "./revert.server";
 import { isWindowExpired } from "./window-lifecycle";
 import type { ScheduledProductSnapshot } from "../types/pricing";
 import { withShopifyRetry } from "./shopify-graphql.server";
+import { parseShopifyPrice } from "./price-utils";
 
 // ─── Subscription & Billing Helper ──────────────────────────────────────────
 
@@ -85,7 +86,7 @@ function toWorkerPriceItem(snapshot: ScheduledProductSnapshot): WorkerPriceItem 
             snapshot.oldPrice
         ),
         compareAtPrice: snapshot.compareAtPrice
-            ? parseFloat(String(snapshot.compareAtPrice))
+            ? parseShopifyPrice(snapshot.compareAtPrice)
             : null,
         isManual: snapshot.isManual === true,
     };
@@ -772,7 +773,7 @@ export function startWorker() {
                                     variantId: item.variantId,
                                     oldPrice: item.originalPrice,
                                     oldCompareAtPrice: item.compareAtPrice
-                                        ? parseFloat(String(item.compareAtPrice))
+                                        ? parseShopifyPrice(item.compareAtPrice)
                                         : null,
                                     newPrice: item.stagedPrice,
                                     isManual: item.isManual === true,

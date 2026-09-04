@@ -6,6 +6,7 @@ import prisma from "../db.server";
 import { logActivity } from "../utils/activity.server";
 import type { PricingPreviewItem } from "../types/pricing";
 import { applyLocaleFromSession, t } from "../utils/i18n";
+import { parseShopifyPrice } from "../utils/price-utils";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const preflight = handlePreflight(request);
@@ -188,12 +189,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             const variantNodes = product?.variants?.nodes || [];
             for (const variant of variantNodes) {
                 const variantId = variant?.id || "";
-                const currentPrice = parseFloat(variant?.price ?? "0");
-                const compareAtPrice = Number(variant?.compareAtPrice ?? NaN);
+                const currentPrice = parseShopifyPrice(variant?.price ?? "0");
+                const compareAtPrice =
+                    variant?.compareAtPrice != null && variant.compareAtPrice !== ""
+                        ? parseShopifyPrice(variant.compareAtPrice)
+                        : NaN;
 
                 const history = latestHistoryMap[variantId];
-                const historyOld = history ? parseFloat(String(history.oldPrice)) : NaN;
-                const historyNew = history ? parseFloat(String(history.newPrice)) : NaN;
+                const historyOld = history ? parseShopifyPrice(history.oldPrice) : NaN;
+                const historyNew = history ? parseShopifyPrice(history.newPrice) : NaN;
 
                 // Baseline rules:
                 // - Normal (rule-based) applies keep using the prior baseline (history.oldPrice) to avoid compounding.
