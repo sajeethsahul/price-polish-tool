@@ -66,23 +66,40 @@ export function t(key: TranslationKey): string {
  * Detects the locale from a Shopify session (BCP-47) or falls back to "en".
  * Call setLocale() with the detected value before using t() server-side.
  */
-export function detectLocaleFromSession(session: { locale?: string } | null | undefined | any): string {
+// Supported locale codes — add more here when ready
+const SUPPORTED_LOCALES = ["es", "fr", "de"];
+
+export function detectLocaleFromSession(
+  session: { locale?: string } | null | undefined | any
+): string {
   const raw = session?.locale;
   if (typeof raw === "string" && raw.length > 0) {
-    const normalized = raw.toLowerCase();
-    if (normalized.startsWith("es")) return "es";
-    if (normalized.startsWith("en")) return "en.default";
+    const base = raw.toLowerCase().split("-")[0];
+    if (SUPPORTED_LOCALES.includes(base)) return base;
   }
+  // Everything else → English
   return "en.default";
 }
 
 /**
- * Server-side helper: given a session, set the active dictionary and return
+ * Server-side helper: given a session (and optionally an explicit locale
+ * override sent by the client), set the active dictionary and return
  * the resolved locale id. Call this at the top of API loaders/actions before
  * using t() to localize response messages.
  */
-export function applyLocaleFromSession(session: { locale?: string } | null | undefined | any): string {
-  const localeId = detectLocaleFromSession(session);
+export function applyLocaleFromSession(
+  session: { locale?: string } | null | undefined | any,
+  overrideLocale?: string | null,
+): string {
+  let localeId: string | null = null;
+
+  if (typeof overrideLocale === "string" && overrideLocale.length > 0) {
+    const base = overrideLocale.toLowerCase().split("-")[0];
+    if (SUPPORTED_LOCALES.includes(base)) localeId = base;
+  }
+
+  if (!localeId) localeId = detectLocaleFromSession(session);
+
   setLocale(localeId);
   return localeId;
 }

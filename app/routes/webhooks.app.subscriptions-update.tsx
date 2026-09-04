@@ -14,7 +14,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const status: string | undefined = (payload as any)?.app_subscription?.status;
 
   if (!status || !shop) {
-    console.warn("[WEBHOOK] Missing shop or status in payload", { shop, payload });
+    console.warn("[WEBHOOK] Missing shop or status in payload", {
+      shop,
+      payload,
+    });
     return new Response("Bad Request", { status: 400 });
   }
 

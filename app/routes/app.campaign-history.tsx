@@ -734,11 +734,12 @@ export default function CampaignHistoryPage() {
 
   const detailStatusLabel = useCallback((status?: string | null) => {
     const normalized = (status ?? "pending").toLowerCase();
-    if (normalized === "reverted") return "Reverted";
-    if (normalized === "failed") return "Failed";
-    if (normalized === "unrecoverable") return "Unrecoverable";
-    if (normalized === "scheduled") return "Scheduled";
-    return "Pending";
+    if (normalized === "reverted") return t("common.status.reverted");
+    if (normalized === "failed") return t("common.status.failed");
+    if (normalized === "unrecoverable") return t("common.status.unrecoverable");
+    if (normalized === "scheduled") return t("common.status.scheduled");
+    if (normalized === "actual") return t("common.status.actual");
+    return t("common.status.pending");
   }, []);
 
   const formatDetailScheduleType = useCallback((type?: string | null) => {

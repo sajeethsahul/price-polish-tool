@@ -79,18 +79,27 @@
       "preview": "Vista Previa de Productos"
     },
     "status": {
+      "published": "Publicado",
+      "reverted": "Revertido",
+      "autoRestored": "Restaurado Automáticamente",
       "pending": "Pendiente",
       "processing": "Procesando",
+      "scheduled": "Programado",
+      "failed": "Fallido",
+      "active": "Activo",
+      "completed": "Completado",
+      "restoreFailed": "Error al Restaurar",
       "missedDuringUninstall": "Omitido Durante la Desinstalación",
       "activeWindow": "Ventana Activa",
       "restoring": "Restaurando",
-      "autoRestored": "Restaurado Automáticamente",
-      "restoreFailed": "Error al Restaurar",
-      "completed": "Completado",
-      "failed": "Fallido",
       "windowStopped": "Ventana Detenida",
       "cancelled": "Cancelado",
-      "comingSoon": "Próximamente"
+      "unrecoverable": "Irrecuperable",
+      "draft": "Borrador",
+      "partial": "Parcial",
+      "publishing": "Publicando",
+      "comingSoon": "Próximamente",
+      "actual": "Real"
     },
     "time": {
       "invalidDate": "Fecha no válida",
@@ -427,6 +436,9 @@
     }
   },
   "dashboard": {
+    "status": {
+      "stagedReady": "Los precios preparados están listos para publicar"
+    },
     "onboarding": {
       "heroTitle": "Bienvenido a Price Polish",
       "heroLine1": "Gestione las actualizaciones de precios con confianza.",
@@ -718,6 +730,8 @@
       "title": "Actividad Reciente",
       "viewAll": "Ver Todo",
       "noCampaigns": "Aún no hay campañas registradas.",
+      "productCountOne": "1 producto",
+      "productCountMany": "{count} productos",
       "productsSuffix": "productos"
     },
     "quickActions": {
@@ -982,7 +996,22 @@
     }
   },
   "errors": {
-    "noPricingRulesFound": "No se Encontraron Reglas de Precios"
+    "subscriptionRequired": "Se requiere una suscripción activa para realizar esta acción.",
+    "noPricingRulesFound": "No se Encontraron Reglas de Precios",
+    "dbTableNotFound": "No se encontró la tabla de la base de datos. Ejecute las migraciones.",
+    "failedLoadPricingRules": "Error al cargar las reglas de precios.",
+    "failedLoadCampaign": "Error al cargar la campaña.",
+    "noCampaignId": "No se proporcionó un ID de campaña.",
+    "campaignNotFound": "Campaña no encontrada.",
+    "failedLoadTrackedItems": "Error al cargar los artículos rastreados.",
+    "noTrackedItems": "No se encontraron artículos rastreados para esta campaña.",
+    "methodNotAllowed": "Método No Permitido",
+    "unauthorized": "No Autorizado",
+    "noItemsProvided": "No se proporcionaron artículos.",
+    "invalidItemsPayload": "Carga de artículos no válida.",
+    "invalidScheduledPrices": "Carga de precios programados no válida.",
+    "noCampaignOrBatch": "No se proporcionó campaignId ni batchId.",
+    "failedLoadScheduleHistory": "Error al cargar el historial de programación."
   },
   "bulk": {
     "modal": {
@@ -1008,7 +1037,11 @@
     },
     "page": {
       "title": "Editor Masivo",
-      "emptyTitle": "No se encontraron reglas de precios"
+      "emptyTitle": "No se encontraron reglas de precios",
+      "editorTitle": "Editor Masivo de Precios",
+      "underDevelopmentBody": "Esta función está en desarrollo. Una vez completada, podrá editar manualmente los precios de los productos de forma masiva usando sus reglas de precios configuradas.",
+      "emptyBodyPrefix": "El editor masivo requiere al menos una regla de precios configurada. Vaya a la página de ",
+      "emptyBodySuffix": " para crear su primera regla."
     }
   },
   "help": {
@@ -1312,6 +1345,25 @@
       "missingShop": "Ingrese el dominio de su tienda para iniciar sesión",
       "invalidShop": "Ingrese un dominio de tienda válido para iniciar sesión"
     }
+  },
+  "export": {
+    "reportTitle": "Price Polish — Informe de impacto de campaña",
+    "campaign": "Campaña",
+    "generated": "Generado",
+    "downloadedBy": "Descargado por",
+    "productsAffected": "Productos afectados",
+    "variantsAffected": "Variantes afectadas",
+    "averageChange": "Cambio promedio de precio",
+    "headers": {
+      "product": "Producto",
+      "sku": "SKU",
+      "priceBefore": "Precio Anterior",
+      "adjustment": "Ajuste",
+      "rounding": "Redondeo",
+      "newPrice": "Precio Nuevo",
+      "priceChange": "Cambio de Precio"
+    },
+    "total": "TOTAL"
   },
   "server": {
     "methodNotAllowed": "Método No Permitido",

@@ -4,12 +4,14 @@ import { authenticate } from "../shopify.server";
 import { cors, handlePreflight } from "../utils/cors";
 import { revertCampaignPrices } from "../utils/revert.server";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
+import { applyLocaleFromSession, t } from "../utils/i18n";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const preflight = handlePreflight(request);
   if (preflight) return preflight;
 
-  return cors(new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+  applyLocaleFromSession(null);
+  return cors(new Response(JSON.stringify({ error: t("server.methodNotAllowed") }), {
     status: 405,
     headers: { "Content-Type": "application/json" },
   }));
@@ -21,10 +23,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const auth = await authenticate.admin(request);
   if (!auth?.session || !auth?.admin) {
-    throw new Response("Unauthorized", { status: 401 });
+    applyLocaleFromSession(auth?.session);
+    throw new Response(t("server.unauthorized"), { status: 401 });
   }
 
   const { session, admin } = auth;
+  applyLocaleFromSession(session);
   const shop = session.shop;
   const body = await request.json().catch(() => ({}));
 
@@ -43,7 +47,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!isActive) {
       return cors(
         new Response(
-          JSON.stringify({ error: "Subscription required. Restore your subscription to continue." }),
+          JSON.stringify({ error: t("errors.subscriptionRequired") }),
           {
             status: 403,
             headers: { "Content-Type": "application/json" },
@@ -63,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : null;
 
   if (!campaignId || !requestedAction) {
-    return cors(new Response(JSON.stringify({ error: "Choose a valid window action." }), {
+    return cors(new Response(JSON.stringify({ error: t("server.chooseValidWindowAction") }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     }));
@@ -108,7 +112,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   ]);
 
   if (!campaign || !job) {
-    return cors(new Response(JSON.stringify({ error: "Pricing window was not found." }), {
+    return cors(new Response(JSON.stringify({ error: t("server.windowNotFound") }), {
       status: 404,
       headers: { "Content-Type": "application/json" },
     }));
@@ -136,7 +140,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (requestedAction === "cancel-schedule") {
     if (runtimeState !== "scheduled-window") {
       return cors(new Response(JSON.stringify({
-        error: "This window has already started and can no longer be cancelled.",
+        error: t("server.windowAlreadyStarted"),
       }), {
         status: 409,
         headers: { "Content-Type": "application/json" },
@@ -169,7 +173,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return cors(new Response(JSON.stringify({
       success: true,
       status: "cancelled-window",
-      message: "Pricing window cancelled before it started.",
+      message: t("server.windowCancelled"),
     }), {
       headers: { "Content-Type": "application/json" },
     }));
@@ -177,7 +181,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (runtimeState !== "active-window") {
     return cors(new Response(JSON.stringify({
-      error: "This pricing window is not currently active.",
+      error: t("server.windowNotActive"),
     }), {
       status: 409,
       headers: { "Content-Type": "application/json" },
@@ -236,8 +240,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     failedCount: restoreResult.failedCount,
     unrecoverableCount: restoreResult.unrecoverableCount,
     message: restoredCleanly
-      ? "Original storefront pricing was restored before the scheduled end time."
-      : "Original pricing was restored for some products. Review failed items before retrying.",
+      ? t("server.windowRestored")
+      : t("server.windowPartialRestore"),
   }), {
     headers: { "Content-Type": "application/json" },
   }));

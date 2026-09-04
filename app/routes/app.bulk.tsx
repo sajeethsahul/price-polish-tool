@@ -10,7 +10,7 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { t } from "../utils/i18n";
+import { t, applyLocaleFromSession } from "../utils/i18n";
 
 interface BulkEditorData {
     hasRules: boolean;
@@ -23,6 +23,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     try {
         const { session } = await authenticate.admin(request);
+        applyLocaleFromSession(session);
 
         const rule = await prisma.pricingRule.findUnique({
             where: { shop: session.shop },
@@ -35,11 +36,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return { hasRules: true, isBypass: true };
         }
         console.error("❌ Bulk Editor Loader Error:", error);
-        
+
         if (error?.code === 'P2021' || error?.message?.includes("does not exist")) {
-            return { hasRules: false, error: "Database table not found. Please run migrations." };
+            return { hasRules: false, error: t("errors.dbTableNotFound") };
         }
-        return { hasRules: false, error: "Failed to load pricing rules." };
+        return { hasRules: false, error: t("errors.failedLoadPricingRules") };
     }
 };
 
@@ -58,7 +59,7 @@ export default function BulkEditorPage() {
 
                 {!hasRules && !error && (
                     <Banner title={t("bulk.page.emptyTitle")} tone="warning">
-                        <p>The bulk editor requires at least one pricing rule to be configured. Please go to the <strong>{t("common.nav.pricingRules")}</strong> page to create your first rule.</p>
+                        <p>{t("bulk.page.emptyBodyPrefix")}<strong>{t("common.nav.pricingRules")}</strong>{t("bulk.page.emptyBodySuffix")}</p>
                     </Banner>
                 )}
 
@@ -66,10 +67,10 @@ export default function BulkEditorPage() {
                     <Card>
                         <BlockStack gap="300">
                             <Text  as="h2"  variant="headingLg">
-                                Bulk Price Editor
+                                {t("bulk.page.editorTitle")}
                             </Text>
                             <Text as="p" variant="bodyMd">
-                                This feature is under development. Once complete, you will be able to manually edit product prices in bulk using your configured pricing rules.
+                                {t("bulk.page.underDevelopmentBody")}
                             </Text>
                         </BlockStack>
                     </Card>

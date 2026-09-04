@@ -79,18 +79,27 @@
       "preview": "Product Previews"
     },
     "status": {
+      "published": "Published",
+      "reverted": "Reverted",
+      "autoRestored": "Auto Restored",
       "pending": "Pending",
       "processing": "Processing",
+      "scheduled": "Scheduled",
+      "failed": "Failed",
+      "active": "Active",
+      "completed": "Completed",
+      "restoreFailed": "Restore Failed",
       "missedDuringUninstall": "Missed During Uninstall",
       "activeWindow": "Active Window",
       "restoring": "Restoring",
-      "autoRestored": "Auto Restored",
-      "restoreFailed": "Restore Failed",
-      "completed": "Completed",
-      "failed": "Failed",
       "windowStopped": "Window Stopped",
       "cancelled": "Cancelled",
-      "comingSoon": "Coming Soon"
+      "unrecoverable": "Unrecoverable",
+      "draft": "Draft",
+      "partial": "Partial",
+      "publishing": "Publishing",
+      "comingSoon": "Coming Soon",
+      "actual": "Actual"
     },
     "time": {
       "invalidDate": "Invalid date",
@@ -427,6 +436,9 @@
     }
   },
   "dashboard": {
+    "status": {
+      "stagedReady": "Staged prices are ready to publish"
+    },
     "onboarding": {
       "heroTitle": "Welcome to Price Polish",
       "heroLine1": "Manage pricing updates with confidence.",
@@ -718,6 +730,8 @@
       "title": "Recent Activity",
       "viewAll": "View All",
       "noCampaigns": "No campaigns recorded yet.",
+      "productCountOne": "1 product",
+      "productCountMany": "{count} products",
       "productsSuffix": "products"
     },
     "quickActions": {
@@ -982,7 +996,22 @@
     }
   },
   "errors": {
-    "noPricingRulesFound": "No Pricing Rules Found"
+    "subscriptionRequired": "An active subscription is required to perform this action.",
+    "noPricingRulesFound": "No Pricing Rules Found",
+    "dbTableNotFound": "Database table not found. Please run migrations.",
+    "failedLoadPricingRules": "Failed to load pricing rules.",
+    "failedLoadCampaign": "Failed to load campaign.",
+    "noCampaignId": "No campaign ID provided.",
+    "campaignNotFound": "Campaign not found.",
+    "failedLoadTrackedItems": "Failed to load tracked items.",
+    "noTrackedItems": "No tracked items found for this campaign.",
+    "methodNotAllowed": "Method Not Allowed",
+    "unauthorized": "Unauthorized",
+    "noItemsProvided": "No items provided.",
+    "invalidItemsPayload": "Invalid items payload.",
+    "invalidScheduledPrices": "Invalid scheduled prices payload.",
+    "noCampaignOrBatch": "No campaignId or batchId provided.",
+    "failedLoadScheduleHistory": "Failed to load schedule history."
   },
   "bulk": {
     "modal": {
@@ -1008,7 +1037,11 @@
     },
     "page": {
       "title": "Bulk Editor",
-      "emptyTitle": "No pricing rules found"
+      "emptyTitle": "No pricing rules found",
+      "editorTitle": "Bulk Price Editor",
+      "underDevelopmentBody": "This feature is under development. Once complete, you will be able to manually edit product prices in bulk using your configured pricing rules.",
+      "emptyBodyPrefix": "The bulk editor requires at least one pricing rule to be configured. Please go to the ",
+      "emptyBodySuffix": " page to create your first rule."
     }
   },
   "help": {
@@ -1312,6 +1345,25 @@
       "missingShop": "Please enter your shop domain to log in",
       "invalidShop": "Please enter a valid shop domain to log in"
     }
+  },
+  "export": {
+    "reportTitle": "Price Polish — Campaign Impact Report",
+    "campaign": "Campaign",
+    "generated": "Generated",
+    "downloadedBy": "Downloaded by",
+    "productsAffected": "Products affected",
+    "variantsAffected": "Variants affected",
+    "averageChange": "Average price change",
+    "headers": {
+      "product": "Product",
+      "sku": "SKU",
+      "priceBefore": "Price Before",
+      "adjustment": "Adjustment",
+      "rounding": "Rounding",
+      "newPrice": "New Price",
+      "priceChange": "Price Change"
+    },
+    "total": "TOTAL"
   },
   "server": {
     "methodNotAllowed": "Method Not Allowed",

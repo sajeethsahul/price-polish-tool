@@ -16,7 +16,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         console.log("LOCATION:", auth.headers.get("Location"));
         return auth;
     }
-    
+
     if (!auth?.session) {
         console.error("NO SESSION FOUND IN REQUEST (METRICS)");
         throw new Response("Unauthorized", { status: 401 });
@@ -112,7 +112,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             reviewRequestShownAt: appState?.reviewRequestShownAt ?? null,
             reviewRequestDismissedAt: appState?.reviewRequestDismissedAt ?? null,
         };
-        
+
         // Check for enabled live pricing rules
         const pricingRule = await prisma.pricingRule.findUnique({
             where: { shop }
@@ -172,7 +172,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 activeCampaignId: appState?.activeCampaignId ?? null,
                 canGoLive,
                 goLiveMessage: canGoLive
-                    ? t("server.stagedPricesReady")
+                    ? t("dashboard.status.stagedReady")
                     : t("server.noStagedReady")
             },
         }), {

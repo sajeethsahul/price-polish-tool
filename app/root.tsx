@@ -30,19 +30,27 @@ export const links = () => [
 
 export async function loader({ request }: LoaderFunctionArgs) {
   try {
-    const { session } = await  shopify.authenticate.admin(request);
+    const { session } = await shopify.authenticate.admin(request);
 
-    // Shopify sends BCP-47 locale e.g. "en", "es", "de", "fr", "ja"
-    // session.locale may be undefined for older installs — fall back to "en"
-    const locale: string = (session as any).locale ?? "en";
+    const raw: string = (session as any).locale ?? "en";
+    
+    // Normalize BCP-47 to base language code
+    // "fr-CA" → "fr", "de-AT" → "de", "es-MX" → "es"
+    const base = raw.toLowerCase().split("-")[0];
+    
+    // Only these 4 are supported — everything else gets English
+    const SUPPORTED = ["es", "fr", "de"];
+    const localeId = SUPPORTED.includes(base) ? base : "en.default";
 
-    // Switch the active dictionary for this request
-    setLocale("es");
+    setLocale(localeId);
 
-    return json({ locale:"es" });
+    // Return the clean code to the client (not "en.default")
+    const locale = localeId === "en.default" ? "en" : localeId;
+    //return json({ locale });
+    return json({ locale: "es" });
+
   } catch {
-    // Not an authenticated request (e.g. auth redirect) — use default locale
-    setLocale("en");
+    setLocale("en.default");
     return json({ locale: "en" });
   }
 }

@@ -14,6 +14,9 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/webhooks/app/subscriptions-update": {
+    params: {};
+  };
   "/api/publish-lifecycle-action": {
     params: {};
   };
@@ -45,6 +48,9 @@ type Pages = {
     params: {};
   };
   "/auth/session-token": {
+    params: {};
+  };
+  "/api/export-impact": {
     params: {};
   };
   "/api/preview-price": {
@@ -126,7 +132,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/subscriptions-update" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/export-impact" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
+  };
+  "routes/webhooks.app.subscriptions-update.tsx": {
+    id: "routes/webhooks.app.subscriptions-update";
+    page: "/webhooks/app/subscriptions-update";
   };
   "routes/api.publish-lifecycle-action.ts": {
     id: "routes/api.publish-lifecycle-action";
@@ -171,6 +181,10 @@ type RouteFiles = {
   "routes/auth.session-token.ts": {
     id: "routes/auth.session-token";
     page: "/auth/session-token";
+  };
+  "routes/api.export-impact.ts": {
+    id: "routes/api.export-impact";
+    page: "/api/export-impact";
   };
   "routes/api.preview-price.ts": {
     id: "routes/api.preview-price";
@@ -280,6 +294,7 @@ type RouteFiles = {
 
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
+  "routes/webhooks.app.subscriptions-update": typeof import("./app/routes/webhooks.app.subscriptions-update.tsx");
   "routes/api.publish-lifecycle-action": typeof import("./app/routes/api.publish-lifecycle-action.ts");
   "routes/api.campaign-revert-preview": typeof import("./app/routes/api.campaign-revert-preview.ts");
   "routes/api.window-lifecycle-action": typeof import("./app/routes/api.window-lifecycle-action.ts");
@@ -291,6 +306,7 @@ type RouteModules = {
   "routes/api.push-storefront": typeof import("./app/routes/api.push-storefront.ts");
   "routes/api.proxy.settings": typeof import("./app/routes/api.proxy.settings.ts");
   "routes/auth.session-token": typeof import("./app/routes/auth.session-token.ts");
+  "routes/api.export-impact": typeof import("./app/routes/api.export-impact.ts");
   "routes/api.preview-price": typeof import("./app/routes/api.preview-price.ts");
   "routes/api.staging-price": typeof import("./app/routes/api.staging-price.ts");
   "routes/api.retry-failed": typeof import("./app/routes/api.retry-failed.ts");

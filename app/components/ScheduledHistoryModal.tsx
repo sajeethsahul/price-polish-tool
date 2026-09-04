@@ -66,6 +66,7 @@ function getStatusLabel(status: string): string {
     error: t("common.status.failed"),
     "window-stopped": t("common.status.windowStopped"),
     cancelled: t("common.status.cancelled"),
+    actual: t("common.status.actual"),
   };
   return map[status.toLowerCase()] ?? status;
 }

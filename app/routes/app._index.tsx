@@ -24,7 +24,7 @@ import {
   Grid,
   Tooltip,
   Icon,
-  SkeletonPage
+  SkeletonPage,
 } from "@shopify/polaris";
 import {
   InfoIcon,
@@ -42,7 +42,6 @@ import {
 import {
   formatMoney,
   getCurrencySymbol,
-  ZERO_DECIMAL_CURRENCIES,
 } from "../utils/format";
 import { useAppFetch } from "../utils/fetch";
 import { ScheduledHistoryModal } from "../components/ScheduledHistoryModal";
@@ -79,8 +78,7 @@ const BATCH_SIZE = 50;
 const PAGE_SIZE = 15;
 /** Number of staged variants processed per publish API call for client-side progress tracking. */
 const PUBLISH_BATCH_SIZE = 50;
-const CAMPAIGN_DETAIL_COMPARISON_GRID =
-  "minmax(0, 1fr) 110px 160px 120px";
+const CAMPAIGN_DETAIL_COMPARISON_GRID = "minmax(0, 1fr) 110px 160px 120px";
 const REVERT_PREVIEW_COMPARISON_GRID = "minmax(0, 1fr) 110px 160px";
 const LARGE_OPERATION_THRESHOLD = 100;
 const VERY_LARGE_OPERATION_THRESHOLD = 250;
@@ -191,7 +189,9 @@ interface DashboardMetrics {
   storefrontControl: StorefrontControlMetrics;
 }
 
-const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
+// Getter (not a module-level constant): t() must be evaluated lazily so the
+// message resolves against the active locale at render time, not bundle load.
+const getDefaultStorefrontControlMetrics = (): StorefrontControlMetrics => ({
   influencedVariantCount: 0,
   stagedPendingCount: 0,
   pendingRetryCount: 0,
@@ -202,7 +202,7 @@ const DEFAULT_STOREFRONT_CONTROL_METRICS: StorefrontControlMetrics = {
   closedCampaignCount: 0,
   canGoLive: false,
   goLiveMessage: t("server.noStagedReady"),
-};
+});
 
 const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
   activeCampaignsCount: 0,
@@ -222,7 +222,7 @@ const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
     reviewRequestShownAt: null,
     reviewRequestDismissedAt: null,
   },
-  storefrontControl: DEFAULT_STOREFRONT_CONTROL_METRICS,
+  storefrontControl: getDefaultStorefrontControlMetrics(),
 };
 
 type TimelineTone = "success" | "warning" | "critical" | "info" | "attention";
@@ -348,6 +348,41 @@ function normalizeCampaignSource(source: string | null) {
   return (source ?? "").trim().toLowerCase();
 }
 
+export function getStatusLabel(status: string): string {
+  const normalized = (status ?? "").toLowerCase().trim();
+  const STATUS_LABELS: Record<string, string> = {
+    published: t("common.status.published"),
+    reverted: t("common.status.reverted"),
+    "auto-restored": t("common.status.autoRestored"),
+    pending: t("common.status.pending"),
+    processing: t("common.status.processing"),
+    scheduled: t("common.status.scheduled"),
+    failed: t("common.status.failed"),
+    active: t("common.status.active"),
+    completed: t("common.status.completed"),
+    done: t("common.status.completed"),
+    success: t("common.status.completed"),
+    "restore-failed": t("common.status.restoreFailed"),
+    "missed-during-uninstall": t("common.status.missedDuringUninstall"),
+    "active-window": t("common.status.activeWindow"),
+    restoring: t("common.status.restoring"),
+    "window-stopped": t("common.status.windowStopped"),
+    cancelled: t("common.status.cancelled"),
+    "cancelled-publish": t("dashboard.campaignHistory.cancelled"),
+    "cancelled-window": t("dashboard.campaignHistory.cancelledWindow"),
+    "scheduled-publish": t("dashboard.campaignHistory.scheduledPublish"),
+    "scheduled-window": t("dashboard.campaignHistory.scheduledWindow"),
+    "publishing-window": t("dashboard.campaignHistory.publishingWindow"),
+    publishing: t("common.status.publishing"),
+    "expired-window": t("dashboard.campaignHistory.expiredWindow"),
+    unrecoverable: t("common.status.unrecoverable"),
+    draft: t("common.status.draft"),
+    partial: t("common.status.partial"),
+    actual: t("common.status.actual"),
+  };
+  return STATUS_LABELS[normalized] ?? status;
+}
+
 function resolveCampaignRuntimeStatus(
   campaign: CampaignHistoryItem,
   now: Date = new Date(),
@@ -393,8 +428,10 @@ function resolveCampaignRuntimeStatus(
 function formatCampaignSourceLabel(source: string | null) {
   const normalized = normalizeCampaignSource(source);
   if (normalized === "manual") return t("dashboard.campaignHistory.manual");
-  if (normalized === "scheduled") return t("dashboard.campaignHistory.scheduled");
-  if (normalized === "time-window") return t("dashboard.campaignHistory.timeWindow");
+  if (normalized === "scheduled")
+    return t("dashboard.campaignHistory.scheduled");
+  if (normalized === "time-window")
+    return t("dashboard.campaignHistory.timeWindow");
   return source || t("dashboard.campaignHistory.unknown");
 }
 
@@ -410,22 +447,39 @@ function formatTimeWindowSummary(campaign: CampaignHistoryItem) {
     : null;
 
   if (status === "scheduled-window" && start && end) {
-    return `Pricing will publish at ${start} and automatically restore at ${end}.`;
+    return t("campaignHistory.list.publishRestoreAt")
+      .replace("{start}", start)
+      .replace("{end}", end);
+  }
+  if (status === "publishing-window") {
+    return t("campaignHistory.list.applyingScheduledPricingNotice");
   }
   if (status === "active-window" && end) {
-    return `Pricing is active now. Original pricing will automatically restore at ${end}.`;
+    return t("campaignHistory.list.pricingActive");
+  }
+  if (status === "restoring" || status === "expired-window") {
+    return t("campaignHistory.list.restoringOriginalPricingNotice");
   }
   if (status === "auto-restored") {
-    return t("server.windowRestored");
+    return t("campaignHistory.list.originalPricingRestored");
+  }
+  if (status === "restore-failed") {
+    return t("campaignHistory.list.autoRestoreFailed");
   }
   if (status === "window-stopped") {
-    return t("server.windowRestored");
+    return t("campaignHistory.list.originalPricingRestoredBeforeEnd");
   }
   if (status === "cancelled-window") {
-    return t("server.windowCancelledBeforeStart");
+    return t("campaignHistory.list.windowCancelledBeforeStart");
+  }
+  if (status === "missed-during-uninstall") {
+    return t("campaignHistory.list.scheduleMissedUninstall");
+  }
+  if (status === "failed") {
+    return t("campaignHistory.list.scheduledPricingFailed");
   }
   if (status === "partial") {
-    return "Automatic restore needs attention for one or more tracked products.";
+    return t("campaignHistory.list.restoreNeedsAttention");
   }
 
   return null;
@@ -439,23 +493,26 @@ function formatScheduledPublishSummary(
   const status = resolveCampaignRuntimeStatus(campaign, now);
   const runAt = campaign.runAt ? new Date(campaign.runAt) : null;
   if (
-    status === "scheduled-publish" &&
+    (status === "scheduled" || status === "scheduled-publish") &&
     runAt &&
     !Number.isNaN(runAt.getTime())
   ) {
-    return `Pricing will publish automatically at ${runAt.toLocaleTimeString(
-      [],
-      {
-        hour: "numeric",
-        minute: "2-digit",
-      },
-    )}`;
+    const time = runAt.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return t("campaignHistory.list.publishesAtTime").replace("{time}", time);
   }
-  if (status === "publishing") return "Applying scheduled pricing.";
-  if (status === "published") return "Pricing was published successfully.";
-  if (status === "cancelled-publish")
-    return t("server.publishCancelledBeforeStart");
-  if (status === "failed") return "Scheduled publish needs attention.";
+  if (status === "publishing")
+    return t("campaignHistory.list.applyingScheduledPricingNotice");
+  if (status === "published")
+    return t("campaignHistory.list.publishedSuccessfully");
+  if (status === "cancelled-publish" || status === "cancelled")
+    return t("campaignHistory.list.scheduledPublishCancelled");
+  if (status === "missed-during-uninstall")
+    return t("campaignHistory.list.scheduleMissedUninstall");
+  if (status === "failed")
+    return t("campaignHistory.list.scheduledPricingFailed");
   return null;
 }
 
@@ -691,8 +748,10 @@ function DashboardContent({
     details?: string;
   } | null>(null);
   const [applyCampaignTitle, setApplyCampaignTitle] = useState("");
- const [activeCampaignId, setActiveCampaignId] =useState<string | null>(null);
-  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>([],);
+  const [activeCampaignId, setActiveCampaignId] = useState<string | null>(null);
+  const [campaignHistory, setCampaignHistory] = useState<CampaignHistoryItem[]>(
+    [],
+  );
   const [campaignHistoryLoading, setCampaignHistoryLoading] = useState(false);
   const [campaignHistoryExpanded, setCampaignHistoryExpanded] = useState(true);
   const [hideClosedCampaigns, setHideClosedCampaigns] = useState(true);
@@ -766,8 +825,6 @@ function DashboardContent({
   const [billingBlockModalCode, setBillingBlockModalCode] =
     useState<BillingBlockModalCode | null>(null);
 
-
-
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
     if (shopify) shopify.toast.show(t("toast.billingComingSoon"));
@@ -776,7 +833,7 @@ function DashboardContent({
 
   const hasActivePlan = metrics.hasActivePlan;
   const storefrontControl =
-    metrics.storefrontControl ?? DEFAULT_STOREFRONT_CONTROL_METRICS;
+    metrics.storefrontControl ?? getDefaultStorefrontControlMetrics();
 
   // UPDATED: hasRules driven by backend DB check (ruleExists), NOT previews.length
   const hasRules = ruleExists === true;
@@ -858,13 +915,13 @@ function DashboardContent({
             ? metricsData.hasActivePlan
             : true,
         storefrontControl: {
-          ...DEFAULT_STOREFRONT_CONTROL_METRICS,
+          ...getDefaultStorefrontControlMetrics(),
           ...(metricsData?.storefrontControl ?? {}),
         },
       }));
       setActiveCampaignId(
-  metricsData?.storefrontControl?.activeCampaignId ?? null
-);
+        metricsData?.storefrontControl?.activeCampaignId ?? null,
+      );
       const campaigns = Array.isArray(campaignHistoryData?.campaigns)
         ? campaignHistoryData.campaigns
         : [];
@@ -963,6 +1020,7 @@ function DashboardContent({
           productId: item.productId,
           variantId: item.variantId,
           oldPrice: item.oldPrice,
+          compareAtPrice: item.compareAtPrice ?? null,
           newPrice:
             item.overriddenPrice !== undefined
               ? item.overriddenPrice
@@ -1455,76 +1513,77 @@ function DashboardContent({
     return notices;
   }, [previews.length, revertPreview]);
 
-const revertPreviewFilteredRows = useMemo(() => {
-  // 🔍 DEBUG TRACE - Now tracking the true active state variables
-  console.log("=== REVERT PREVIEW TRACE ===");
-  console.log("1. Full object:", revertPreview);
-  console.log("2. Rows array:", revertPreview?.rows);
-  console.log("3. Search input state value:", searchQuery); // Changed to tracked search state
+  const revertPreviewFilteredRows = useMemo(() => {
+    // 🔍 DEBUG TRACE - Now tracking the true active state variables
+    console.log("=== REVERT PREVIEW TRACE ===");
+    console.log("1. Full object:", revertPreview);
+    console.log("2. Rows array:", revertPreview?.rows);
+    console.log("3. Search input state value:", searchQuery); // Changed to tracked search state
 
-  // Early exit check - if no object or rows array, match initial trace state safely
-  if (!revertPreview || !revertPreview.rows) return [] as CampaignRevertPreviewRow[];
+    // Early exit check - if no object or rows array, match initial trace state safely
+    if (!revertPreview || !revertPreview.rows)
+      return [] as CampaignRevertPreviewRow[];
 
-  const normalizedQuery = searchQuery.trim().toLowerCase();
+    const normalizedQuery = searchQuery.trim().toLowerCase();
 
-  return revertPreview.rows.filter((row) => {
-    // 🔹 1. Robust Extended Search Logic
-    if (normalizedQuery) {
-      const title = (row.productTitle || "").toLowerCase();
+    return revertPreview.rows.filter((row) => {
+      // 🔹 1. Robust Extended Search Logic
+      if (normalizedQuery) {
+        const title = (row.productTitle || "").toLowerCase();
 
-      // Fallback matching logic for multiple common Shopify object schemas
-      const type = (
-        (row as any).productType ||
-        (row as any).type ||
-        (row as any).product_type ||
-        (row as any).productVariant?.product?.productType ||
-        ""
-      ).toLowerCase();
+        // Fallback matching logic for multiple common Shopify object schemas
+        const type = (
+          (row as any).productType ||
+          (row as any).type ||
+          (row as any).product_type ||
+          (row as any).productVariant?.product?.productType ||
+          ""
+        ).toLowerCase();
 
-      const vendor = (
-        (row as any).vendor ||
-        (row as any).vendorName ||
-        (row as any).brand ||
-        (row as any).productVariant?.product?.vendor ||
-        ""
-      ).toLowerCase();
+        const vendor = (
+          (row as any).vendor ||
+          (row as any).vendorName ||
+          (row as any).brand ||
+          (row as any).productVariant?.product?.vendor ||
+          ""
+        ).toLowerCase();
 
-      const matchesTitle = title.includes(normalizedQuery);
-      const matchesType = type.includes(normalizedQuery);
-      const matchesVendor = vendor.includes(normalizedQuery);
+        const matchesTitle = title.includes(normalizedQuery);
+        const matchesType = type.includes(normalizedQuery);
+        const matchesVendor = vendor.includes(normalizedQuery);
 
-      if (!matchesTitle && !matchesType && matchesVendor) {
-        return false;
+        if (!matchesTitle && !matchesType && matchesVendor) {
+          return false;
+        }
       }
-    }
 
-    // 🔹 2. Movement Filters (Ensure dependency matches your exact state naming, e.g., activeFilter)
-    if (activeFilter === "all") return true;
+      // 🔹 2. Movement Filters (Ensure dependency matches your exact state naming, e.g., activeFilter)
+      if (activeFilter === "all") return true;
 
-    if (row.currentPrice == null || row.currentPrice <= 0) {
-      return activeFilter === "high_impact" ? false : true;
-    }
+      if (row.currentPrice == null || row.currentPrice <= 0) {
+        return activeFilter === "high_impact" ? false : true;
+      }
 
-    const delta = row.revertTargetPrice - row.currentPrice;
-    const deltaPercent = (delta / row.currentPrice) * 100;
+      const delta = row.revertTargetPrice - row.currentPrice;
+      const deltaPercent = (delta / row.currentPrice) * 100;
 
-    if (activeFilter === "increase") return delta > 0;
-    if (activeFilter === "decrease") return delta < 0;
-    if (activeFilter === "high_impact") {
-      return Math.abs(deltaPercent) >= 10; // Matches your card's high impact threshold rule
-    }
-    return true;
-  });
-  // 💡 Ensure the hook updates whenever the active states or data payload rows change!
-}, [revertPreview, activeFilter, searchQuery]);
+      if (activeFilter === "increase") return delta > 0;
+      if (activeFilter === "decrease") return delta < 0;
+      if (activeFilter === "high_impact") {
+        return Math.abs(deltaPercent) >= 10; // Matches your card's high impact threshold rule
+      }
+      return true;
+    });
+    // 💡 Ensure the hook updates whenever the active states or data payload rows change!
+  }, [revertPreview, activeFilter, searchQuery]);
 
-const handleClearFilters = useCallback(() => {
-  setSearchQuery("");
-  setMinPrice("");
-  setMaxPrice("");
-  setActiveFilter("all");
-  // Optional: Reset sort if desired, e.g., setSortOrder("alphabetical_az");
-}, []);
+  const handleClearFilters = useCallback(() => {
+    setSearchQuery("");
+    setMinPrice("");
+    setMaxPrice("");
+    setActiveFilter("all");
+    // Optional: Reset sort if desired, e.g., setSortOrder("alphabetical_az");
+  }, []);
 
   const revertPreviewTotalPages = Math.max(
     1,
@@ -1557,92 +1616,92 @@ const handleClearFilters = useCallback(() => {
     }
   }, [revertPreviewPage, revertPreviewTotalPages]);
 
-const filteredPreviews = useMemo(() => {
-  console.log(
-    `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
-  );
-  const normalizedQuery = searchQuery.trim().toLowerCase();
-  const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
-  const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
+  const filteredPreviews = useMemo(() => {
+    console.log(
+      `DEBUG: compute filteredPreviews. Source length: ${previews.length}`,
+    );
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const parsedMin = minPrice === "" ? null : parseFloat(minPrice);
+    const parsedMax = maxPrice === "" ? null : parseFloat(maxPrice);
 
-  const derived = previews.map((p) => {
-    const livePrice = parseFloat(p.oldPrice);
-    const finalPrice =
-      p.overriddenPrice !== undefined
-        ? Number(p.overriddenPrice) || 0
-        : parseFloat(p.newPrice);
-    const delta = finalPrice - livePrice;
-    const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
-    return {
-      ...p,
-      livePrice,
-      finalPrice,
-      delta,
-      deltaPercent,
-    };
-  });
+    const derived = previews.map((p) => {
+      const livePrice = parseFloat(p.oldPrice);
+      const finalPrice =
+        p.overriddenPrice !== undefined
+          ? Number(p.overriddenPrice) || 0
+          : parseFloat(p.newPrice);
+      const delta = finalPrice - livePrice;
+      const deltaPercent = livePrice !== 0 ? (delta / livePrice) * 100 : 0;
+      return {
+        ...p,
+        livePrice,
+        finalPrice,
+        delta,
+        deltaPercent,
+      };
+    });
 
-  let result = derived.filter((p) => {
-    // 🔹 1. Extended Multi-Field Search (Title, Product Type, and Vendor)
-    let matchesSearch = normalizedQuery.length === 0;
+    let result = derived.filter((p) => {
+      // 🔹 1. Extended Multi-Field Search (Title, Product Type, and Vendor)
+      let matchesSearch = normalizedQuery.length === 0;
 
-    if (!matchesSearch) {
-      const title = (p.title || "").toLowerCase();
+      if (!matchesSearch) {
+        const title = (p.title || "").toLowerCase();
 
-      // Dynamic property mapping for variant/product types & vendors
-      const type = (
-        (p as any).productType ||
-        (p as any).type ||
-        (p as any).product_type ||
-        ""
-      ).toLowerCase();
+        // Dynamic property mapping for variant/product types & vendors
+        const type = (
+          (p as any).productType ||
+          (p as any).type ||
+          (p as any).product_type ||
+          ""
+        ).toLowerCase();
 
-      const vendor = (
-        (p as any).vendor ||
-        (p as any).vendorName ||
-        ""
-      ).toLowerCase();
+        const vendor = (
+          (p as any).vendor ||
+          (p as any).vendorName ||
+          ""
+        ).toLowerCase();
 
-      matchesSearch =
-        title.includes(normalizedQuery) ||
-        type.includes(normalizedQuery) ||
-        vendor.includes(normalizedQuery);
-    }
+        matchesSearch =
+          title.includes(normalizedQuery) ||
+          type.includes(normalizedQuery) ||
+          vendor.includes(normalizedQuery);
+      }
 
-    // 🔹 2. Existing Price & Smart Segment Filters (Unchanged)
-    const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
-    const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
+      // 🔹 2. Existing Price & Smart Segment Filters (Unchanged)
+      const matchesMin = parsedMin == null || p.finalPrice >= parsedMin;
+      const matchesMax = parsedMax == null || p.finalPrice <= parsedMax;
 
-    let matchesSmartFilter = true;
-    if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
-    else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
-    else if (activeFilter === "high_impact")
-      matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
+      let matchesSmartFilter = true;
+      if (activeFilter === "increase") matchesSmartFilter = p.delta > 0;
+      else if (activeFilter === "decrease") matchesSmartFilter = p.delta < 0;
+      else if (activeFilter === "high_impact")
+        matchesSmartFilter = Math.abs(p.deltaPercent) >= 10;
 
-    return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
-  });
+      return matchesSearch && matchesMin && matchesMax && matchesSmartFilter;
+    });
 
-  result.sort((a, b) => {
-    switch (sortOrder) {
-      case "alphabetical_az":
-        return a.title.localeCompare(b.title);
-      case "alphabetical_za":
-        return b.title.localeCompare(a.title);
-      case "highest_increase":
-        return b.delta - a.delta || a.title.localeCompare(b.title);
-      case "highest_decrease":
-        return a.delta - b.delta || a.title.localeCompare(b.title);
-      case "highest_final_price":
-        return b.finalPrice - a.finalPrice || a.title.localeCompare(b.title);
-      case "lowest_final_price":
-        return a.finalPrice - b.finalPrice || a.title.localeCompare(b.title);
-      default:
-        return 0;
-    }
-  });
+    result.sort((a, b) => {
+      switch (sortOrder) {
+        case "alphabetical_az":
+          return a.title.localeCompare(b.title);
+        case "alphabetical_za":
+          return b.title.localeCompare(a.title);
+        case "highest_increase":
+          return b.delta - a.delta || a.title.localeCompare(b.title);
+        case "highest_decrease":
+          return a.delta - b.delta || a.title.localeCompare(b.title);
+        case "highest_final_price":
+          return b.finalPrice - a.finalPrice || a.title.localeCompare(b.title);
+        case "lowest_final_price":
+          return a.finalPrice - b.finalPrice || a.title.localeCompare(b.title);
+        default:
+          return 0;
+      }
+    });
 
-  return result;
-}, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
+    return result;
+  }, [previews, searchQuery, minPrice, maxPrice, activeFilter, sortOrder]);
 
   const previewImpactSummary = useMemo(() => {
     const rows = filteredPreviews;
@@ -2221,43 +2280,66 @@ const filteredPreviews = useMemo(() => {
     );
   }, []);
 
-  const handleDownloadReport = useCallback(() => {
+  const handleDownloadReport = useCallback(async () => {
     if (previews.length === 0) return;
 
-    let csv =
-      "Product Title,Variant ID,Original Price,Markup Added,Rounding Adjustment,Final Optimized,Net Profit Gain\n";
-    let totalProfit = 0;
-
-    const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(currencyCode);
-    const dec = isZeroDecimal ? 0 : 2;
-
-    previews.forEach((p) => {
+    // Columns: Product | SKU | Price Before | Adjustment | Rounding | New Price | Price Change
+    // (Variant ID removed — merchants don't need raw Shopify GIDs.)
+    const rows = previews.map((p) => {
       const base = parseFloat(p.originalBasePrice);
       const final = Number(
         p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice,
       );
       const markupAdded = base * (activeMarkup / 100);
       const roundingAdj = final - (base + markupAdded);
-      const netGain = final - base;
-      totalProfit += netGain;
-      const titleSafe = p.title.replace(/"/g, '""');
-      csv += `"${titleSafe}","${p.variantId}",${base.toFixed(dec)},${markupAdded.toFixed(dec)},${roundingAdj.toFixed(dec)},${final.toFixed(dec)},${netGain.toFixed(dec)}\n`;
+      return {
+        title: p.title,
+        sku: p.sku ?? "",
+        priceBefore: base,
+        adjustment: markupAdded,
+        rounding: roundingAdj,
+        newPrice: final,
+        priceChange: final - base,
+      };
     });
 
-    csv += `,,,,,,,\n`;
-    csv += `TOTAL STOREFRONT VALUE INCREASE,,,,,,${totalProfit.toFixed(dec)}\n`;
+    try {
+      const response = await fetch("/api/export-impact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignTitle: applyCampaignTitle,
+          currencyCode,
+          // Match the report language to the language the UI is rendered in.
+          locale: (typeof window !== "undefined" && (window as any).__LOCALE__) || undefined,
+          rows,
+        }),
+      });
+      if (!response.ok) throw new Error("Export failed");
 
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const dateStr = new Date().toISOString().split("T")[0];
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
 
-    link.href = url;
-    link.setAttribute("download", `PricePolish_Impact_Report_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [previews, activeMarkup]);
+      // price-polish-[campaign-name]-[YYYY-MM].xlsx
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const slug =
+        (applyCampaignTitle || "campaign")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "") || "campaign";
+
+      link.href = url;
+      link.setAttribute("download", `price-polish-${slug}-${month}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[EXPORT] Impact report download failed", err);
+    }
+  }, [previews, activeMarkup, currencyCode, applyCampaignTitle]);
 
   const resetOverride = useCallback((variantId: string) => {
     setPreviews((prev) =>
@@ -2285,7 +2367,9 @@ const filteredPreviews = useMemo(() => {
     blocker: overrideBlocker,
     discardChanges: discardOverrides,
     keepEditing: keepOverrides,
-  } = useUnsavedChanges(hasManualOverrides || isImmediateApplyDirty || isScheduleDirty);
+  } = useUnsavedChanges(
+    hasManualOverrides || isImmediateApplyDirty || isScheduleDirty,
+  );
 
   // UPDATED: Wrapped with guardNoRules — does NOT change existing handler logic
   const handleGoLiveClick = useCallback(() => {
@@ -2301,7 +2385,6 @@ const filteredPreviews = useMemo(() => {
 
   const handlePushStorefront = useCallback(
     async (clear = false) => {
-
       setIsProcessing(true);
       setShowGoLiveModal(false);
       setShowStopModal(false);
@@ -2325,8 +2408,8 @@ const filteredPreviews = useMemo(() => {
             if (!res.ok) {
               throw new Error(
                 data.message ??
-                data.error ??
-                t("dashboard.pushStorefront.failedStop"),
+                  data.error ??
+                  t("dashboard.pushStorefront.failedStop"),
               );
             }
           }
@@ -2373,13 +2456,13 @@ const filteredPreviews = useMemo(() => {
 
           const data = await res.json();
 
-            if (!res.ok) {
-              throw new Error(
-                data.message ??
+          if (!res.ok) {
+            throw new Error(
+              data.message ??
                 data.error ??
                 t("dashboard.pushStorefront.failedPublish"),
-              );
-            }
+            );
+          }
 
           // Count this batch: successful + failed = processed in this pass
           const batchProcessed = (data.applied ?? 0) + (data.failed ?? 0);
@@ -2395,8 +2478,7 @@ const filteredPreviews = useMemo(() => {
         }
 
         setProgress(100);
-        if (shopify)
-          shopify.toast.show(t("dashboard.pushStorefront.live"));
+        if (shopify) shopify.toast.show(t("dashboard.pushStorefront.live"));
         else console.log("BYPASS: Prices are now live on your storefront");
         setMetrics((prev) => ({ ...prev, isLive: true }));
         setActiveCampaignId(null);
@@ -2454,28 +2536,7 @@ const filteredPreviews = useMemo(() => {
   }, []);
 
   const campaignStatusLabel = useCallback((status: string) => {
-    const normalized = status.toLowerCase();
-    const labels: Record<string, string> = {
-      scheduled: t("dashboard.campaignHistory.scheduled"),
-      "scheduled-window": t("dashboard.campaignHistory.scheduledWindow"),
-      "publishing-window": t("dashboard.campaignHistory.publishingWindow"),
-      "active-window": t("dashboard.campaignHistory.activeWindow"),
-      restoring: t("common.status.restoring"),
-      "expired-window": t("dashboard.campaignHistory.expiredWindow"),
-      "auto-restored": t("dashboard.campaignHistory.autoRestored"),
-      "window-stopped": t("dashboard.campaignHistory.windowStopped"),
-      "cancelled-window": t("dashboard.campaignHistory.cancelledWindow"),
-      "scheduled-publish": t("dashboard.campaignHistory.scheduledPublish"),
-      "cancelled-publish": t("dashboard.campaignHistory.cancelled"),
-      publishing: t("dashboard.campaignHistory.publishing"),
-      published: t("dashboard.campaignHistory.published"),
-      failed: t("dashboard.campaignHistory.failed"),
-      "restore-failed": t("common.status.restoreFailed"),
-      "missed-during-uninstall": t("common.status.missedDuringUninstall"),
-      unrecoverable: t("dashboard.campaignHistory.unrecoverable"),
-      draft: t("dashboard.campaignHistory.draft"),
-    };
-    return labels[normalized] ?? status;
+    return getStatusLabel(status);
   }, []);
 
   const detailStatusTone = useCallback((status?: string | null) => {
@@ -2487,16 +2548,13 @@ const filteredPreviews = useMemo(() => {
   }, []);
 
   const detailStatusLabel = useCallback((status?: string | null) => {
-    const normalized = (status ?? "pending").toLowerCase();
-    if (normalized === "reverted") return t("dashboard.campaignHistory.reverted");
-    if (normalized === "failed") return t("dashboard.campaignHistory.failed");
-    if (normalized === "unrecoverable") return t("dashboard.campaignHistory.unrecoverable");
-    if (normalized === "scheduled") return t("dashboard.campaignHistory.scheduled");
-    return t("dashboard.campaignHistory.pending");
+    if (!status) return t("common.status.pending");
+    return getStatusLabel(status);
   }, []);
 
   const formatDetailScheduleType = useCallback((type?: string | null) => {
-    if (type === "time-window") return t("dashboard.Schedule.center.timeWindowBadge");
+    if (type === "time-window")
+      return t("dashboard.Schedule.center.timeWindowBadge");
     return t("dashboard.Schedule.center.oneTimePublishBadge");
   }, []);
 
@@ -3042,17 +3100,40 @@ const filteredPreviews = useMemo(() => {
     [previews],
   );
 
-  const timeAgo = (dateStr: string) => {
-    const diff = new Date().getTime() - new Date(dateStr).getTime();
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    const remainingMinutes = minutes % 60;
-    const pad = (num: number) => num.toString().padStart(2, "0");
-    return `${days}d ${pad(remainingHours)}:${pad(remainingMinutes)} ago`;
-  };
+  const formatRecentActivityProductCount = useCallback((count: number) => {
+    if (count === 1) {
+      return t("dashboard.recentActivity.productCountOne");
+    }
+    return t("dashboard.recentActivity.productCountMany").replace(
+      "{count}",
+      String(count),
+    );
+  }, []);
+
+  const timeAgo = useCallback((dateStr: string) => {
+    if (!dateStr) return "—";
+    const nowMs = Date.now();
+    const targetMs = new Date(dateStr).getTime();
+    if (Number.isNaN(targetMs)) return t("common.time.unknownTiming");
+
+    const diffMs = nowMs - targetMs;
+    const absMinutes = Math.round(Math.abs(diffMs) / (1000 * 60));
+
+    if (absMinutes < 1) return t("common.time.now");
+    if (absMinutes < 60) {
+      return t("common.time.minutesAgo").replace("{count}", String(absMinutes));
+    }
+
+    const absHours = Math.round(absMinutes / 60);
+    if (absHours < 24) {
+      return t("common.time.hoursAgo").replace("{count}", String(absHours));
+    }
+
+    const absDays = Math.round(absHours / 24);
+    return absDays === 1
+      ? t("common.time.daysAgoOne")
+      : t("common.time.daysAgoMany").replace("{count}", String(absDays));
+  }, []);
 
   const SHOW_DEBUG_TOOLS = false;
   const isInitialDashboardLoad = loading && ruleExists === null;
@@ -3151,8 +3232,8 @@ const filteredPreviews = useMemo(() => {
                     </BlockStack>
                     <Banner tone="info">
                       <p>
-                        If <strong>{t("common.isEmbedded")}</strong> is NO, the app is
-                        running on its own domain instead of{" "}
+                        If <strong>{t("common.isEmbedded")}</strong> is NO, the
+                        app is running on its own domain instead of{" "}
                         <code>admin.shopify.com</code>. This will cause App
                         Bridge origin mismatches.
                       </p>
@@ -3191,9 +3272,7 @@ const filteredPreviews = useMemo(() => {
                   <Text as="h3" variant="headingMd">
                     {t("dashboard.billingUpsell.title")}
                   </Text>
-                  <Text as="p">
-                    {t("dashboard.billingUpsell.body")}
-                  </Text>
+                  <Text as="p">{t("dashboard.billingUpsell.body")}</Text>
                   <InlineStack gap="200">
                     <Badge tone="success">{t("pricing.bulkPricing")}</Badge>
                     <Badge tone="success">{t("pricing.undoAnytime")}</Badge>
@@ -3499,16 +3578,8 @@ const filteredPreviews = useMemo(() => {
                         ) : (
                           <BlockStack gap="150">
                             {campaignHistory.slice(0, 4).map((c, index) => {
-                              const tone =
-                                c.status === "active"
-                                  ? "success"
-                                  : c.status === "scheduled"
-                                    ? "info"
-                                    : c.status === "partial"
-                                      ? "attention"
-                                      : c.status === "closed"
-                                        ? undefined
-                                        : "info";
+                              const tone = campaignStatusTone(c.status);
+                              const label = getStatusLabel(c.status);
                               return (
                                 <div key={c.campaignId}>
                                   <InlineStack
@@ -3536,11 +3607,11 @@ const filteredPreviews = useMemo(() => {
                                         variant="bodySm"
                                         tone="subdued"
                                       >
-                                        {`${c.productCount} products • ${c.createdAt ? timeAgo(c.createdAt) : "—"}`}
+                                        {`${formatRecentActivityProductCount(c.productCount)} • ${c.createdAt ? timeAgo(c.createdAt) : "—"}`}
                                       </Text>
                                     </InlineStack>
                                     <Badge tone={tone} size="small">
-                                      {c.status}
+                                      {label}
                                     </Badge>
                                   </InlineStack>
 
@@ -3630,9 +3701,7 @@ const filteredPreviews = useMemo(() => {
               {!hasRules && ruleExists !== null && (
                 <Banner tone="warning" title={t("errors.noPricingRulesFound")}>
                   <BlockStack gap="200">
-                    <p>
-                      {t("dashboard.noRulesBanner.body")}
-                    </p>
+                    <p>{t("dashboard.noRulesBanner.body")}</p>
                     <InlineStack>
                       <Button
                         variant="primary"
@@ -3687,7 +3756,11 @@ const filteredPreviews = useMemo(() => {
                               >
                                 {t("dashboard.storefrontControl.title")}
                               </Text>
-                              <Tooltip content={t("dashboard.storefrontControl.tooltip")}>
+                              <Tooltip
+                                content={t(
+                                  "dashboard.storefrontControl.tooltip",
+                                )}
+                              >
                                 <span
                                   style={{
                                     cursor: "pointer",
@@ -3710,7 +3783,9 @@ const filteredPreviews = useMemo(() => {
                             tone={metrics.isLive ? "success" : "attention"}
                             size="small"
                           >
-                            {metrics.isLive ? t("dashboard.storefrontControl.live") : t("dashboard.storefrontControl.paused")}
+                            {metrics.isLive
+                              ? t("dashboard.storefrontControl.live")
+                              : t("dashboard.storefrontControl.paused")}
                           </Badge>
                           <Text
                             as="span"
@@ -3812,340 +3887,547 @@ const filteredPreviews = useMemo(() => {
                 <BlockStack gap="200">
                   {/* 🔹 2. FILTER CARD */}
 
+                  <Card padding="300">
+                    <BlockStack gap="200">
+                      {/* Clean, low-profile header row */}
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text
+                          as="h3"
+                          variant="headingSm"
+                          fontWeight="semibold"
+                          tone="subdued"
+                        >
+                          {t("dashboard.filters.title")}
+                        </Text>
+                      </InlineStack>
 
-<Card padding="300">
-  <BlockStack gap="200">
-    {/* Clean, low-profile header row */}
-    <InlineStack align="space-between" blockAlign="center">
-      <Text as="h3" variant="headingSm" fontWeight="semibold" tone="subdued">
-        {t("dashboard.filters.title")}
-      </Text>
-    </InlineStack>
+                      {/* Anchored Control Bar with a subtle background to pop on the screen */}
+                      <Box
+                        background="bg-surface-secondary"
+                        padding="300"
+                        borderRadius="200"
+                      >
+                        <InlineStack
+                          align="space-between"
+                          blockAlign="center"
+                          gap="300"
+                          wrap
+                        >
+                          {/* Left side: Tabbed Quick Segments */}
+                          <InlineStack gap="100" blockAlign="center">
+                            <Button
+                              size="slim"
+                              variant={
+                                activeFilter === "all"
+                                  ? "secondary"
+                                  : "tertiary"
+                              }
+                              pressed={activeFilter === "all"}
+                              onClick={() => setActiveFilter("all")}
+                            >
+                              {t("dashboard.filters.all")}
+                            </Button>
+                            <Button
+                              size="slim"
+                              variant={
+                                activeFilter === "increase"
+                                  ? "secondary"
+                                  : "tertiary"
+                              }
+                              pressed={activeFilter === "increase"}
+                              onClick={() => setActiveFilter("increase")}
+                            >
+                              {t("dashboard.filters.priceIncrease")}
+                            </Button>
+                            <Button
+                              size="slim"
+                              variant={
+                                activeFilter === "decrease"
+                                  ? "secondary"
+                                  : "tertiary"
+                              }
+                              pressed={activeFilter === "decrease"}
+                              onClick={() => setActiveFilter("decrease")}
+                            >
+                              {t("dashboard.filters.priceDecrease")}
+                            </Button>
+                            <Button
+                              size="slim"
+                              variant={
+                                activeFilter === "high_impact"
+                                  ? "secondary"
+                                  : "tertiary"
+                              }
+                              pressed={activeFilter === "high_impact"}
+                              onClick={() => setActiveFilter("high_impact")}
+                            >
+                              {t("dashboard.filters.highImpact")}
+                            </Button>
+                          </InlineStack>
 
-    {/* Anchored Control Bar with a subtle background to pop on the screen */}
-    <Box
-      background="bg-surface-secondary"
-      padding="300"
-      borderRadius="200"
-    >
-      <InlineStack
-        align="space-between"
-        blockAlign="center"
-        gap="300"
-        wrap
-      >
-        {/* Left side: Tabbed Quick Segments */}
-        <InlineStack gap="100" blockAlign="center">
-          <Button
-            size="slim"
-            variant={activeFilter === "all" ? "secondary" : "tertiary"}
-            pressed={activeFilter === "all"}
-            onClick={() => setActiveFilter("all")}
-          >
-            {t("dashboard.filters.all")}
-          </Button>
-          <Button
-            size="slim"
-            variant={activeFilter === "increase" ? "secondary" : "tertiary"}
-            pressed={activeFilter === "increase"}
-            onClick={() => setActiveFilter("increase")}
-          >
-            {t("dashboard.filters.priceIncrease")}
-          </Button>
-          <Button
-            size="slim"
-            variant={activeFilter === "decrease" ? "secondary" : "tertiary"}
-            pressed={activeFilter === "decrease"}
-            onClick={() => setActiveFilter("decrease")}
-          >
-            {t("dashboard.filters.priceDecrease")}
-          </Button>
-          <Button
-            size="slim"
-            variant={activeFilter === "high_impact" ? "secondary" : "tertiary"}
-            pressed={activeFilter === "high_impact"}
-            onClick={() => setActiveFilter("high_impact")}
-          >
-            {t("dashboard.filters.highImpact")}
-          </Button>
-        </InlineStack>
+                          {/* Right side: Inline Search, Sort & Numeric Range Inputs */}
+                          <div style={{ flexGrow: 1, minWidth: "320px" }}>
+                            <InlineStack
+                              gap="150"
+                              align="end"
+                              blockAlign="center"
+                              wrap
+                            >
+                              {/* Search Input */}
+                              <div
+                                style={{ flex: "2 1 180px", minWidth: "160px" }}
+                              >
+                                <TextField
+                                  label={t("dashboard.products.searchLabel")}
+                                  labelHidden
+                                  value={searchQuery}
+                                  onChange={handleSearchChange}
+                                  autoComplete="off"
+                                  placeholder={t(
+                                    "dashboard.products.searchPlaceholder",
+                                  )}
+                                  prefix={
+                                    <Icon source={SearchIcon} tone="base" />
+                                  }
+                                  maxLength={100}
+                                />
+                              </div>
 
-        {/* Right side: Inline Search, Sort & Numeric Range Inputs */}
-        <div style={{ flexGrow: 1, minWidth: "320px" }}>
-          <InlineStack
-            gap="150"
-            align="end"
-            blockAlign="center"
-            wrap
-          >
-            {/* Search Input */}
-            <div style={{ flex: "2 1 180px", minWidth: "160px" }}>
-              <TextField
-                label={t("dashboard.products.searchLabel")}
-                labelHidden
-                value={searchQuery}
-                onChange={handleSearchChange}
-                autoComplete="off"
-                placeholder={t("dashboard.products.searchPlaceholder")}
-                prefix={<Icon source={SearchIcon} tone="base" />}
-                maxLength={100}
-              />
-            </div>
+                              {/* Sort Menu Selector */}
+                              <div
+                                style={{
+                                  flex: "1.5 1 140px",
+                                  minWidth: "140px",
+                                }}
+                              >
+                                <Select
+                                  label={t("common.sortBy")}
+                                  labelHidden
+                                  options={[
+                                    {
+                                      label: t("dashboard.filters.sortAZ"),
+                                      value: "alphabetical_az",
+                                    },
+                                    {
+                                      label: t("dashboard.filters.sortZA"),
+                                      value: "alphabetical_za",
+                                    },
+                                    {
+                                      label: t(
+                                        "dashboard.filters.sortHighestIncrease",
+                                      ),
+                                      value: "highest_increase",
+                                    },
+                                    {
+                                      label: t(
+                                        "dashboard.filters.sortHighestDecrease",
+                                      ),
+                                      value: "highest_decrease",
+                                    },
+                                    {
+                                      label: t(
+                                        "dashboard.filters.sortHighestFinalPrice",
+                                      ),
+                                      value: "highest_final_price",
+                                    },
+                                    {
+                                      label: t(
+                                        "dashboard.filters.sortLowestFinalPrice",
+                                      ),
+                                      value: "lowest_final_price",
+                                    },
+                                  ]}
+                                  value={sortOrder}
+                                  onChange={(value) =>
+                                    setSortOrder(value as PreviewSortOrder)
+                                  }
+                                />
+                              </div>
 
-            {/* Sort Menu Selector */}
-            <div style={{ flex: "1.5 1 140px", minWidth: "140px" }}>
-              <Select
-                label={t("common.sortBy")}
-                labelHidden
-                options={[
-                  { label: t("dashboard.filters.sortAZ"), value: "alphabetical_az" },
-                  { label: t("dashboard.filters.sortZA"), value: "alphabetical_za" },
-                  { label: t("dashboard.filters.sortHighestIncrease"), value: "highest_increase" },
-                  { label: t("dashboard.filters.sortHighestDecrease"), value: "highest_decrease" },
-                  { label: t("dashboard.filters.sortHighestFinalPrice"), value: "highest_final_price" },
-                  { label: t("dashboard.filters.sortLowestFinalPrice"), value: "lowest_final_price" },
-                ]}
-                value={sortOrder}
-                onChange={(value) => setSortOrder(value as PreviewSortOrder)}
-              />
-            </div>
+                              {/* Min Price Field */}
+                              <div
+                                style={{ flex: "1 1 85px", minWidth: "85px" }}
+                              >
+                                <TextField
+                                  label={t("dashboard.products.minPriceLabel")}
+                                  labelHidden
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={minPrice}
+                                  onChange={handleMinPriceChange}
+                                  autoComplete="off"
+                                  prefix={currencySymbol}
+                                  placeholder={t(
+                                    "dashboard.products.minPricePlaceholder",
+                                  )}
+                                  maxLength={15}
+                                />
+                              </div>
 
-{/* Min Price Field */}
-      <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
-              <TextField
-                label={t("dashboard.products.minPriceLabel")}
-                labelHidden
-                type="text"
-                inputMode="decimal"
-                value={minPrice}
-                onChange={handleMinPriceChange}
-                autoComplete="off"
-                prefix={currencySymbol}
-                placeholder={t("dashboard.products.minPricePlaceholder")}
-                maxLength={15}
-              />
-            </div>
+                              {/* Max Price Field */}
+                              <div
+                                style={{ flex: "1 1 85px", minWidth: "85px" }}
+                              >
+                                <TextField
+                                  label={t("dashboard.products.maxPriceLabel")}
+                                  labelHidden
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={maxPrice}
+                                  onChange={handleMaxPriceChange}
+                                  autoComplete="off"
+                                  prefix={currencySymbol}
+                                  placeholder={t(
+                                    "dashboard.products.maxPricePlaceholder",
+                                  )}
+                                  maxLength={15}
+                                />
+                              </div>
 
-            {/* Max Price Field */}
-            <div style={{ flex: "1 1 85px", minWidth: "85px" }}>
-              <TextField
-                label={t("dashboard.products.maxPriceLabel")}
-                labelHidden
-                type="text"
-                inputMode="decimal"
-                value={maxPrice}
-                onChange={handleMaxPriceChange}
-                autoComplete="off"
-                prefix={currencySymbol}
-                placeholder={t("dashboard.products.maxPricePlaceholder")}
-                maxLength={15}
-              />
-            </div>
-
-            {/* 🔴 Added: Clear Filter Icon Action Button with Tooltip */}
-            {(searchQuery || minPrice || maxPrice || activeFilter !== "all") && (
-              <Tooltip content={t("dashboard.filters.clearAllFilters")} dismissOnMouseOut>
-             <Button
-              variant="tertiary"
-              tone="critical"
-              icon={XCircleIcon}
-              onClick={handleClearFilters}
-              accessibilityLabel={t("dashboard.filters.clearAccessibility")}
-            >
-              {t("dashboard.filters.clear")}
-            </Button>
-              </Tooltip>
-            )}
-          </InlineStack>
-        </div>
-      </InlineStack>
-    </Box>
-  </BlockStack>
-</Card>
+                              {/* 🔴 Added: Clear Filter Icon Action Button with Tooltip */}
+                              {(searchQuery ||
+                                minPrice ||
+                                maxPrice ||
+                                activeFilter !== "all") && (
+                                <Tooltip
+                                  content={t(
+                                    "dashboard.filters.clearAllFilters",
+                                  )}
+                                  dismissOnMouseOut
+                                >
+                                  <Button
+                                    variant="tertiary"
+                                    tone="critical"
+                                    icon={XCircleIcon}
+                                    onClick={handleClearFilters}
+                                    accessibilityLabel={t(
+                                      "dashboard.filters.clearAccessibility",
+                                    )}
+                                  >
+                                    {t("dashboard.filters.clear")}
+                                  </Button>
+                                </Tooltip>
+                              )}
+                            </InlineStack>
+                          </div>
+                        </InlineStack>
+                      </Box>
+                    </BlockStack>
+                  </Card>
 
                   {previews.length > 0 && (
                     <Card>
-  <Box padding="400">
-    <BlockStack gap="300">
+                      <Box padding="400">
+                        <BlockStack gap="300">
+                          {/* Header Summary Metadata Row */}
+                          <InlineStack
+                            align="space-between"
+                            blockAlign="center"
+                            gap="200"
+                            wrap
+                          >
+                            <Text
+                              as="h3"
+                              variant="headingSm"
+                              fontWeight="semibold"
+                            >
+                              {t("dashboard.previewSummary.title")}
+                            </Text>
+                            <Text as="p" variant="bodySm" tone="subdued">
+                              {(() => {
+                                const productCount = Number(
+                                  previewImpactSummary.totalCount ?? 0,
+                                );
+                                const variantCount = Number(
+                                  previewImpactSummary.variantCount ??
+                                    productCount,
+                                );
 
-      {/* Header Summary Metadata Row */}
-      <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
-        <Text as="h3" variant="headingSm" fontWeight="semibold">
-          {t("dashboard.previewSummary.title")}
-        </Text>
-        <Text as="p" variant="bodySm" tone="subdued">
-          {(() => {
-            const productCount = Number(previewImpactSummary.totalCount ?? 0);
-            const variantCount = Number(previewImpactSummary.variantCount ?? productCount);
+                                if (
+                                  productCount > 0 &&
+                                  variantCount > 0 &&
+                                  variantCount !== productCount
+                                ) {
+                                  return t(
+                                    "dashboard.previewSummary.basedOnProductsVariants",
+                                  )
+                                    .replace("{count}", String(productCount))
+                                    .replace(
+                                      "{variants}",
+                                      String(variantCount),
+                                    );
+                                }
+                                return t(
+                                  "dashboard.previewSummary.basedOnProducts",
+                                ).replace("{count}", String(productCount));
+                              })()}
+                            </Text>
+                          </InlineStack>
 
-            if (productCount > 0 && variantCount > 0 && variantCount !== productCount) {
-              return t("dashboard.previewSummary.basedOnProductsVariants")
-                .replace("{count}", String(productCount))
-                .replace("{variants}", String(variantCount));
-            }
-            return t("dashboard.previewSummary.basedOnProducts")
-              .replace("{count}", String(productCount));
-          })()}
-        </Text>
-      </InlineStack>
+                          <Divider />
 
-      <Divider />
+                          {/* Empty State vs Metrics Dashboard View */}
+                          {previewImpactSummary.affectedCount === 0 ? (
+                            <Box
+                              padding="300"
+                              background="bg-surface-secondary"
+                              borderRadius="200"
+                            >
+                              <Text
+                                as="p"
+                                variant="bodySm"
+                                tone="subdued"
+                                alignment="center"
+                              >
+                                {t("dashboard.previewSummary.noChanges")}
+                              </Text>
+                            </Box>
+                          ) : (
+                            /* Pure Flexbox Grid: 100% immune to Polaris appendChild lifecycle errors */
+                            <div
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                gap: "12px",
+                                width: "100%",
+                              }}
+                            >
+                              {/* Card 1: Products Affected */}
+                              <div style={{ flex: "1 1 180px", minWidth: "0" }}>
+                                <Box
+                                  padding="300"
+                                  background="bg-surface-secondary"
+                                  borderRadius="200"
+                                  borderStyle="solid"
+                                  borderWidth="025"
+                                  borderColor="border-secondary"
+                                >
+                                  <BlockStack gap="100">
+                                    <Text
+                                      as="p"
+                                      variant="bodyXs"
+                                      fontWeight="medium"
+                                      tone="subdued"
+                                    >
+                                      {t(
+                                        "dashboard.previewSummary.productsAffected",
+                                      )}
+                                    </Text>
+                                    <Text
+                                      as="p"
+                                      variant="headingMd"
+                                      fontWeight="bold"
+                                    >
+                                      {previewImpactSummary.affectedCount}
+                                    </Text>
+                                  </BlockStack>
+                                </Box>
+                              </div>
 
-      {/* Empty State vs Metrics Dashboard View */}
-      {previewImpactSummary.affectedCount === 0 ? (
-        <Box
-          padding="300"
-          background="bg-surface-secondary"
-          borderRadius="200"
-        >
-          <Text as="p" variant="bodySm" tone="subdued" alignment="center">
-            {t("dashboard.previewSummary.noChanges")}
-          </Text>
-        </Box>
-      ) : (
-        /* Pure Flexbox Grid: 100% immune to Polaris appendChild lifecycle errors */
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '12px',
-          width: '100%'
-        }}>
+                              {/* Card 2: Average Change */}
+                              <div style={{ flex: "1 1 180px", minWidth: "0" }}>
+                                <Box
+                                  padding="300"
+                                  background={
+                                    previewImpactSummary.averageDelta >= 0
+                                      ? "bg-surface-success"
+                                      : "bg-surface-critical"
+                                  }
+                                  borderRadius="200"
+                                  borderStyle="solid"
+                                  borderWidth="025"
+                                  borderColor={
+                                    previewImpactSummary.averageDelta >= 0
+                                      ? "border-success"
+                                      : "border-critical"
+                                  }
+                                >
+                                  <BlockStack gap="100">
+                                    <Text
+                                      as="p"
+                                      variant="bodyXs"
+                                      fontWeight="medium"
+                                      tone="subdued"
+                                    >
+                                      {t(
+                                        "dashboard.previewSummary.averageChange",
+                                      )}
+                                    </Text>
+                                    <Text
+                                      as="p"
+                                      variant="headingMd"
+                                      fontWeight="bold"
+                                      tone={
+                                        previewImpactSummary.averageDelta >= 0
+                                          ? "success"
+                                          : "critical"
+                                      }
+                                    >
+                                      {`${previewImpactSummary.averageDelta >= 0 ? "+" : ""}${formatMoney(previewImpactSummary.averageDelta, currencyCode)}`}
+                                    </Text>
+                                  </BlockStack>
+                                </Box>
+                              </div>
 
-          {/* Card 1: Products Affected */}
-          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
-            <Box
-              padding="300"
-              background="bg-surface-secondary"
-              borderRadius="200"
-              borderStyle="solid"
-              borderWidth="025"
-              borderColor="border-secondary"
-            >
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  {t("dashboard.previewSummary.productsAffected")}
-                </Text>
-                <Text as="p" variant="headingMd" fontWeight="bold">
-                  {previewImpactSummary.affectedCount}
-                </Text>
-              </BlockStack>
-            </Box>
-          </div>
+                              {/* Card 3: Largest Increase */}
+                              <div style={{ flex: "1 1 180px", minWidth: "0" }}>
+                                <Box
+                                  padding="300"
+                                  background={
+                                    previewImpactSummary.hasIncrease
+                                      ? "bg-surface-success"
+                                      : "bg-surface-secondary"
+                                  }
+                                  borderRadius="200"
+                                  borderStyle="solid"
+                                  borderWidth="025"
+                                  borderColor={
+                                    previewImpactSummary.hasIncrease
+                                      ? "border-success"
+                                      : "border-secondary"
+                                  }
+                                >
+                                  <BlockStack gap="100">
+                                    <Text
+                                      as="p"
+                                      variant="bodyXs"
+                                      fontWeight="medium"
+                                      tone="subdued"
+                                    >
+                                      {t(
+                                        "dashboard.previewSummary.largestIncrease",
+                                      )}
+                                    </Text>
+                                    <Text
+                                      as="p"
+                                      variant="headingMd"
+                                      fontWeight="bold"
+                                      tone={
+                                        previewImpactSummary.hasIncrease
+                                          ? "success"
+                                          : undefined
+                                      }
+                                    >
+                                      {previewImpactSummary.hasIncrease
+                                        ? `+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`
+                                        : "—"}
+                                    </Text>
+                                  </BlockStack>
+                                </Box>
+                              </div>
 
-          {/* Card 2: Average Change */}
-          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
-            <Box
-              padding="300"
-              background={previewImpactSummary.averageDelta >= 0 ? "bg-surface-success" : "bg-surface-critical"}
-              borderRadius="200"
-              borderStyle="solid"
-              borderWidth="025"
-              borderColor={previewImpactSummary.averageDelta >= 0 ? "border-success" : "border-critical"}
-            >
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  {t("dashboard.previewSummary.averageChange")}
-                </Text>
-                <Text
-                  as="p"
-                  variant="headingMd"
-                  fontWeight="bold"
-                  tone={previewImpactSummary.averageDelta >= 0 ? "success" : "critical"}
-                >
-                  {`${previewImpactSummary.averageDelta >= 0 ? "+" : ""}${formatMoney(previewImpactSummary.averageDelta, currencyCode)}`}
-                </Text>
-              </BlockStack>
-            </Box>
-          </div>
+                              {/* Card 4: Largest Decrease */}
+                              <div style={{ flex: "1 1 180px", minWidth: "0" }}>
+                                <Box
+                                  padding="300"
+                                  background={
+                                    previewImpactSummary.hasDecrease
+                                      ? "bg-surface-critical"
+                                      : "bg-surface-secondary"
+                                  }
+                                  borderRadius="200"
+                                  borderStyle="solid"
+                                  borderWidth="025"
+                                  borderColor={
+                                    previewImpactSummary.hasDecrease
+                                      ? "border-critical"
+                                      : "border-secondary"
+                                  }
+                                >
+                                  <BlockStack gap="100">
+                                    <Text
+                                      as="p"
+                                      variant="bodyXs"
+                                      fontWeight="medium"
+                                      tone="subdued"
+                                    >
+                                      {t(
+                                        "dashboard.previewSummary.largestDecrease",
+                                      )}
+                                    </Text>
+                                    <Text
+                                      as="p"
+                                      variant="headingMd"
+                                      fontWeight="bold"
+                                      tone={
+                                        previewImpactSummary.hasDecrease
+                                          ? "critical"
+                                          : undefined
+                                      }
+                                    >
+                                      {previewImpactSummary.hasDecrease
+                                        ? formatMoney(
+                                            previewImpactSummary.maxDecreaseDelta,
+                                            currencyCode,
+                                          )
+                                        : "—"}
+                                    </Text>
+                                  </BlockStack>
+                                </Box>
+                              </div>
 
-          {/* Card 3: Largest Increase */}
-          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
-            <Box
-              padding="300"
-              background={previewImpactSummary.hasIncrease ? "bg-surface-success" : "bg-surface-secondary"}
-              borderRadius="200"
-              borderStyle="solid"
-              borderWidth="025"
-              borderColor={previewImpactSummary.hasIncrease ? "border-success" : "border-secondary"}
-            >
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  {t("dashboard.previewSummary.largestIncrease")}
-                </Text>
-                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasIncrease ? "success" : undefined}>
-                  {previewImpactSummary.hasIncrease
-                    ? `+${formatMoney(previewImpactSummary.maxIncreaseDelta, currencyCode)}`
-                    : "—"
-                  }
-                </Text>
-              </BlockStack>
-            </Box>
-          </div>
-
-          {/* Card 4: Largest Decrease */}
-          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
-            <Box
-              padding="300"
-              background={previewImpactSummary.hasDecrease ? "bg-surface-critical" : "bg-surface-secondary"}
-              borderRadius="200"
-              borderStyle="solid"
-              borderWidth="025"
-              borderColor={previewImpactSummary.hasDecrease ? "border-critical" : "border-secondary"}
-            >
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  {t("dashboard.previewSummary.largestDecrease")}
-                </Text>
-                <Text as="p" variant="headingMd" fontWeight="bold" tone={previewImpactSummary.hasDecrease ? "critical" : undefined}>
-                  {previewImpactSummary.hasDecrease
-                    ? formatMoney(previewImpactSummary.maxDecreaseDelta, currencyCode)
-                    : "—"
-                  }
-                </Text>
-              </BlockStack>
-            </Box>
-          </div>
-
-          {/* Card 5: Avg Final Price & Safeguards */}
-          <div style={{ flex: '1 1 180px', minWidth: '0' }}>
-            <Box
-              padding="300"
-              background="bg-surface-secondary"
-              borderRadius="200"
-              borderStyle="solid"
-              borderWidth="025"
-              borderColor="border-secondary"
-            >
-              <BlockStack gap="100">
-                <Text as="p" variant="bodyXs" fontWeight="medium" tone="subdued">
-                  {t("dashboard.previewSummary.avgPriceSafeguards")}
-                </Text>
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="p" variant="headingMd" fontWeight="bold">
-                    {formatMoney(previewImpactSummary.averageFinalPrice, currencyCode)}
-                  </Text>
-                  {previewImpactSummary.safeguardAdjustedCount > 0 && (
-                    <Box
-                      background="bg-surface-warning"
-                      paddingInline="150"
-                      paddingBlock="050"
-                      borderRadius="100"
-                    >
-                      <Text as="span" variant="bodyXs" fontWeight="semibold" tone="caution">
-                        {`${previewImpactSummary.safeguardAdjustedCount} ${t("dashboard.previewSummary.locked")}`}
-                      </Text>
-                    </Box>
-                  )}
-                </InlineStack>
-              </BlockStack>
-            </Box>
-          </div>
-
-        </div>
-      )}
-    </BlockStack>
-  </Box>
-</Card>
+                              {/* Card 5: Avg Final Price & Safeguards */}
+                              <div style={{ flex: "1 1 180px", minWidth: "0" }}>
+                                <Box
+                                  padding="300"
+                                  background="bg-surface-secondary"
+                                  borderRadius="200"
+                                  borderStyle="solid"
+                                  borderWidth="025"
+                                  borderColor="border-secondary"
+                                >
+                                  <BlockStack gap="100">
+                                    <Text
+                                      as="p"
+                                      variant="bodyXs"
+                                      fontWeight="medium"
+                                      tone="subdued"
+                                    >
+                                      {t(
+                                        "dashboard.previewSummary.avgPriceSafeguards",
+                                      )}
+                                    </Text>
+                                    <InlineStack
+                                      align="space-between"
+                                      blockAlign="center"
+                                    >
+                                      <Text
+                                        as="p"
+                                        variant="headingMd"
+                                        fontWeight="bold"
+                                      >
+                                        {formatMoney(
+                                          previewImpactSummary.averageFinalPrice,
+                                          currencyCode,
+                                        )}
+                                      </Text>
+                                      {previewImpactSummary.safeguardAdjustedCount >
+                                        0 && (
+                                        <Box
+                                          background="bg-surface-warning"
+                                          paddingInline="150"
+                                          paddingBlock="050"
+                                          borderRadius="100"
+                                        >
+                                          <Text
+                                            as="span"
+                                            variant="bodyXs"
+                                            fontWeight="semibold"
+                                            tone="caution"
+                                          >
+                                            {`${previewImpactSummary.safeguardAdjustedCount} ${t("dashboard.previewSummary.locked")}`}
+                                          </Text>
+                                        </Box>
+                                      )}
+                                    </InlineStack>
+                                  </BlockStack>
+                                </Box>
+                              </div>
+                            </div>
+                          )}
+                        </BlockStack>
+                      </Box>
+                    </Card>
                   )}
 
                   {/* 🔹 1. ACTION BAR CARD */}
@@ -4208,7 +4490,10 @@ const filteredPreviews = useMemo(() => {
                                   selectedPreviewItems.length === 0
                                 }
                               >
-                                {t("dashboard.actionBar.applySelected").replace("{count}", String(selectedPreviewItems.length))}
+                                {t("dashboard.actionBar.applySelected").replace(
+                                  "{count}",
+                                  String(selectedPreviewItems.length),
+                                )}
                               </Button>
                             </div>
 
@@ -4226,7 +4511,10 @@ const filteredPreviews = useMemo(() => {
                                 !hasRules
                               }
                             >
-                              {t("dashboard.actionBar.applyAll").replace("{count}", String(previews.length))}
+                              {t("dashboard.actionBar.applyAll").replace(
+                                "{count}",
+                                String(previews.length),
+                              )}
                             </Button>
 
                             {/* Schedule Center */}
@@ -4243,7 +4531,9 @@ const filteredPreviews = useMemo(() => {
                           {/* Right Side Group: Utilities / Reports */}
                           <InlineStack gap="150" blockAlign="center">
                             {previews.length === 0 ? (
-                              <Tooltip content={t("dashboard.actionBar.reportTooltip")}>
+                              <Tooltip
+                                content={t("dashboard.actionBar.reportTooltip")}
+                              >
                                 <span style={{ display: "inline-block" }}>
                                   <Button
                                     variant="tertiary"
@@ -4315,7 +4605,9 @@ const filteredPreviews = useMemo(() => {
                                       variant="bodySm"
                                       fontWeight="medium"
                                     >
-                                      {t("dashboard.actionBar.processingUpdates")}
+                                      {t(
+                                        "dashboard.actionBar.processingUpdates",
+                                      )}
                                     </Text>
                                   </InlineStack>
                                   <Text as="p" tone="subdued" variant="bodyXs">
@@ -4362,7 +4654,9 @@ const filteredPreviews = useMemo(() => {
                           onPrevious={() => setCurrentPage((prev) => prev - 1)}
                           hasNext={currentPage < totalPages}
                           onNext={() => setCurrentPage((prev) => prev + 1)}
-                          label={t("dashboard.productGrid.pageLabel").replace("{current}", String(currentPage)).replace("{total}", String(totalPages || 1))}
+                          label={t("dashboard.productGrid.pageLabel")
+                            .replace("{current}", String(currentPage))
+                            .replace("{total}", String(totalPages || 1))}
                         />
                       </InlineStack>
 
@@ -4429,458 +4723,619 @@ const filteredPreviews = useMemo(() => {
                           </Box>
                         )}
 
-{paginatedPreviews.length > 0 && (
-  <Box
-    paddingBlockEnd="200"
-    paddingInline="300"
-    borderBlockEndWidth="025"
-    borderColor="border-secondary"
-  >
-    <Box padding="200">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "16px",
-          width: "100%",
-        }}
-      >
-        {/* Left Area: Product Name Column Offset */}
-        <div style={{ flex: 1, paddingLeft: "84px" }}>
-          <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-            {t("dashboard.productGrid.product")}
-          </Text>
-        </div>
+                        {paginatedPreviews.length > 0 && (
+                          <Box
+                            paddingBlockEnd="200"
+                            paddingInline="300"
+                            borderBlockEndWidth="025"
+                            borderColor="border-secondary"
+                          >
+                            <Box padding="200">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: "16px",
+                                  width: "100%",
+                                }}
+                              >
+                                {/* Left Area: Product Name Column Offset */}
+                                <div style={{ flex: 1, paddingLeft: "84px" }}>
+                                  <Text
+                                    as="span"
+                                    variant="bodySm"
+                                    tone="subdued"
+                                    fontWeight="medium"
+                                  >
+                                    {t("dashboard.productGrid.product")}
+                                  </Text>
+                                </div>
 
-        {/* Right Area: Main Header Layout alignment matching row items */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "70px 100px 140px 95px 95px 340px",
-            gap: "16px",
-            alignItems: "center",
-            flexShrink: 0,
-          }}
-        >
-          {/* Inventory */}
-          <div style={{ textAlign: "left" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.inventory")}
-            </Text>
-          </div>
+                                {/* Right Area: Main Header Layout alignment matching row items */}
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns:
+                                      "70px 100px 140px 95px 95px 340px",
+                                    gap: "16px",
+                                    alignItems: "center",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {/* Inventory */}
+                                  <div style={{ textAlign: "left" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t("dashboard.productGrid.inventory")}
+                                    </Text>
+                                  </div>
 
-          {/* Product Type */}
-          <div style={{ textAlign: "left" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.productType")}
-            </Text>
-          </div>
+                                  {/* Product Type */}
+                                  <div style={{ textAlign: "left" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t("dashboard.productGrid.productType")}
+                                    </Text>
+                                  </div>
 
-          {/* Vendor */}
-          <div style={{ textAlign: "left" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.vendor")}
-            </Text>
-          </div>
+                                  {/* Vendor */}
+                                  <div style={{ textAlign: "left" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t("dashboard.productGrid.vendor")}
+                                    </Text>
+                                  </div>
 
-          {/* Original Catalog */}
-          <div style={{ textAlign: "right" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.originalCatalog")}
-            </Text>
-          </div>
+                                  {/* Original Catalog */}
+                                  <div style={{ textAlign: "right" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t(
+                                        "dashboard.productGrid.originalCatalog",
+                                      )}
+                                    </Text>
+                                  </div>
 
-          {/* Live Storefront */}
-          <div style={{ textAlign: "right" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.liveStorefront")}
-            </Text>
-          </div>
+                                  {/* Live Storefront */}
+                                  <div style={{ textAlign: "right" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t(
+                                        "dashboard.productGrid.liveStorefront",
+                                      )}
+                                    </Text>
+                                  </div>
 
-          {/* New Preview */}
-          <div style={{ textAlign: "left" }}>
-            <Text as="span" variant="bodySm" tone="subdued" fontWeight="medium">
-              {t("dashboard.productGrid.newPreview")}
-            </Text>
-          </div>
-        </div>
-      </div>
-    </Box>
-  </Box>
-)}
+                                  {/* New Preview */}
+                                  <div style={{ textAlign: "left" }}>
+                                    <Text
+                                      as="span"
+                                      variant="bodySm"
+                                      tone="subdued"
+                                      fontWeight="medium"
+                                    >
+                                      {t("dashboard.productGrid.newPreview")}
+                                    </Text>
+                                  </div>
+                                </div>
+                              </div>
+                            </Box>
+                          </Box>
+                        )}
 
-{paginatedPreviews.map((p) => {
-  const currentPrice = parseFloat(p.oldPrice);
-  const originalPrice = parseFloat(p.originalBasePrice);
-  const isManual = p.overriddenPrice !== undefined;
-  const targetPrice = isManual
-    ? Number(p.overriddenPrice!) || 0
-    : parseFloat(p.newPrice);
-  const isPolished = currentPrice !== originalPrice;
-  const isChanged = currentPrice !== targetPrice;
-  const diffFromOriginal =
-    originalPrice !== 0
-      ? ((targetPrice - originalPrice) / originalPrice) * 100
-      : 0;
-  const isSelected = selectedItems.has(p.variantId);
-  const rowSafeguardNotices: string[] = [];
+                        {paginatedPreviews.map((p) => {
+                          const currentPrice = parseFloat(p.oldPrice);
+                          const originalPrice = parseFloat(p.originalBasePrice);
+                          const isManual = p.overriddenPrice !== undefined;
+                          const targetPrice = isManual
+                            ? Number(p.overriddenPrice!) || 0
+                            : parseFloat(p.newPrice);
+                          const isPolished = currentPrice !== originalPrice;
+                          const isChanged = currentPrice !== targetPrice;
+                          const diffFromOriginal =
+                            originalPrice !== 0
+                              ? ((targetPrice - originalPrice) /
+                                  originalPrice) *
+                                100
+                              : 0;
+                          const isSelected = selectedItems.has(p.variantId);
+                          const rowSafeguardNotices: string[] = [];
 
-  if (
-    !isManual &&
-    previewPricingRule &&
-    isFinite(originalPrice)
-  ) {
-    const minPrice =
-      typeof previewPricingRule.minPrice === "number" &&
-      isFinite(previewPricingRule.minPrice)
-        ? previewPricingRule.minPrice
-        : null;
-    const maxPrice =
-      typeof previewPricingRule.maxPrice === "number" &&
-      isFinite(previewPricingRule.maxPrice)
-        ? previewPricingRule.maxPrice
-        : null;
+                          if (
+                            !isManual &&
+                            previewPricingRule &&
+                            isFinite(originalPrice)
+                          ) {
+                            const minPrice =
+                              typeof previewPricingRule.minPrice === "number" &&
+                              isFinite(previewPricingRule.minPrice)
+                                ? previewPricingRule.minPrice
+                                : null;
+                            const maxPrice =
+                              typeof previewPricingRule.maxPrice === "number" &&
+                              isFinite(previewPricingRule.maxPrice)
+                                ? previewPricingRule.maxPrice
+                                : null;
 
-    if (minPrice != null) {
-      const withoutMin = calculatePrice(originalPrice, {
-        ...previewPricingRule,
-        minPrice: null,
-      });
-      if (
-        withoutMin + 0.01 < minPrice &&
-        Math.abs(targetPrice - minPrice) < 0.01
-      ) {
-        rowSafeguardNotices.push(t("dashboard.productGrid.adjustedMin"));
-      }
-    }
+                            if (minPrice != null) {
+                              const withoutMin = calculatePrice(originalPrice, {
+                                ...previewPricingRule,
+                                minPrice: null,
+                              });
+                              if (
+                                withoutMin + 0.01 < minPrice &&
+                                Math.abs(targetPrice - minPrice) < 0.01
+                              ) {
+                                rowSafeguardNotices.push(
+                                  t("dashboard.productGrid.adjustedMin"),
+                                );
+                              }
+                            }
 
-    if (maxPrice != null) {
-      const withoutMax = calculatePrice(originalPrice, {
-        ...previewPricingRule,
-        maxPrice: null,
-      });
-      if (
-        withoutMax - 0.01 > maxPrice &&
-        Math.abs(targetPrice - maxPrice) < 0.01
-      ) {
-        rowSafeguardNotices.push(t("dashboard.productGrid.adjustedMax"));
-      }
-    }
+                            if (maxPrice != null) {
+                              const withoutMax = calculatePrice(originalPrice, {
+                                ...previewPricingRule,
+                                maxPrice: null,
+                              });
+                              if (
+                                withoutMax - 0.01 > maxPrice &&
+                                Math.abs(targetPrice - maxPrice) < 0.01
+                              ) {
+                                rowSafeguardNotices.push(
+                                  t("dashboard.productGrid.adjustedMax"),
+                                );
+                              }
+                            }
 
-    const roundingPrecision = String(
-      previewPricingRule.roundingPrecision ?? "standard",
-    )
-      .trim()
-      .toLowerCase();
-    if (
-      roundingPrecision !== "" &&
-      roundingPrecision !== "standard"
-    ) {
-      const standardRoundedFinal = calculatePrice(originalPrice, {
-        ...previewPricingRule,
-        roundingPrecision: "standard",
-      });
+                            const roundingPrecision = String(
+                              previewPricingRule.roundingPrecision ??
+                                "standard",
+                            )
+                              .trim()
+                              .toLowerCase();
+                            if (
+                              roundingPrecision !== "" &&
+                              roundingPrecision !== "standard"
+                            ) {
+                              const standardRoundedFinal = calculatePrice(
+                                originalPrice,
+                                {
+                                  ...previewPricingRule,
+                                  roundingPrecision: "standard",
+                                },
+                              );
 
-      if (Math.abs(targetPrice - standardRoundedFinal) > 0.01) {
-        if (roundingPrecision === "nearest-0.05") {
-          rowSafeguardNotices.push(t("dashboard.productGrid.roundedNearest005"));
-        } else if (roundingPrecision === "whole") {
-          rowSafeguardNotices.push(t("dashboard.productGrid.roundedWhole"));
-        } else {
-          rowSafeguardNotices.push(t("dashboard.productGrid.roundedConsistency"));
-        }
-      }
-    }
-  }
-
-  return (
-    <Box
-      key={p.variantId}
-      paddingBlockStart="400"
-      paddingBlockEnd="400"
-      paddingInline="300"
-      borderBlockEndWidth="025"
-      borderColor="border-secondary"
-    >
-      <Box
-        background={isManual ? "bg-surface-caution" : undefined}
-        padding="200"
-        borderRadius="200"
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "16px",
-            width: "100%",
-            flexWrap: "wrap",
-          }}
-        >
-          {/* LEFT SIDE: Product Info */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "12px",
-              minWidth: 0,
-              flex: 1,
-              overflowX: "hidden",
-            }}
-          >
-            <div style={{ paddingTop: "2px" }}>
-              <Checkbox
-                label=""
-                labelHidden
-                checked={isSelected}
-                onChange={() => toggleSelection(p.variantId)}
-              />
-            </div>
-
-            <Thumbnail source={p.image || ""} alt={p.title} size="small" />
-
-            <BlockStack gap="100">
-              <Text as="span" variant="bodyMd" fontWeight="medium">
-                {p.title}
-              </Text>
-
-              {(() => {
-                const subtitle = buildVariantSubtitle({
-                  productTitle: p.title,
-                  variantTitle: p.variantTitle ?? null,
-                  sku: p.sku ?? null,
-                });
-
-                if (!subtitle) return null;
-
-                return (
-                  <div
-                    style={{
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      maxWidth: "100%",
-                    }}
-                  >
-                    <Text as="span" variant="bodySm" tone="subdued">
-                      {subtitle}
-                    </Text>
-                  </div>
-                );
-              })()}
-
-              {rowSafeguardNotices.length > 0 && (
-                <Text as="span" variant="bodySm" tone="subdued">
-                  {rowSafeguardNotices.join(" • ")}
-                </Text>
-              )}
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: "6px",
-                  flexWrap: "wrap",
-                  opacity: 0.92,
-                  marginTop: "4px",
-                }}
-              >
-                {isManual && <Badge tone="attention">{t("pricing.manualOverride")}</Badge>}
-
-                {Math.abs(diffFromOriginal) >= 20 && (
-                  <Badge tone="warning">{t("pricing.highImpact")}</Badge>
-                )}
-              </div>
-            </BlockStack>
-          </div>
-
-          {/* RIGHT SIDE: Table Metadata and Inline Action Controls */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "70px 100px 140px 95px 95px 340px",
-              gap: "16px",
-              alignItems: "center",
-            }}
-          >
-            {/* COLUMN 1: Inventory */}
-            <Box>
-              <BlockStack gap="0" inlineAlign="start">
-                <Text as="span" variant="bodyMd" tone="subdued">
-                  {(p.inventory ?? p.inventoryQuantity) !== undefined && (p.inventory ?? p.inventoryQuantity) !== null
-                    ? String(p.inventory ?? p.inventoryQuantity)
-                    : "—"}
-                </Text>
-              </BlockStack>
-            </Box>
-
-            {/* COLUMN 2: Product Type */}
-            <Box>
-              <BlockStack gap="0" inlineAlign="start">
-                <Text as="span" variant="bodyMd" tone="subdued">
-                  {p.productType || "—"}
-                </Text>
-              </BlockStack>
-            </Box>
-
-            {/* COLUMN 3: Vendor */}
-            <Box>
-              <BlockStack gap="0" inlineAlign="start">
-                <Text as="span" variant="bodyMd" tone="subdued">
-                  {p.vendor || "—"}
-                </Text>
-              </BlockStack>
-            </Box>
-
-            {/* COLUMN 4: Original Catalog */}
-            <Box>
-              <BlockStack gap="0" inlineAlign="end">
-                <Text as="span" variant="bodyMd" tone="subdued">
-                  {formatMoney(parseFloat(p.originalBasePrice), currencyCode)}
-                </Text>
-              </BlockStack>
-            </Box>
-
-            {/* COLUMN 5: Live Storefront */}
-            <Box>
-              <BlockStack gap="0" inlineAlign="end">
-                <Text
-                  as="span"
-                  variant="bodyMd"
-                  tone={isPolished || isChanged ? "subdued" : "base"}
-                  textDecorationLine={
-                    isPolished || isChanged ? "line-through" : undefined
-                  }
-                >
-                  {formatMoney(parseFloat(p.oldPrice), currencyCode)}
-                </Text>
-              </BlockStack>
-            </Box>
-
-            {/* COLUMN 6: Restored Original Inline Flow Controls */}
-            <Box>
-              <InlineStack gap="150" blockAlign="center" wrap={false}>
-                {/* Slim Price input field */}
-                <div style={{ width: "100px", flexShrink: 0 }}>
-                  <TextField
-                    label=""
-                    labelHidden
-                    value={String(
-                      p.overriddenPrice !== undefined
-                        ? p.overriddenPrice
-                        : p.newPrice,
-                    )}
-                    onChange={(val) => handlePriceChange(p.variantId, val)}
-                    autoComplete="off"
-                    prefix={currencySymbol}
-                    size="slim"
-                    maxLength={15}
-                  />
-                </div>
-
-                {/* Inline Action Container holding logic indicators and buttons */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "16px",
-                    flexGrow: 1,
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  {/* Directional Chevron Impact Percentage Indicators */}
-                  {(isPolished || isChanged) &&
-                    Math.abs(diffFromOriginal) > 0.01 && (
-                      <InlineStack
-                        gap="100"
-                        blockAlign="center"
-                        wrap={false}
-                      >
-                        <Icon
-                          source={
-                            targetPrice > originalPrice
-                              ? ChevronUpIcon
-                              : ChevronDownIcon
+                              if (
+                                Math.abs(targetPrice - standardRoundedFinal) >
+                                0.01
+                              ) {
+                                if (roundingPrecision === "nearest-0.05") {
+                                  rowSafeguardNotices.push(
+                                    t(
+                                      "dashboard.productGrid.roundedNearest005",
+                                    ),
+                                  );
+                                } else if (roundingPrecision === "whole") {
+                                  rowSafeguardNotices.push(
+                                    t("dashboard.productGrid.roundedWhole"),
+                                  );
+                                } else {
+                                  rowSafeguardNotices.push(
+                                    t(
+                                      "dashboard.productGrid.roundedConsistency",
+                                    ),
+                                  );
+                                }
+                              }
+                            }
                           }
-                          tone={
-                            targetPrice > originalPrice
-                              ? "success"
-                              : "critical"
-                          }
-                        />
-                        <Text
-                          as="span"
-                          variant="bodySm"
-                          tone={
-                            targetPrice > originalPrice
-                              ? "success"
-                              : "critical"
-                          }
-                          fontWeight="medium"
-                        >
-                          {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
-                        </Text>
-                      </InlineStack>
-                    )}
 
-                  {/* Restored Reset Action */}
-                  {isManual && (
-                    <Button
-                      size="slim"
-                      variant="tertiary"
-                      onClick={() => resetOverride(p.variantId)}
-                    >
-                      {t("dashboard.productGrid.reset")}
-                    </Button>
-                  )}
+                          return (
+                            <Box
+                              key={p.variantId}
+                              paddingBlockStart="400"
+                              paddingBlockEnd="400"
+                              paddingInline="300"
+                              borderBlockEndWidth="025"
+                              borderColor="border-secondary"
+                            >
+                              <Box
+                                background={
+                                  isManual ? "bg-surface-caution" : undefined
+                                }
+                                padding="200"
+                                borderRadius="200"
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    gap: "16px",
+                                    width: "100%",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  {/* LEFT SIDE: Product Info */}
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      gap: "12px",
+                                      minWidth: 0,
+                                      flex: 1,
+                                      overflowX: "hidden",
+                                    }}
+                                  >
+                                    <div style={{ paddingTop: "2px" }}>
+                                      <Checkbox
+                                        label=""
+                                        labelHidden
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          toggleSelection(p.variantId)
+                                        }
+                                      />
+                                    </div>
 
-                  {/* Restored Apply Action workflow with Tooltip safeguards */}
-                  {isChanged ? (
-                    <Button
-                      size="slim"
-                      onClick={() => handleApplySingle(p)}
-                      loading={updatingItem === p.variantId}
-                      disabled={
-                        !hasActivePlan ||
-                        !!updatingItem ||
-                        isProcessing ||
-                        (isManual && p.overriddenPrice === "") ||
-                        !hasRules
-                      }
-                      tone="success"
-                    >
-                      {t("dashboard.productGrid.apply")}
-                    </Button>
-                  ) : (
-                    <Tooltip content={t("dashboard.productGrid.alreadySynced")}>
-                      <span style={{ display: "inline-block" }}>
-                        <Button
-                          size="slim"
-                          onClick={() => handleApplySingle(p)}
-                          loading={updatingItem === p.variantId}
-                          disabled={
-                            !hasActivePlan ||
-                            !!updatingItem ||
-                            isProcessing ||
-                            (isManual && p.overriddenPrice === "") ||
-                            !hasRules
-                          }
-                        >
-                          {t("dashboard.productGrid.apply")}
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  )}
-                </div>
-              </InlineStack>
-            </Box>
-          </div>
-        </div>
-      </Box>
-    </Box>
-  );
-})}
+                                    <Thumbnail
+                                      source={p.image || ""}
+                                      alt={p.title}
+                                      size="small"
+                                    />
 
+                                    <BlockStack gap="100">
+                                      <Text
+                                        as="span"
+                                        variant="bodyMd"
+                                        fontWeight="medium"
+                                      >
+                                        {p.title}
+                                      </Text>
 
+                                      {(() => {
+                                        const subtitle = buildVariantSubtitle({
+                                          productTitle: p.title,
+                                          variantTitle: p.variantTitle ?? null,
+                                          sku: p.sku ?? null,
+                                        });
+
+                                        if (!subtitle) return null;
+
+                                        return (
+                                          <div
+                                            style={{
+                                              whiteSpace: "nowrap",
+                                              overflow: "hidden",
+                                              textOverflow: "ellipsis",
+                                              maxWidth: "100%",
+                                            }}
+                                          >
+                                            <Text
+                                              as="span"
+                                              variant="bodySm"
+                                              tone="subdued"
+                                            >
+                                              {subtitle}
+                                            </Text>
+                                          </div>
+                                        );
+                                      })()}
+
+                                      {rowSafeguardNotices.length > 0 && (
+                                        <Text
+                                          as="span"
+                                          variant="bodySm"
+                                          tone="subdued"
+                                        >
+                                          {rowSafeguardNotices.join(" • ")}
+                                        </Text>
+                                      )}
+
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          gap: "6px",
+                                          flexWrap: "wrap",
+                                          opacity: 0.92,
+                                          marginTop: "4px",
+                                        }}
+                                      >
+                                        {isManual && (
+                                          <Badge tone="attention">
+                                            {t("pricing.manualOverride")}
+                                          </Badge>
+                                        )}
+
+                                        {Math.abs(diffFromOriginal) >= 20 && (
+                                          <Badge tone="warning">
+                                            {t("pricing.highImpact")}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </BlockStack>
+                                  </div>
+
+                                  {/* RIGHT SIDE: Table Metadata and Inline Action Controls */}
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "70px 100px 140px 95px 95px 340px",
+                                      gap: "16px",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    {/* COLUMN 1: Inventory */}
+                                    <Box>
+                                      <BlockStack gap="0" inlineAlign="start">
+                                        <Text
+                                          as="span"
+                                          variant="bodyMd"
+                                          tone="subdued"
+                                        >
+                                          {(p.inventory ??
+                                            p.inventoryQuantity) !==
+                                            undefined &&
+                                          (p.inventory ??
+                                            p.inventoryQuantity) !== null
+                                            ? String(
+                                                p.inventory ??
+                                                  p.inventoryQuantity,
+                                              )
+                                            : "—"}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+
+                                    {/* COLUMN 2: Product Type */}
+                                    <Box>
+                                      <BlockStack gap="0" inlineAlign="start">
+                                        <Text
+                                          as="span"
+                                          variant="bodyMd"
+                                          tone="subdued"
+                                        >
+                                          {p.productType || "—"}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+
+                                    {/* COLUMN 3: Vendor */}
+                                    <Box>
+                                      <BlockStack gap="0" inlineAlign="start">
+                                        <Text
+                                          as="span"
+                                          variant="bodyMd"
+                                          tone="subdued"
+                                        >
+                                          {p.vendor || "—"}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+
+                                    {/* COLUMN 4: Original Catalog */}
+                                    <Box>
+                                      <BlockStack gap="0" inlineAlign="end">
+                                        <Text
+                                          as="span"
+                                          variant="bodyMd"
+                                          tone="subdued"
+                                        >
+                                          {formatMoney(
+                                            parseFloat(p.originalBasePrice),
+                                            currencyCode,
+                                          )}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+
+                                    {/* COLUMN 5: Live Storefront */}
+                                    <Box>
+                                      <BlockStack gap="0" inlineAlign="end">
+                                        <Text
+                                          as="span"
+                                          variant="bodyMd"
+                                          tone={
+                                            isPolished || isChanged
+                                              ? "subdued"
+                                              : "base"
+                                          }
+                                          textDecorationLine={
+                                            isPolished || isChanged
+                                              ? "line-through"
+                                              : undefined
+                                          }
+                                        >
+                                          {formatMoney(
+                                            parseFloat(p.oldPrice),
+                                            currencyCode,
+                                          )}
+                                        </Text>
+                                      </BlockStack>
+                                    </Box>
+
+                                    {/* COLUMN 6: Restored Original Inline Flow Controls */}
+                                    <Box>
+                                      <InlineStack
+                                        gap="150"
+                                        blockAlign="center"
+                                        wrap={false}
+                                      >
+                                        {/* Slim Price input field */}
+                                        <div
+                                          style={{
+                                            width: "100px",
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          <TextField
+                                            label=""
+                                            labelHidden
+                                            value={String(
+                                              p.overriddenPrice !== undefined
+                                                ? p.overriddenPrice
+                                                : p.newPrice,
+                                            )}
+                                            onChange={(val) =>
+                                              handlePriceChange(
+                                                p.variantId,
+                                                val,
+                                              )
+                                            }
+                                            autoComplete="off"
+                                            prefix={currencySymbol}
+                                            size="slim"
+                                            maxLength={15}
+                                          />
+                                        </div>
+
+                                        {/* Inline Action Container holding logic indicators and buttons */}
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "16px",
+                                            flexGrow: 1,
+                                            justifyContent: "flex-end",
+                                          }}
+                                        >
+                                          {/* Directional Chevron Impact Percentage Indicators */}
+                                          {(isPolished || isChanged) &&
+                                            Math.abs(diffFromOriginal) >
+                                              0.01 && (
+                                              <InlineStack
+                                                gap="100"
+                                                blockAlign="center"
+                                                wrap={false}
+                                              >
+                                                <Icon
+                                                  source={
+                                                    targetPrice > originalPrice
+                                                      ? ChevronUpIcon
+                                                      : ChevronDownIcon
+                                                  }
+                                                  tone={
+                                                    targetPrice > originalPrice
+                                                      ? "success"
+                                                      : "critical"
+                                                  }
+                                                />
+                                                <Text
+                                                  as="span"
+                                                  variant="bodySm"
+                                                  tone={
+                                                    targetPrice > originalPrice
+                                                      ? "success"
+                                                      : "critical"
+                                                  }
+                                                  fontWeight="medium"
+                                                >
+                                                  {`${Math.abs(diffFromOriginal).toFixed(1)}%`}
+                                                </Text>
+                                              </InlineStack>
+                                            )}
+
+                                          {/* Restored Reset Action */}
+                                          {isManual && (
+                                            <Button
+                                              size="slim"
+                                              variant="tertiary"
+                                              onClick={() =>
+                                                resetOverride(p.variantId)
+                                              }
+                                            >
+                                              {t("dashboard.productGrid.reset")}
+                                            </Button>
+                                          )}
+
+                                          {/* Restored Apply Action workflow with Tooltip safeguards */}
+                                          {isChanged ? (
+                                            <Button
+                                              size="slim"
+                                              onClick={() =>
+                                                handleApplySingle(p)
+                                              }
+                                              loading={
+                                                updatingItem === p.variantId
+                                              }
+                                              disabled={
+                                                !hasActivePlan ||
+                                                !!updatingItem ||
+                                                isProcessing ||
+                                                (isManual &&
+                                                  p.overriddenPrice === "") ||
+                                                !hasRules
+                                              }
+                                              tone="success"
+                                            >
+                                              {t("dashboard.productGrid.apply")}
+                                            </Button>
+                                          ) : (
+                                            <Tooltip
+                                              content={t(
+                                                "dashboard.productGrid.alreadySynced",
+                                              )}
+                                            >
+                                              <span
+                                                style={{
+                                                  display: "inline-block",
+                                                }}
+                                              >
+                                                <Button
+                                                  size="slim"
+                                                  onClick={() =>
+                                                    handleApplySingle(p)
+                                                  }
+                                                  loading={
+                                                    updatingItem === p.variantId
+                                                  }
+                                                  disabled={
+                                                    !hasActivePlan ||
+                                                    !!updatingItem ||
+                                                    isProcessing ||
+                                                    (isManual &&
+                                                      p.overriddenPrice ===
+                                                        "") ||
+                                                    !hasRules
+                                                  }
+                                                >
+                                                  {t(
+                                                    "dashboard.productGrid.apply",
+                                                  )}
+                                                </Button>
+                                              </span>
+                                            </Tooltip>
+                                          )}
+                                        </div>
+                                      </InlineStack>
+                                    </Box>
+                                  </div>
+                                </div>
+                              </Box>
+                            </Box>
+                          );
+                        })}
                       </BlockStack>
 
                       <InlineStack align="center">
@@ -4889,7 +5344,9 @@ const filteredPreviews = useMemo(() => {
                           onPrevious={() => setCurrentPage((prev) => prev - 1)}
                           hasNext={currentPage < totalPages}
                           onNext={() => setCurrentPage((prev) => prev + 1)}
-                          label={t("dashboard.productGrid.pageLabel").replace("{current}", String(currentPage)).replace("{total}", String(totalPages || 1))}
+                          label={t("dashboard.productGrid.pageLabel")
+                            .replace("{current}", String(currentPage))
+                            .replace("{total}", String(totalPages || 1))}
                         />
                       </InlineStack>
 
@@ -4909,29 +5366,28 @@ const filteredPreviews = useMemo(() => {
         {/* ── TASK 4: Confirmation Modals ── */}
 
         {shopify && (
-         <ImmediateApplyConfirmationModal
-         open={immediateApplyModalOpen}
-         onClose={closeImmediateApplyModal}
-         scopeLabel={immediateApplyScopeLabel}
-         itemCount={immediateApplyContextItems.length}
-         impactSummary={immediateApplyImpactSummary}
-         safeguardNotices={immediateApplySafeguardNotices}
-         isProcessing={isProcessing}
-         initialCampaignTitle=""
-         validateCampaignTitle={validateCampaignTitle}
-         onConfirm={async (campaignTitle) => {
-           const ok = await handleApplyBatch(
-             immediateApplyContextItems,
-             campaignTitle,
-           );
-           if (ok) {
-             setApplyCampaignTitle(campaignTitle);
-           }
-           return ok;
-         }}
-         onDirtyChange={setIsImmediateApplyDirty}
-       />
-
+          <ImmediateApplyConfirmationModal
+            open={immediateApplyModalOpen}
+            onClose={closeImmediateApplyModal}
+            scopeLabel={immediateApplyScopeLabel}
+            itemCount={immediateApplyContextItems.length}
+            impactSummary={immediateApplyImpactSummary}
+            safeguardNotices={immediateApplySafeguardNotices}
+            isProcessing={isProcessing}
+            initialCampaignTitle=""
+            validateCampaignTitle={validateCampaignTitle}
+            onConfirm={async (campaignTitle) => {
+              const ok = await handleApplyBatch(
+                immediateApplyContextItems,
+                campaignTitle,
+              );
+              if (ok) {
+                setApplyCampaignTitle(campaignTitle);
+              }
+              return ok;
+            }}
+            onDirtyChange={setIsImmediateApplyDirty}
+          />
         )}
 
         {shopify && (
@@ -4987,7 +5443,10 @@ const filteredPreviews = useMemo(() => {
                 <>
                   <InlineStack gap="300" wrap>
                     <Text as="p" variant="bodySm">
-                      <strong>{t("dashboard.revertPreview.campaignLabel")}</strong> {campaignDetail.title}
+                      <strong>
+                        {t("dashboard.revertPreview.campaignLabel")}
+                      </strong>{" "}
+                      {campaignDetail.title}
                     </Text>
                     <Text as="p" variant="bodySm" tone="subdued">
                       <strong>
@@ -5047,13 +5506,19 @@ const filteredPreviews = useMemo(() => {
                               ? t("dashboard.campaignDetail.draftCampaignBadge")
                               : campaignDetail.schedule?.status ===
                                   "cancelled-window"
-                                ? t("dashboard.campaignDetail.cancelledWindowBadge")
+                                ? t(
+                                    "dashboard.campaignDetail.cancelledWindowBadge",
+                                  )
                                 : campaignDetail.schedule?.status ===
                                     "cancelled-publish"
                                   ? t("dashboard.campaignDetail.cancelledBadge")
                                   : campaignDetail.prePublish
-                                    ? t("dashboard.campaignDetail.publishScheduledBadge")
-                                    : t("dashboard.campaignDetail.windowScheduledBadge")}
+                                    ? t(
+                                        "dashboard.campaignDetail.publishScheduledBadge",
+                                      )
+                                    : t(
+                                        "dashboard.campaignDetail.windowScheduledBadge",
+                                      )}
                           </Badge>
                           {!campaignDetail.staged && (
                             <Badge tone="attention">
@@ -5068,13 +5533,19 @@ const filteredPreviews = useMemo(() => {
                             ? t("dashboard.campaignDetail.stagedBody")
                             : campaignDetail.schedule?.status ===
                                 "cancelled-window"
-                              ? t("dashboard.campaignDetail.cancelledWindowBody")
+                              ? t(
+                                  "dashboard.campaignDetail.cancelledWindowBody",
+                                )
                               : campaignDetail.schedule?.status ===
                                   "cancelled-publish"
-                                ? t("dashboard.campaignDetail.cancelledPublishBody")
+                                ? t(
+                                    "dashboard.campaignDetail.cancelledPublishBody",
+                                  )
                                 : campaignDetail.prePublish
                                   ? t("dashboard.campaignDetail.prePublishBody")
-                                  : t("dashboard.campaignDetail.windowScheduledBody")}
+                                  : t(
+                                      "dashboard.campaignDetail.windowScheduledBody",
+                                    )}
                         </Text>
                         <Text as="p" variant="bodySm" tone="subdued">
                           {campaignDetail.staged
@@ -5085,7 +5556,9 @@ const filteredPreviews = useMemo(() => {
                                   "cancelled-publish"
                               ? t("dashboard.campaignDetail.cancelledSubBody")
                               : campaignDetail.prePublish
-                                ? t("dashboard.campaignDetail.prePublishSubBody")
+                                ? t(
+                                    "dashboard.campaignDetail.prePublishSubBody",
+                                  )
                                 : t("dashboard.campaignDetail.windowSubBody")}
                         </Text>
                         <InlineStack gap="400" wrap>
@@ -5099,7 +5572,9 @@ const filteredPreviews = useMemo(() => {
                           )}
                           {campaignDetail.schedule?.windowEndAt && (
                             <Text as="p" variant="bodySm" tone="subdued">
-                              {t("dashboard.campaignDetail.automaticRestoreLabel")}{" "}
+                              {t(
+                                "dashboard.campaignDetail.automaticRestoreLabel",
+                              )}{" "}
                               {new Date(
                                 campaignDetail.schedule.windowEndAt,
                               ).toLocaleString()}
@@ -5146,14 +5621,22 @@ const filteredPreviews = useMemo(() => {
                             <BlockStack gap="150">
                               <InlineStack gap="200" wrap>
                                 <Badge tone="success">
-                                  {t("dashboard.campaignDetail.pricingActiveBadge")}
+                                  {t(
+                                    "dashboard.campaignDetail.pricingActiveBadge",
+                                  )}
                                 </Badge>
-                                <Badge tone="attention">{t("dashboard.campaignDetail.timeWindowBadge")}</Badge>
+                                <Badge tone="attention">
+                                  {t(
+                                    "dashboard.campaignDetail.timeWindowBadge",
+                                  )}
+                                </Badge>
                               </InlineStack>
                               <InlineStack gap="400" wrap>
                                 {selectedCampaignForDetail.runAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    {t("dashboard.campaignDetail.activeSinceLabel")}{" "}
+                                    {t(
+                                      "dashboard.campaignDetail.activeSinceLabel",
+                                    )}{" "}
                                     {new Date(
                                       selectedCampaignForDetail.runAt,
                                     ).toLocaleString()}
@@ -5161,7 +5644,9 @@ const filteredPreviews = useMemo(() => {
                                 )}
                                 {selectedCampaignForDetail.windowEndAt && (
                                   <Text as="p" variant="bodySm" tone="subdued">
-                                    {t("dashboard.campaignDetail.restoreTimeLabel")}{" "}
+                                    {t(
+                                      "dashboard.campaignDetail.restoreTimeLabel",
+                                    )}{" "}
                                     {new Date(
                                       selectedCampaignForDetail.windowEndAt,
                                     ).toLocaleString()}
@@ -5200,7 +5685,9 @@ const filteredPreviews = useMemo(() => {
                     >
                       <BlockStack gap="200">
                         <Text as="h3" variant="headingSm">
-                          {t("dashboard.campaignDetail.operationalTimelineTitle")}
+                          {t(
+                            "dashboard.campaignDetail.operationalTimelineTitle",
+                          )}
                         </Text>
                         <div
                           style={{
@@ -5257,7 +5744,10 @@ const filteredPreviews = useMemo(() => {
                                         {milestone.label}
                                       </Text>
                                       <Badge tone={milestone.tone}>
-                                        {milestone.badgeLabel ?? t("dashboard.campaignDetail.milestoneBadgeDefault")}
+                                        {milestone.badgeLabel ??
+                                          t(
+                                            "dashboard.campaignDetail.milestoneBadgeDefault",
+                                          )}
                                       </Badge>
                                     </InlineStack>
                                     {milestone.timestamp ? (
@@ -5303,13 +5793,17 @@ const filteredPreviews = useMemo(() => {
                             campaignDetail.preActivation ||
                             campaignDetail.prePublish ||
                             campaignDetail.staged
-                              ? t("dashboard.campaignDetail.scheduledProductsLower")
+                              ? t(
+                                  "dashboard.campaignDetail.scheduledProductsLower",
+                                )
                               : t("dashboard.campaignDetail.trackedItemsLower")
                           }`}
                         </Text>
                         <div style={{ minWidth: 140 }}>
                           <Select
-                            label={t("dashboard.revertPreview.rowsPerPageLabel")}
+                            label={t(
+                              "dashboard.revertPreview.rowsPerPageLabel",
+                            )}
                             options={OPERATIONAL_PAGE_SIZE_OPTIONS.map(
                               (size) => ({
                                 label: `${SELECT_OPTION_PREFIX}${size}`,
@@ -5347,8 +5841,12 @@ const filteredPreviews = useMemo(() => {
                               {campaignDetail.preActivation ||
                               campaignDetail.prePublish ||
                               campaignDetail.staged
-                                ? t("dashboard.campaignDetail.originalPriceHeader")
-                                : t("dashboard.campaignDetail.revertedFromHeader")}
+                                ? t(
+                                    "dashboard.campaignDetail.originalPriceHeader",
+                                  )
+                                : t(
+                                    "dashboard.campaignDetail.revertedFromHeader",
+                                  )}
                             </Text>
                           </div>
                           <div style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -5361,8 +5859,12 @@ const filteredPreviews = useMemo(() => {
                               {campaignDetail.preActivation ||
                               campaignDetail.prePublish ||
                               campaignDetail.staged
-                                ? t("dashboard.campaignDetail.stagedPriceHeader")
-                                : t("dashboard.campaignDetail.restoredToHeader")}
+                                ? t(
+                                    "dashboard.campaignDetail.stagedPriceHeader",
+                                  )
+                                : t(
+                                    "dashboard.campaignDetail.restoredToHeader",
+                                  )}
                             </Text>
                           </div>
                           <InlineStack align="start">
@@ -5492,7 +5994,9 @@ const filteredPreviews = useMemo(() => {
                         {(campaignDetail.missingHistoricalRevertedFromCount ??
                           0) > 0 && (
                           <Text as="p" variant="bodySm" tone="subdued">
-                            {t("dashboard.campaignDetail.historicalUnavailableNotice")}
+                            {t(
+                              "dashboard.campaignDetail.historicalUnavailableNotice",
+                            )}
                           </Text>
                         )}
                         <InlineStack align="end">
@@ -5587,10 +6091,15 @@ const filteredPreviews = useMemo(() => {
                   </Text>
                   <InlineStack gap="300" wrap>
                     <Text as="p" variant="bodySm">
-                      <strong>{t("dashboard.revertPreview.campaignLabel")}</strong> {revertPreview.title}
+                      <strong>
+                        {t("dashboard.revertPreview.campaignLabel")}
+                      </strong>{" "}
+                      {revertPreview.title}
                     </Text>
                     <Text as="p" variant="bodySm">
-                      <strong>{t("dashboard.revertPreview.affectedProductsLabel")}</strong>{" "}
+                      <strong>
+                        {t("dashboard.revertPreview.affectedProductsLabel")}
+                      </strong>{" "}
                       {revertPreviewCounts.variantCount !==
                       revertPreviewCounts.productCount
                         ? `${revertPreviewCounts.productCount} • ${revertPreviewCounts.variantCount} ${t("dashboard.revertPreview.variantsSuffix")}`
@@ -5630,7 +6139,9 @@ const filteredPreviews = useMemo(() => {
                           wrap
                         >
                           <Text as="p" variant="bodySm" fontWeight="medium">
-                            {t("dashboard.revertPreview.operationalSafeguardsTitle")}
+                            {t(
+                              "dashboard.revertPreview.operationalSafeguardsTitle",
+                            )}
                           </Text>
                           <InlineStack gap="100" wrap>
                             <Badge tone="warning">
@@ -5639,7 +6150,9 @@ const filteredPreviews = useMemo(() => {
                                   (notice) => notice.severity === "warning",
                                 ).length === 1
                                   ? t("dashboard.revertPreview.warningLabel")
-                                  : t("dashboard.revertPreview.warningLabelPlural")
+                                  : t(
+                                      "dashboard.revertPreview.warningLabelPlural",
+                                    )
                               }`}
                             </Badge>
                             <Badge tone="info">
@@ -5686,7 +6199,7 @@ const filteredPreviews = useMemo(() => {
                     borderColor="border"
                     borderWidth="025"
                   >
-                  <InlineStack
+                    <InlineStack
                       gap="200"
                       wrap
                       align="space-between"
@@ -5697,14 +6210,18 @@ const filteredPreviews = useMemo(() => {
                           label={t("dashboard.revertPreview.searchLabel")}
                           value={revertPreviewSearchQuery}
                           onChange={setRevertPreviewSearchQuery}
-                          placeholder={t("dashboard.revertPreview.searchPlaceholder")}
+                          placeholder={t(
+                            "dashboard.revertPreview.searchPlaceholder",
+                          )}
                           autoComplete="off"
                           disabled={isProcessing}
                         />
                       </div>
                       <div style={{ minWidth: 210 }}>
                         <Select
-                          label={t("dashboard.revertPreview.movementFilterLabel")}
+                          label={t(
+                            "dashboard.revertPreview.movementFilterLabel",
+                          )}
                           options={[
                             {
                               label: `${SELECT_OPTION_PREFIX}${t("dashboard.revertPreview.movementFilterAll")}`,
@@ -5793,7 +6310,9 @@ const filteredPreviews = useMemo(() => {
                             fontWeight="medium"
                             alignment="end"
                           >
-                            {t("dashboard.revertPreview.tableHeaderRevertTarget")}
+                            {t(
+                              "dashboard.revertPreview.tableHeaderRevertTarget",
+                            )}
                           </Text>
                         </div>
                       </div>
@@ -5932,8 +6451,8 @@ const filteredPreviews = useMemo(() => {
           </Modal.Section>
         </Modal>
 
-{/* UPDATED TASK 4: Go Live confirmation modal */}
-      <Modal
+        {/* UPDATED TASK 4: Go Live confirmation modal */}
+        <Modal
           open={showGoLiveModal}
           onClose={() => setShowGoLiveModal(false)}
           title={t("dashboard.goLiveModal.title")}
@@ -5945,7 +6464,10 @@ const filteredPreviews = useMemo(() => {
             disabled: isProcessing,
           }}
           secondaryActions={[
-            { content: t("common.cancel"), onAction: () => setShowGoLiveModal(false) },
+            {
+              content: t("common.cancel"),
+              onAction: () => setShowGoLiveModal(false),
+            },
           ]}
         >
           <Modal.Section>
@@ -5976,19 +6498,18 @@ const filteredPreviews = useMemo(() => {
             destructive: true,
           }}
           secondaryActions={[
-            { content: t("common.cancel"), onAction: () => setShowStopModal(false) },
+            {
+              content: t("common.cancel"),
+              onAction: () => setShowStopModal(false),
+            },
           ]}
         >
           <Modal.Section>
             <BlockStack gap="300">
-              <Text as="p">
-                {t("dashboard.stopLiveModal.body")}
-              </Text>
+              <Text as="p">{t("dashboard.stopLiveModal.body")}</Text>
               <Box paddingInlineStart="400">
                 <BlockStack gap="200">
-                  <Text as="p">
-                    ✔️ {t("dashboard.stopLiveModal.bullet1")}
-                  </Text>
+                  <Text as="p">✔️ {t("dashboard.stopLiveModal.bullet1")}</Text>
                   <Text as="p">✔️ {t("dashboard.stopLiveModal.bullet2")}</Text>
                 </BlockStack>
               </Box>
