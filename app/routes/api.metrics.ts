@@ -24,7 +24,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     const { session } = auth;
     const shop = session.shop;
-    applyLocaleFromSession(session);
+    // Locale: prefer the locale the UI is rendered in (sent by the client),
+    // fall back to the Shopify session locale.
+    const clientLocale = new URL(request.url).searchParams.get("locale");
+    applyLocaleFromSession(session, clientLocale);
     console.log("SESSION SHOP (METRICS):", shop);
 
     try {

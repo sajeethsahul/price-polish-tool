@@ -869,7 +869,11 @@ function DashboardContent({
 
       const [data, metricsData, campaignHistoryData] = await Promise.all([
         fetcher("/api/preview-price"),
-        fetcher("/api/metrics").catch(() => DEFAULT_DASHBOARD_METRICS),
+        fetcher(
+          `/api/metrics?locale=${encodeURIComponent(
+            (typeof window !== "undefined" && (window as any).__LOCALE__) || "",
+          )}`,
+        ).catch(() => DEFAULT_DASHBOARD_METRICS),
         fetcher("/api/campaign-history").catch(() => ({ campaigns: [] })),
       ]);
 

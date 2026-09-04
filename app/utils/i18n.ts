@@ -66,8 +66,8 @@ export function t(key: TranslationKey): string {
  * Detects the locale from a Shopify session (BCP-47) or falls back to "en".
  * Call setLocale() with the detected value before using t() server-side.
  */
-// Supported locale codes — add more here when ready
-const SUPPORTED_LOCALES = ["es", "fr", "de"];
+// Supported locale codes — add more here when ready (German/English/Spanish/French/Italy/Dutch/Portuguese)
+const SUPPORTED_LOCALES = ["es", "fr", "de","it","nl","pt"];
 
 export function detectLocaleFromSession(
   session: { locale?: string } | null | undefined | any

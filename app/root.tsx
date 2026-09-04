@@ -38,17 +38,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // "fr-CA" → "fr", "de-AT" → "de", "es-MX" → "es"
     const base = raw.toLowerCase().split("-")[0];
     
-    // Only these 4 are supported — everything else gets English
-    const SUPPORTED = ["es", "fr", "de"];
+    // Only these 4 are supported — everything else gets English ( German/Spanish/French/Italy/Dutch/Portuguese)
+    const SUPPORTED = ["es", "fr", "de","it","nl","pt"];
     const localeId = SUPPORTED.includes(base) ? base : "en.default";
 
     setLocale(localeId);
 
     // Return the clean code to the client (not "en.default")
     const locale = localeId === "en.default" ? "en" : localeId;
-    //return json({ locale });
-    return json({ locale: "es" });
-
+    return json({ locale });
+   // return json({ locale: "it" });
   } catch {
     setLocale("en.default");
     return json({ locale: "en" });
