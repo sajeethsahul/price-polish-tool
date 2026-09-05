@@ -24,14 +24,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // 💰 BILLING FLOW (SHOPIFY HANDLED)
   // ===============================
   const result = await billing.require({
-    plans: ["free", "basic"],
+    plans: ["basic"],
     isTest: true,
 
     onFailure: async () => {
       console.log("🚀 Creating billing request");
 
       return billing.request({
-        plan: "free", // default new merchants to free plan
+        plan: "basic", // default new merchants to free plan
         isTest: true,
         // trialDays comes from config → no need here
       });
