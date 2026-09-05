@@ -27,10 +27,8 @@ import { authenticate, registerWebhooks } from "../shopify.server";
 import { recordShopInstall } from "../utils/shop-lifecycle.server";
 import {
   BillingStatusBanner,
-  isBillingActive,
   type BillingStatusValue,
 } from "../components/BillingStatusBanner";
-import { normalizeBillingFromResult } from "../utils/billing-status.server";
 import { t } from "../utils/i18n";
 //import { persistBillingStateFromShopify } from "../utils/billing-persistence.server";
 
@@ -200,38 +198,73 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect(to);
   }
 
-  // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
-  const billingResponse = await billing.require({
-    plans: ["basic"],
-    isTest: process.env.NODE_ENV !== "production",
-    onFailure: async () =>
-      billing.request({
-        plan: "basic", // default new merchants to free plan
-        isTest: process.env.NODE_ENV !== "production",
-      }),
+  // 💰 BILLING — DB-FIRST CHECK (🔥 THIS IS THE KEY FIX)
+  // New merchants get a free plan record on first entry and use the app
+  // immediately. Shopify billing is ONLY consulted when the local DB says
+  // the merchant is on the "basic" plan, and only to verify the charge is
+  // still active (downgrade to free if cancelled). No redirect, ever.
+
+  // 1) Check local subscription record first
+  let subscription = await prisma.subscription.findFirst({
+    where: { shop },
+    select: { plan: true, status: true },
   });
 
-  // If Shopify wants to redirect → do it
-  if (billingResponse instanceof Response) {
-    console.log("[AUTH/BILLING REDIRECT]");
-    console.log("REQUEST:", request.url);
-    console.log("STATUS:", billingResponse.status);
-    console.log("LOCATION:", billingResponse.headers.get("Location"));
-    return toTopLevelRedirect(billingResponse);
+  const activeStates = ["active", "ACTIVE", "PENDING", "trialing", "free"];
+
+  // 2) If no subscription record exists — create free plan (first install)
+  if (!subscription) {
+    await prisma.subscription.upsert({
+      where: { shop },
+      update: {},
+      create: {
+        shop,
+        plan: "free",
+        status: "active",
+        chargeId: null,
+      },
+    });
+    subscription = { plan: "free", status: "active" };
+    console.log(`[BILLING] Created free plan subscription for ${shop}`);
   }
 
-  // ─── BILLING RECONCILIATION: sync cache with Shopify truth on every app entry ────
-  // `billingResponse` is NOT a redirect — merchant was authenticated and approved.
-  // Persist a local snapshot so the Billing page and diagnostics are populated.
-  // This is non-fatal: persistence errors never block the app from loading.
-  console.log(`[BILLING RECONCILIATION] shop=${shop}`);
+  // 3) Free plan merchants skip billing entirely — no Shopify approval needed
+  let hasActivePlan = activeStates.includes(subscription.status);
+  let currentPlan = subscription.plan;
 
-  // Inline extraction — mirrors billing-status.server.ts logic
-  const rawBillingResult = billingResponse as unknown as Record<string, unknown>;
-  const billingStatus: BillingStatusValue = normalizeBillingFromResult(rawBillingResult);
+  // 4) If merchant has basic plan — verify with Shopify (no redirect)
+  if (subscription.plan === "basic") {
+    try {
+      const isActiveInShopify = await billing.check({
+        plans: ["basic"],
+        isTest: process.env.NODE_ENV !== "production",
+      });
+      if (!isActiveInShopify) {
+        // Basic plan record exists in DB but not in Shopify —
+        // billing was cancelled. Downgrade to free instead of redirecting.
+        await prisma.subscription.updateMany({
+          where: { shop },
+          data: { plan: "free", status: "active" },
+        });
+        currentPlan = "free";
+        hasActivePlan = true;
+        console.warn(
+          `[BILLING] Basic plan not active in Shopify — downgraded ${shop} to free`
+        );
+      }
+    } catch (billingErr) {
+      // Billing check failed — continue with free plan (fail-safe, no block)
+      console.warn("[BILLING] Shopify billing check failed — using free plan", {
+        shop,
+        message: billingErr instanceof Error ? billingErr.message : String(billingErr),
+      });
+    }
+  }
 
-  // ✅ hasActivePlan reflects enforcement gate.
-  const hasActivePlan = isBillingActive(billingStatus);
+  // hasActivePlan is used downstream for UI rendering
+  const billingStatus: BillingStatusValue = (hasActivePlan
+    ? subscription.status
+    : "none") as BillingStatusValue;
 
   // 💱 CURRENCY
   let currencyCode = "USD";
@@ -292,6 +325,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasActivePlan,
     hasMultipleMarkets,
     billingStatus,
+    currentPlan,
     isOnboarded,
   };
 };

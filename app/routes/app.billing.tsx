@@ -135,7 +135,7 @@ export async function action({ request }: LoaderFunctionArgs) {
   // Shopify redirects to the payment confirmation screen.
   const response = await billing.request({
     plan: BILLING_PLANS.BASIC.name,
-    isTest: true,
+   isTest: process.env.NODE_ENV !== "production"
   });
 
   return response;
