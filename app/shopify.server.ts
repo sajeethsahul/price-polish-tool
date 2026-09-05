@@ -31,6 +31,7 @@ console.log("✅ SHOPIFY_APP_URL:", appUrl);
 
 // 🚀 SHOPIFY APP CONFIG
 const shopify = shopifyApp({
+  publicRoutes: ["/privacy"],
   apiKey: shopifyApiKey,
   apiSecretKey: apiSecret,
   apiVersion: ApiVersion.October24,
