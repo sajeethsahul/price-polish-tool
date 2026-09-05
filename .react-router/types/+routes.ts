@@ -92,6 +92,9 @@ type Pages = {
   "/auth/login": {
     params: {};
   };
+  "/privacy": {
+    params: {};
+  };
   "/auth/*": {
     params: {
       "*": string;
@@ -132,7 +135,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/subscriptions-update" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/export-impact" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/subscriptions-update" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/export-impact" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/privacy" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.subscriptions-update.tsx": {
     id: "routes/webhooks.app.subscriptions-update";
@@ -238,6 +241,10 @@ type RouteFiles = {
     id: "routes/auth.login";
     page: "/auth/login";
   };
+  "routes/privacy.tsx": {
+    id: "routes/privacy";
+    page: "/privacy";
+  };
   "routes/auth.$.tsx": {
     id: "routes/auth.$";
     page: "/auth/*";
@@ -320,6 +327,7 @@ type RouteModules = {
   "routes/api.test-db": typeof import("./app/routes/api.test-db.ts");
   "routes/api.health": typeof import("./app/routes/api.health.ts");
   "routes/auth.login": typeof import("./app/routes/auth.login/route.tsx");
+  "routes/privacy": typeof import("./app/routes/privacy.tsx");
   "routes/auth.$": typeof import("./app/routes/auth.$.tsx");
   "routes/_index": typeof import("./app/routes/_index.tsx");
   "routes/app": typeof import("./app/routes/app.tsx");

@@ -28,34 +28,67 @@ export const links = () => [
   },
 ];
 
+// Public routes that must render without any Shopify authentication or
+// App Bridge (e.g. legal pages opened directly in a browser tab).
+const PUBLIC_ROUTES = ["/privacy"];
+
 export async function loader({ request }: LoaderFunctionArgs) {
+  // Public pages skip the Shopify auth flow entirely — anyone can access them.
+  if (PUBLIC_ROUTES.includes(new URL(request.url).pathname)) {
+    return json({ locale: "en", public: true });
+  }
+
   try {
     const { session } = await shopify.authenticate.admin(request);
 
     const raw: string = (session as any).locale ?? "en";
-    
+
+    // pt-BR must be checked before base split
+    if (raw.toLowerCase() === "pt-br") {
+      setLocale("pt-BR");
+      return json({ locale: "pt-BR", public: false });
+    }
+
     // Normalize BCP-47 to base language code
     // "fr-CA" → "fr", "de-AT" → "de", "es-MX" → "es"
     const base = raw.toLowerCase().split("-")[0];
-    
+
     // Only these 4 are supported — everything else gets English ( German/Spanish/French/Italy/Dutch/Portuguese)
-    const SUPPORTED = ["es", "fr", "de","it","nl","pt"];
+    const SUPPORTED = ["es", "fr", "de","it","nl"];
     const localeId = SUPPORTED.includes(base) ? base : "en.default";
 
     setLocale(localeId);
 
     // Return the clean code to the client (not "en.default")
     const locale = localeId === "en.default" ? "en" : localeId;
-    return json({ locale });
+    return json({ locale, public: false });
    // return json({ locale: "it" });
   } catch {
     setLocale("en.default");
-    return json({ locale: "en" });
+    return json({ locale: "en", public: false });
   }
 }
 
 export default function App() {
-  const { locale } = useLoaderData<typeof loader>();
+  const { locale, public: isPublicRoute } = useLoaderData<typeof loader>();
+
+  if (isPublicRoute) {
+    // Standalone public page — no App Bridge, no embedded app chrome.
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width,initial-scale=1" />
+          <Meta />
+          <Links />
+        </head>
+        <body>
+          <Outlet />
+          <Scripts />
+        </body>
+      </html>
+    );
+  }
 
   return (
     <html lang={locale}>

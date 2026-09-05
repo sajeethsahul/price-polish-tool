@@ -67,13 +67,14 @@ export function t(key: TranslationKey): string {
  * Call setLocale() with the detected value before using t() server-side.
  */
 // Supported locale codes — add more here when ready (German/English/Spanish/French/Italy/Dutch/Portuguese)
-const SUPPORTED_LOCALES = ["es", "fr", "de","it","nl","pt"];
+const SUPPORTED_LOCALES = ["es", "fr", "de","it","nl"];
 
 export function detectLocaleFromSession(
   session: { locale?: string } | null | undefined | any
 ): string {
   const raw = session?.locale;
   if (typeof raw === "string" && raw.length > 0) {
+      if (raw.toLowerCase() === "pt-br") return "pt-BR";
     const base = raw.toLowerCase().split("-")[0];
     if (SUPPORTED_LOCALES.includes(base)) return base;
   }

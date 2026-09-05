@@ -28,7 +28,6 @@ import {
 } from "@shopify/polaris";
 import {
   InfoIcon,
-  RefreshIcon,
   CalendarTimeIcon,
   ArrowDownIcon,
   UndoIcon,
@@ -38,6 +37,13 @@ import {
   SearchIcon,
   XCircleIcon,
   PlayIcon,
+  HomeIcon,
+  ClockIcon,
+  PriceListIcon,
+  CreditCardIcon,
+  SettingsIcon,
+  QuestionCircleIcon,
+  RefreshIcon
 } from "@shopify/polaris-icons";
 import {
   formatMoney,
@@ -3200,7 +3206,11 @@ function DashboardContent({
 
       `}</style>
 
-      <Page title={t("common.dashboard")} fullWidth>
+      <Page
+        title={t("common.dashboard")}
+        titleMetadata={<Icon source={HomeIcon} tone="base" />}
+        fullWidth
+      >
         <div style={{ width: "100%" }}>
           <BlockStack gap="300">
             {/* Debug Tools */}
@@ -3294,9 +3304,12 @@ function DashboardContent({
             {!hasActivePlan && (
               <Card>
                 <BlockStack gap="300">
-                  <Text as="h3" variant="headingMd">
-                    {t("dashboard.billingUpsell.title")}
-                  </Text>
+                  <InlineStack gap="100" blockAlign="center">
+                    <Icon source={CreditCardIcon} tone="base" />
+                    <Text as="h3" variant="headingMd">
+                      {t("dashboard.billingUpsell.title")}
+                    </Text>
+                  </InlineStack>
                   <Text as="p">{t("dashboard.billingUpsell.body")}</Text>
                   <InlineStack gap="200">
                     <Badge tone="success">{t("pricing.bulkPricing")}</Badge>
@@ -3672,9 +3685,12 @@ function DashboardContent({
                           alignItems: "center",
                         }}
                       >
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          {t("dashboard.quickActions.title")}
-                        </Text>
+                        <InlineStack gap="100" blockAlign="center">
+                          <Icon source={HomeIcon} tone="base" />
+                          <Text as="h3" variant="headingSm" fontWeight="semibold">
+                            {t("dashboard.quickActions.title")}
+                          </Text>
+                        </InlineStack>
                       </div>
 
                       {/* Matches the left container's background style and height perfectly */}
@@ -3694,6 +3710,7 @@ function DashboardContent({
                           <Button
                             variant="primary"
                             size="slim"
+                            icon={PriceListIcon}
                             onClick={() => navigate("/app/rules")}
                             fullWidth
                           >
@@ -3702,6 +3719,7 @@ function DashboardContent({
                           <Button
                             variant="secondary"
                             size="slim"
+                            icon={SearchIcon}
                             onClick={() => navigate("/app/preview")}
                             fullWidth
                           >
@@ -3710,6 +3728,7 @@ function DashboardContent({
                           <Button
                             variant="tertiary"
                             size="slim"
+                            icon={ClockIcon}
                             onClick={() => navigate("/app/campaign-history")}
                             fullWidth
                           >

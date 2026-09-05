@@ -12,7 +12,9 @@ import {
   InlineStack,
   Page,
   Text,
+  Icon,
 } from "@shopify/polaris";
+import { CreditCardIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { BILLING_PLANS } from "../config/billing";
@@ -163,6 +165,7 @@ export default function BillingPage() {
   return (
     <Page
       title={t("common.nav.billing")}
+      titleMetadata={<Icon source={CreditCardIcon} tone="base" />}
       backAction={{ onAction: () => navigate("/app") }}
       fullWidth
     >

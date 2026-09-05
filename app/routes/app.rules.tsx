@@ -24,7 +24,10 @@ import {
     Banner,
     Box,
     Badge,
+    Icon,
 } from "@shopify/polaris";
+
+import { PriceListIcon } from "@shopify/polaris-icons";
 
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -409,6 +412,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     return (
         <Page
             title={t("rules.pageTitle")}
+            titleMetadata={<Icon source={PriceListIcon} tone="base" />}
             backAction={{
                 onAction: handleBackClick,
             }}

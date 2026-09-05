@@ -18,8 +18,9 @@ import {
   Spinner,
   Text,
   TextField,
+  Icon,
 } from "@shopify/polaris";
-import { RefreshIcon } from "@shopify/polaris-icons";
+import { ClockIcon, RefreshIcon } from "@shopify/polaris-icons";
 import { authenticate } from "../shopify.server";
 import { useAppFetch } from "../utils/fetch";
 import { formatMoney } from "../utils/format";
@@ -1250,7 +1251,12 @@ export default function CampaignHistoryPage() {
 
   return (
     <>
-<Page title={t("campaignHistory.pageTitle")} backAction={{ onAction: () => navigate("/app") }} fullWidth>
+<Page
+  title={t("campaignHistory.pageTitle")}
+  titleMetadata={<Icon source={ClockIcon} tone="base" />}
+  backAction={{ onAction: () => navigate("/app") }}
+  fullWidth
+>
         {isInitialCampaignHistoryLoad ? (
           showInitialCampaignHistoryLoader ? (
             <PricePolishLoader
