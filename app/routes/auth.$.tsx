@@ -5,9 +5,12 @@ import { AppProvider } from "@shopify/polaris";
 import { AppLaunchSplash } from "../components/AppLaunchSplash";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+   // Guard against bodyless HEAD requests — prevents 500 in logs
+  if (request.method === "HEAD") return new Response(null, { status: 204 });
   const url = new URL(request.url);
 
   const toTopLevelRedirect = (response: Response): Response => {
+
     const location = response.headers.get("Location");
     console.log("[REDIRECT TRACE]");
     console.log("REQUEST:", request.url);
