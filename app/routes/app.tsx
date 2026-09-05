@@ -202,12 +202,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   // 💰 BILLING ENFORCEMENT (🔥 THIS IS THE KEY FIX)
   const billingResponse = await billing.require({
-    plans: ["free", "basic"],
-    isTest: true,
+    plans: ["basic"],
+    isTest: process.env.NODE_ENV !== "production",
     onFailure: async () =>
       billing.request({
-        plan: "free", // default new merchants to free plan
-        isTest: true,
+        plan: "basic", // default new merchants to free plan
+        isTest: process.env.NODE_ENV !== "production",
       }),
   });
 

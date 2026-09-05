@@ -49,16 +49,6 @@ const shopify = shopifyApp({
   isEmbeddedApp: true,
 
 billing: {
-  free: {
-    lineItems: [
-      {
-        amount: 0,
-        currencyCode: "USD",
-        interval: BillingInterval.Every30Days,
-      },
-    ],
-    trialDays: 0,
-  },
   basic: {
     lineItems: [
       {
