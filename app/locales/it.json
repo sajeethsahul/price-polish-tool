@@ -170,6 +170,7 @@
     "roundingWhole": "Solo numeri interi",
     "roundingKeepCents": "Mantieni centesimi",
     "roundingNearest005": "Arrotonda a 0,05",
+    "zeroDecimalNote": "La valuta di questo negozio ({currency}) non ha unità decimali, quindi le opzioni di terminazione e arrotondamento ai centesimi non sono disponibili.",
     "safeguards": "Tutele",
     "minimumPriceOptional": "Prezzo minimo (opzionale)",
     "maximumPriceOptional": "Prezzo massimo (opzionale)",
@@ -1104,6 +1105,22 @@
       "override_label": "Sostituzione manuale del prezzo:",
       "override_desc": "Sostituisci manualmente un prezzo calcolato per un singolo articolo. Le sostituzioni manuali vengono conservate separatamente dai prezzi calcolati automaticamente."
     },
+    "priceReviews": {
+      "title": "Capire le anteprime dei prezzi e la griglia della dashboard",
+      "subtitle": "Le griglie dell'anteprima e della dashboard mostrano tre colonne di prezzo per ogni prodotto. Capire il significato di ciascuna — e da dove deriva la variazione percentuale — è essenziale per rivedere correttamente le modifiche dei prezzi.",
+      "originalCatalog_title": "Catalogo originale",
+      "originalCatalog_desc": "Il prezzo di base del tuo prodotto memorizzato in Price Polish. È il prezzo da cui viene calcolata la tua regola di prezzo (margine, arrotondamento, prezzi psicologici). Tutte le modifiche di prezzo proposte e le percentuali sono misurate rispetto a questo valore.",
+      "liveStorefront_title": "Negozio in diretta",
+      "liveStorefront_desc": "Il prezzo attualmente mostrato ai clienti nel tuo negozio Shopify live. Viene indicato solo come riferimento: non influisce sul calcolo della nuova anteprima né della variazione percentuale. Se il negozio in diretta differisce notevolmente dal catalogo originale, di solito significa che il prezzo è stato modificato manualmente nell'amministrazione Shopify oppure che un'operazione di prezzo precedente non si è ancora riflessa qui. Verifica sempre direttamente nell'amministrazione Shopify se questo scarto ti sembra inatteso.",
+      "newPreview_title": "Nuova anteprima",
+      "newPreview_desc": "Il prezzo che la tua regola di prezzo attiva imposterà una volta applicata, calcolato a partire dal catalogo originale (ad es. \"Aumenta di ₹15.00 • Arrotonda a 0.50\", mostrato nel banner di contesto dell'anteprima).",
+      "newPreview_edit_desc": "Questo campo è anche modificabile: puoi digitare manualmente un prezzo personalizzato per qualsiasi prodotto direttamente nella casella Nuova anteprima, sostituendo il valore calcolato dalla regola solo per quel prodotto. È utile quando un articolo richiede un prezzo diverso da quello che la regola applicherebbe (ad es. un articolo promozionale, un prodotto con esigenze di prezzo particolari o una correzione prima dell'applicazione). I prezzi modificati manualmente vengono conservati separatamente da quelli calcolati automaticamente — vedi Override manuale del prezzo sopra per i dettagli su come gli override vengono tracciati e applicati.",
+      "formula_title": "Come funziona la percentuale di variazione",
+      "formula_desc": "La percentuale confronta sempre la nuova anteprima con il catalogo originale — mai con il negozio in diretta: variazione % = (nuova anteprima − catalogo originale) / catalogo originale × 100. Esempio: catalogo originale ₹20.00 → nuova anteprima ₹35.50 → +77.5%, anche se il negozio in diretta mostra un prezzo diverso come ₹2.00.",
+      "formula_manual": "Se modifichi manualmente il prezzo della nuova anteprima, la percentuale si aggiorna subito per riflettere il tuo valore personalizzato al posto di quello calcolato dalla regola.",
+      "tip_title": "Perché è importante",
+      "tip": "Poiché la tua regola di prezzo è definita rispetto al catalogo originale, la percentuale riflette l'effetto reale della regola (o il tuo override manuale, se presente). Non è una previsione di quanto aumenterà il prezzo del negozio per i clienti — usa il valore del negozio in diretta solo per verificare eventuali scostamenti, non per interpretare la percentuale."
+    },
     "sectionF": {
       "title": "Applica prezzi",
       "subtitle": "Applica le modifiche di prezzo dopo aver rivisto l'anteprima.",
@@ -1278,6 +1295,10 @@
     "continue": "Continua →",
     "continueAria": "Vai al Passaggio 3: Applica prezzi",
     "priceChange": "Vecchio: {old} → Nuovo: {new}",
+    "currentPrice": "Attuale",
+    "newPrice": "Nuovo",
+    "noChange": "Nessuna modifica",
+    "livePrice": "Live: {price}",
     "empty": {
       "heading": "Ancora nessun prodotto da anteprima",
       "action": "Modifica regola di prezzo",

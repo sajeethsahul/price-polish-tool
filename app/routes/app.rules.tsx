@@ -33,6 +33,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { calculatePrice } from "../utils/pricing";
+import { formatMoney, getCurrencySymbol, ZERO_DECIMAL_CURRENCIES } from "../utils/format";
 import { requireActiveBilling } from "../utils/billing-protection.server";
 import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
 import { DiscardChangesModal } from "../components/DiscardChangesModal";
@@ -53,7 +54,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const history = await prisma.pricingRuleHistory.findMany({
         where: { shop: session.shop },
         orderBy: { createdAt: "desc" },
-        take: 5,
+        take: 20,
     });
 
     return {
@@ -272,6 +273,41 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
     const revisitSuffix = isRevisit ? "&revisit=1" : "";
 
     const isSubmitting = navigation.state === "submitting";
+
+    // Currencies like JPY, KRW have no decimal units — price-ending and
+    // cent-rounding options are meaningless there and must be hidden.
+    const isZeroDecimal = ZERO_DECIMAL_CURRENCIES.includes(
+        String(currencyCode).toUpperCase(),
+    );
+
+    // For zero-decimal currencies, only "None" ending and integer rounding
+    // make sense — drop the decimal-aware options entirely.
+    const endingOptions = [
+        { label: `${SELECT_OPTION_PREFIX}${t("rules.none")}`, value: "none" },
+    ].concat(
+        isZeroDecimal
+            ? []
+            : [
+                { label: `${SELECT_OPTION_PREFIX}.00`, value: "0.00" },
+                { label: `${SELECT_OPTION_PREFIX}.25`, value: "0.25" },
+                { label: `${SELECT_OPTION_PREFIX}.49`, value: "0.49" },
+                { label: `${SELECT_OPTION_PREFIX}.50`, value: "0.50" },
+                { label: `${SELECT_OPTION_PREFIX}.75`, value: "0.75" },
+                { label: `${SELECT_OPTION_PREFIX}.95`, value: "0.95" },
+                { label: `${SELECT_OPTION_PREFIX}.99`, value: "0.99" },
+            ],
+    );
+    const roundingOptions = [
+        { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingStandard")}`, value: "standard" },
+        { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingWhole")}`, value: "whole" },
+    ].concat(
+        isZeroDecimal
+            ? []
+            : [
+                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingKeepCents")}`, value: "keep-cents" },
+                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingNearest005")}`, value: "nearest-0.05" },
+            ],
+    );
 
     const initialType = String(loaderData.adjustmentType ?? "percentage").toLowerCase();
     const derivedDirection = (Number(loaderData.markupPercent ?? 0) < 0) ? "decrease" : "increase";
@@ -492,17 +528,8 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                         <Select
                                             label={t("rules.ending")}
                                             name="endingOption"
-                                            options={[
-                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.none")}`, value: "none" },
-                                                { label: `${SELECT_OPTION_PREFIX}.00`, value: "0.00" },
-                                                { label: `${SELECT_OPTION_PREFIX}.25`, value: "0.25" },
-                                                { label: `${SELECT_OPTION_PREFIX}.49`, value: "0.49" },
-                                                { label: `${SELECT_OPTION_PREFIX}.50`, value: "0.50" },
-                                                { label: `${SELECT_OPTION_PREFIX}.75`, value: "0.75" },
-                                                { label: `${SELECT_OPTION_PREFIX}.95`, value: "0.95" },
-                                                { label: `${SELECT_OPTION_PREFIX}.99`, value: "0.99" },
-                                            ]}
-                                            value={endingOption}
+                                            options={endingOptions}
+                                            value={isZeroDecimal ? "none" : endingOption}
                                             disabled={isSubmitting}
                                             onChange={(value) => setEndingOption(value)}
                                             error={actionData?.fieldErrors?.endingOption}
@@ -512,19 +539,20 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                         <Select
                                             label={t("rules.rounding")}
                                             name="roundingPrecision"
-                                            options={[
-                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingStandard")}`, value: "standard" },
-                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingWhole")}`, value: "whole" },
-                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingKeepCents")}`, value: "keep-cents" },
-                                                { label: `${SELECT_OPTION_PREFIX}${t("rules.roundingNearest005")}`, value: "nearest-0.05" },
-                                            ]}
-                                            value={roundingPrecision}
+                                            options={roundingOptions}
+                                            value={isZeroDecimal ? (roundingPrecision === "whole" ? "whole" : "standard") : roundingPrecision}
                                             disabled={isSubmitting}
                                             onChange={(value) => setRoundingPrecision(value)}
                                             error={actionData?.fieldErrors?.roundingPrecision}
                                         />
                                     </div>
                                 </InlineStack>
+
+                                {isZeroDecimal && (
+                                    <Text as="span" tone="subdued" variant="bodySm">
+                                        {t("rules.zeroDecimalNote").replace("{currency}", String(currencyCode))}
+                                    </Text>
+                                )}
 
                                 <Divider />
 
@@ -589,7 +617,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                             <BlockStack gap="150">
                                 <InlineStack align="space-between">
                                     <Text as="span" tone="subdued">{t("rules.current")}</Text>
-                                    <Text as="span">{currencyCode} {basePrice.toFixed(2)}</Text>
+                                    <Text as="span">{formatMoney(basePrice, currencyCode)}</Text>
                                 </InlineStack>
                                 <InlineStack align="space-between">
                                     <Text as="span" tone="subdued">{t("rules.adjustment")}</Text>
@@ -597,18 +625,18 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                         {adjustmentDirection === "decrease" ? t("rules.decrease") : t("rules.increase")}{" "}
                                         {adjustmentType === "percentage"
                                             ? `${safeAdjustmentValue.toFixed(2)}%`
-                                            : `${currencyCode} ${safeAdjustmentValue.toFixed(2)}`}
+                                            : formatMoney(safeAdjustmentValue, currencyCode)}
                                     </Text>
                                 </InlineStack>
                                 <InlineStack align="space-between">
                                     <Text as="span" tone="subdued">{t("rules.afterAdjustment")}</Text>
-                                    <Text as="span">{currencyCode} {Number(rawAdjusted.toFixed(2)).toFixed(2)}</Text>
+                                    <Text as="span">{formatMoney(rawAdjusted, currencyCode)}</Text>
                                 </InlineStack>
                                 <Divider />
                                 <InlineStack align="space-between" blockAlign="center">
                                     <Text as="span" variant="headingSm">{t("pricing.labels.finalPrice")}</Text>
                                     <Text as="span" variant="headingLg" tone="success">
-                                        {currencyCode} {finalPrice.toFixed(2)}
+                                        {formatMoney(finalPrice, currencyCode)}
                                     </Text>
                                 </InlineStack>
                             </BlockStack>
@@ -622,6 +650,18 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                             <BlockStack gap="200">
                                 <Text as="span" variant="headingSm">{t("pricing.labels.recentChanges")}</Text>
 
+                                <div
+                                    role="region"
+                                    tabIndex={0}
+                                    aria-label={t("pricing.labels.recentChanges")}
+                                    style={{
+                                        maxHeight: 360,
+                                        overflowY: "auto",
+                                        padding: 8,
+                                        paddingRight: 4,
+                                        boxSizing: "border-box",
+                                    }}
+                                >
                                 <BlockStack gap="150">
                                     {loaderData.history.map((h: any) => {
                                         const type = String(h.adjustmentType ?? "percentage").toLowerCase();
@@ -648,7 +688,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                                         <Text as="span" variant="bodyMd" fontWeight="medium">
                                                             {type === "percentage"
                                                                 ? `${value.toFixed(2)}%`
-                                                                : `${currencyCode} ${value.toFixed(2)}`}
+                                                                : formatMoney(value, currencyCode)}
                                                         </Text>
                                                         {ending !== "none" && (
                                                             <Badge tone="info">{t("pricing.labels.endingValue").replace("{endingValue}", ending.split(".")[1] ?? "00")}</Badge>
@@ -662,6 +702,7 @@ function RulesContent({ loaderData, actionData, currencyCode, shop, host }: any)
                                         );
                                     })}
                                 </BlockStack>
+                                </div>
                             </BlockStack>
                         </BlockStack>
                     </Card>

@@ -170,6 +170,7 @@
     "roundingWhole": "Alleen hele getallen",
     "roundingKeepCents": "Centen behouden",
     "roundingNearest005": "Afronden op 0,05",
+    "zeroDecimalNote": "De valuta van deze winkel ({currency}) heeft geen decimale eenheden, dus de opties voor afsluiting en cent-afronding zijn niet beschikbaar.",
     "safeguards": "Waarborgen",
     "minimumPriceOptional": "Minimumprijs (optioneel)",
     "maximumPriceOptional": "Maximumprijs (optioneel)",
@@ -1104,6 +1105,22 @@
       "override_label": "Handmatige prijsoverschrijving:",
       "override_desc": "Overschrijf handmatig een berekende prijs voor een afzonderlijk item. Handmatige overschrijvingen worden apart bewaard van automatisch berekende prijzen."
     },
+    "priceReviews": {
+      "title": "Prijsvoorbeelden en dashboardraster begrijpen",
+      "subtitle": "Het voorbeeld- en het dashboardraster tonen drie prijskolommen per product. Begrijpen wat elke kolom betekent — en waar de procentuele wijziging vandaan komt — is essentieel om prijswijzigingen correct te beoordelen.",
+      "originalCatalog_title": "Originele catalogus",
+      "originalCatalog_desc": "De basisprijs van uw product zoals opgeslagen in Price Polish. Dit is de prijs waarop uw prijsregel (opslag, afronding, psychologische prijzen) wordt berekend. Alle voorgestelde prijswijzigingen en percentagebadges worden tegen deze waarde afgezet.",
+      "liveStorefront_title": "Live winkel",
+      "liveStorefront_desc": "De prijs die klanten momenteel in uw live Shopify-winkel te zien krijgen. Deze wordt alleen ter referentie getoond — hij speelt geen rol in de berekening van het nieuwe voorbeeld of de procentuele wijziging. Wijkt de live winkel aanzienlijk af van de originele catalogus, dan is de prijs meestal handmatig gewijzigd in de Shopify-admin of is een eerdere prijsactie hier nog niet zichtbaar. Controleer onverwachte verschillen altijd rechtstreeks in de Shopify-admin.",
+      "newPreview_title": "Nieuw voorbeeld",
+      "newPreview_desc": "De prijs die uw actieve prijsregel na toepassing instelt, berekend vanuit de originele catalogus (bijv. \"Verhogen met ₹15.00 • Afronden op 0.50\", getoond in de voorbeeldcontextbanner).",
+      "newPreview_edit_desc": "Dit veld is ook bewerkbaar: u kunt handmatig een aangepaste prijs typen voor een afzonderlijk product, rechtstreeks in het veld Nieuw voorbeeld, waarmee u de door de regel berekende waarde alleen voor dat product overschrijft. Dit is handig wanneer een specifiek artikel een andere prijs nodig heeft dan de regel zou toepassen (bijv. een promotieartikel, een product met bijzondere prijsvereisten of een correctie vóór het toepassen). Handmatig bewerktte prijzen worden apart bewaard van automatisch berekende prijzen — zie Handmatige prijsoverschrijving hierboven voor meer informatie over hoe overschrijvingen worden bijgehouden en toegepast.",
+      "formula_title": "Hoe de percentagebadge werkt",
+      "formula_desc": "De percentagebadge vergelijkt het nieuwe voorbeeld altijd met de originele catalogus — nooit met de live winkel: % wijziging = (nieuw voorbeeld − originele catalogus) / originele catalogus × 100. Voorbeeld: originele catalogus ₹20.00 → nieuw voorbeeld ₹35.50 → +77.5%, ook al toont de live winkel een andere prijs zoals ₹2.00.",
+      "formula_manual": "Als u de prijs van het nieuwe voorbeeld handmatig bewerkt, wordt de percentagebadge onmiddellijk bijgewerkt en weerspiegelt deze uw aangepaste waarde in plaats van de door de regel berekende waarde.",
+      "tip_title": "Waarom dit belangrijk is",
+      "tip": "Omdat uw prijsregel is gedefinieerd ten opzichte van de originele catalogus, weerspiegelt de percentagebadge het werkelijke effect van de regel (of uw handmatige overschrijving, indien toegepast). Het is geen voorspelling van hoeveel de winkelprijs voor klanten stijgt — gebruik de waarde van de live winkel alleen om afwijkingen te signaleren, niet om de percentagebadge te interpreteren."
+    },
     "sectionF": {
       "title": "Prijzen toepassen",
       "subtitle": "Voer prijswijzigingen door na controle van het voorbeeld.",
@@ -1278,6 +1295,10 @@
     "continue": "Doorgaan →",
     "continueAria": "Ga naar stap 3: Prijzen toepassen",
     "priceChange": "Oud: {old} → Nieuw: {new}",
+    "currentPrice": "Huidig",
+    "newPrice": "Nieuw",
+    "noChange": "Geen wijziging",
+    "livePrice": "Live: {price}",
     "empty": {
       "heading": "Nog geen producten om voor te bekijken",
       "action": "Prijsregel aanpassen",

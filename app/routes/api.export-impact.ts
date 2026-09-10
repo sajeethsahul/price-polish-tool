@@ -13,8 +13,16 @@ interface ExportRow {
   priceChange: number;
 }
 
-const money = (value: number, currency: string) =>
-  `${currency} ${value.toFixed(2)}`;
+const money = (value: number, currency: string, locale?: string) => {
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+    }).format(value);
+  } catch {
+    return `${currency} ${value.toFixed(2)}`;
+  }
+};
 
 const COLORS = {
   headerBg: "FF1A1A2E",
@@ -56,6 +64,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const currency = (body?.currencyCode ?? "USD").trim() || "USD";
+  const locale = body?.locale || undefined;
   const campaignTitle =
     (body?.campaignTitle ?? "").trim() || t("export.campaign");
 
@@ -151,11 +160,11 @@ export async function action({ request }: ActionFunctionArgs) {
     const values: Array<string | number> = [
       r.title,
       r.sku ?? "",
-      money(r.priceBefore, currency),
-      money(r.adjustment, currency),
-      money(r.rounding, currency),
-      money(r.newPrice, currency),
-      money(r.priceChange, currency),
+      money(r.priceBefore, currency, locale),
+      money(r.adjustment, currency, locale),
+      money(r.rounding, currency, locale),
+      money(r.newPrice, currency, locale),
+      money(r.priceChange, currency, locale),
     ];
     values.forEach((value, colIndex) => {
       const cell = row.getCell(colIndex + 1);
@@ -183,11 +192,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const totalValues = [
     t("export.total"),
     "",
-    money(sumBefore, currency),
+    money(sumBefore, currency, locale),
     "",
     "",
-    money(sumNew, currency),
-    money(sumChange, currency),
+    money(sumNew, currency, locale),
+    money(sumChange, currency, locale),
   ];
   totalValues.forEach((value, index) => {
     const cell = totalRow.getCell(index + 1);

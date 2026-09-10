@@ -170,6 +170,7 @@
     "roundingWhole": "Apenas número inteiro",
     "roundingKeepCents": "Manter centavos",
     "roundingNearest005": "Arredondar para 0,05",
+    "zeroDecimalNote": "A moeda desta loja ({currency}) não tem unidades decimais, então as opções de terminação e arredondamento em centavos não estão disponíveis.",
     "safeguards": "Salvaguardas",
     "minimumPriceOptional": "Preço mínimo (opcional)",
     "maximumPriceOptional": "Preço máximo (opcional)",
@@ -1104,6 +1105,22 @@
       "override_label": "Substituição manual de preço:",
       "override_desc": "Substitua manualmente um preço calculado para um item individual. As substituições manuais são preservadas separadamente dos preços calculados automaticamente."
     },
+    "priceReviews": {
+      "title": "Entendendo as pré-visualizações de preços e a grade do painel",
+      "subtitle": "As grades de pré-visualização e do painel mostram três colunas de preço para cada produto. Entender o que cada uma significa — e de onde vem a variação percentual — é essencial para revisar corretamente as alterações de preços.",
+      "originalCatalog_title": "Catálogo original",
+      "originalCatalog_desc": "O preço de base do seu produto armazenado no Price Polish. É a partir dele que sua regra de preços (margem, arredondamento, preço psicológico) é calculada. Todas as alterações de preço propostas e os selos de porcentagem são medidos em relação a esse valor.",
+      "liveStorefront_title": "Loja ao vivo",
+      "liveStorefront_desc": "O preço exibido atualmente aos clientes na sua loja Shopify ao vivo. Ele é mostrado apenas como referência — não entra no cálculo da nova pré-visualização nem da variação percentual. Se a loja ao vivo diferir bastante do catálogo original, normalmente significa que o preço foi alterado manualmente no admin do Shopify ou que uma operação de preços anterior ainda não foi refletida aqui. Verifique sempre diretamente no admin do Shopify se essa diferença parecer inesperada.",
+      "newPreview_title": "Nova pré-visualização",
+      "newPreview_desc": "O preço que sua regra de preços ativa definirá ao ser aplicada, calculado a partir do catálogo original (ex.: \"Aumentar ₹15.00 • Arredondar para 0.50\", exibido no banner de contexto da pré-visualização).",
+      "newPreview_edit_desc": "Este campo também é editável: você pode digitar manualmente um preço personalizado para qualquer produto diretamente na caixa Nova pré-visualização, substituindo o valor calculado pela regra apenas para aquele produto. Isso é útil quando um item específico precisa de um preço diferente do que a regra aplicaria (ex.: um item promocional, um produto com necessidades de preço únicas ou uma correção antes de aplicar). Os preços editados manualmente são preservados separadamente dos calculados automaticamente — consulte Substituição manual de preço acima para saber como as substituições são rastreadas e aplicadas.",
+      "formula_title": "Como funciona o selo de variação percentual",
+      "formula_desc": "O selo de porcentagem sempre compara a nova pré-visualização com o catálogo original — nunca com a loja ao vivo: variação % = (nova pré-visualização − catálogo original) / catálogo original × 100. Exemplo: catálogo original ₹20.00 → nova pré-visualização ₹35.50 → +77.5%, mesmo que a loja ao vivo mostre um preço diferente como ₹2.00.",
+      "formula_manual": "Se você editar manualmente o preço da nova pré-visualização, o selo de porcentagem é atualizado imediatamente para refletir o seu valor personalizado em vez do valor calculado pela regra.",
+      "tip_title": "Por que isso importa",
+      "tip": "Como sua regra de preços é definida em relação ao catálogo original, o selo de porcentagem reflete o efeito real da regra (ou a sua substituição manual, se aplicada). Não é uma previsão de quanto o preço da loja subirá para os clientes — use o valor da loja ao vivo apenas para detectar divergências, não para interpretar o selo de porcentagem."
+    },
     "sectionF": {
       "title": "Aplicar precificação",
       "subtitle": "Efetive as alterações de preço após revisar a pré-visualização.",
@@ -1278,6 +1295,10 @@
     "continue": "Continuar →",
     "continueAria": "Ir para a Etapa 3: Aplicar precificação",
     "priceChange": "Antigo: {old} → Novo: {new}",
+    "currentPrice": "Atual",
+    "newPrice": "Novo",
+    "noChange": "Sem alteração",
+    "livePrice": "Ao vivo: {price}",
     "empty": {
       "heading": "Nenhum produto para pré-visualizar ainda",
       "action": "Ajustar regra de precificação",

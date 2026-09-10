@@ -170,6 +170,7 @@
     "roundingWhole": "Nur ganze Zahl",
     "roundingKeepCents": "Cent beibehalten",
     "roundingNearest005": "Auf 0,05 runden",
+    "zeroDecimalNote": "Die Währung dieses Shops ({currency}) hat keine Dezimalstellen, daher sind Preisendung und Cent-Rundung nicht verfügbar.",
     "safeguards": "Sicherheitsvorkehrungen",
     "minimumPriceOptional": "Mindestpreis (optional)",
     "maximumPriceOptional": "Höchstpreis (optional)",
@@ -1105,6 +1106,22 @@
       "override_label": "Manuelle Preisüberschreibung:",
       "override_desc": "Überschreiben Sie manuell einen berechneten Preis für ein einzelnes Element. Manuelle Überschreibungen werden getrennt von automatisch berechneten Preisen gespeichert."
     },
+    "priceReviews": {
+      "title": "Preisvorschauen und Dashboard-Raster verstehen",
+      "subtitle": "Das Vorschau- und das Dashboard-Raster zeigen für jedes Produkt drei Preisspalten. Zu verstehen, was jede bedeutet — und woher die prozentuale Änderung stammt — ist entscheidend für die korrekte Prüfung von Preisänderungen.",
+      "originalCatalog_title": "Originalkatalog",
+      "originalCatalog_desc": "Der in Price Polish gespeicherte Basispreis Ihres Produkts. Dies ist der Preis, aus dem Ihre Preisregel (Aufschlag, Rundung, Charm-Preise) berechnet wird. Alle vorgeschlagenen Preisänderungen und Prozentschilder werden an diesem Wert gemessen.",
+      "liveStorefront_title": "Live-Shopfront",
+      "liveStorefront_desc": "Der Preis, der Kunden aktuell in Ihrem Live-Shopify-Shop angezeigt wird. Er dient nur als Referenz — er fließt weder in die Berechnung der neuen Vorschau noch des prozentualen Änderungswerts ein. Weicht die Live-Shopfront deutlich vom Originalkatalog ab, wurde der Preis meist manuell im Shopify-Admin geändert oder eine frühere Preisoperation hat sich hier noch nicht niedergeschlagen. Prüfen Sie unerwartete Abweichungen immer direkt im Shopify-Admin.",
+      "newPreview_title": "Neue Vorschau",
+      "newPreview_desc": "Der Preis, den Ihre aktive Preisregel beim Anwenden festlegt, berechnet aus dem Originalkatalog (z. B. „Um ₹15.00 erhöhen • Auf 0,50 runden“, angezeigt im Vorschau-Kontextbanner).",
+      "newPreview_edit_desc": "Dieses Feld kann auch bearbeitet werden: Sie können direkt im Feld „Neue Vorschau“ manuell einen benutzerdefinierten Preis für ein einzelnes Produkt eingeben und damit den regelberechneten Wert nur für dieses Produkt überschreiben. Dies ist nützlich, wenn ein bestimmter Artikel einen anderen Preis braucht, als die Regel anwenden würde (z. B. ein Werbeartikel, ein Produkt mit besonderen Preisanforderungen oder eine Korrektur vor dem Anwenden). Manuell bearbeitete Preise werden getrennt von automatisch berechneten Preisen gespeichert — Details zur Nachverfolgung und Anwendung finden Sie oben unter „Manuelle Preisüberschreibung“.",
+      "formula_title": "So funktioniert das Prozent-Schild",
+      "formula_desc": "Das Prozent-Schild vergleicht die neue Vorschau immer mit dem Originalkatalog — niemals mit der Live-Shopfront: % Änderung = (neue Vorschau − Originalkatalog) / Originalkatalog × 100. Beispiel: Originalkatalog ₹20.00 → neue Vorschau ₹35.50 → +77.5 %, selbst wenn die Live-Shopfront einen anderen Preis wie ₹2.00 anzeigt.",
+      "formula_manual": "Wenn Sie den Preis der neuen Vorschau manuell bearbeiten, aktualisiert sich das Prozent-Schild sofort und zeigt Ihren benutzerdefinierten Wert statt des regelberechneten an.",
+      "tip_title": "Warum das wichtig ist",
+      "tip": "Da Ihre Preisregel relativ zum Originalkatalog definiert ist, spiegelt das Prozent-Schild die tatsächliche Wirkung der Regel wider (oder Ihre manuelle Überschreibung, sofern vorhanden). Es ist keine Vorhersage, wie stark sich der Shop-Preis für Kunden ändert — nutzen Sie den Live-Shopfront-Wert nur zur Prüfung von Abweichungen, nicht zur Interpretation des Prozent-Schilds."
+    },
     "sectionF": {
       "title": "Preise anwenden",
       "subtitle": "Übernehmen Sie Preisänderungen nach der Prüfung der Vorschau.",
@@ -1279,6 +1296,20 @@
     "continue": "Weiter →",
     "continueAria": "Weiter zu Schritt 3: Preise anwenden",
     "priceChange": "Alt: {old} → Neu: {new}",
+    "livePricingActive": "Live-Preise AKTIVIERT",
+    "livePricingActiveDesc": "Ihr Shop zeigt dynamische Preise basierend auf Ihren aktuellen Preisregeln an.",
+    "livePricingInactive": "Live-Preise DEAKTIVIERT",
+    "livePricingInactiveDesc": "Die hier angezeigten Vorschau-preise erscheinen NICHT in Ihrem Shop, bis Sie im Dashboard auf „Live gehen“ klicken.",
+    "filter": {
+      "all": "Alle",
+      "increased": "Erhöht",
+      "reduced": "Reduziert",
+      "unchanged": "Unverändert"
+    },
+    "currentPrice": "Aktuell",
+    "newPrice": "Neu",
+    "noChange": "Keine Änderung",
+    "livePrice": "Live: {price}",
     "empty": {
       "heading": "Noch keine Produkte zur Vorschau",
       "action": "Preisregel anpassen",

@@ -4896,6 +4896,11 @@ function DashboardContent({
                             : parseShopifyPrice(p.newPrice);
                           const isPolished = currentPrice !== originalPrice;
                           const isChanged = currentPrice !== targetPrice;
+                          // % change is relative to the Original Catalog price,
+                          // matching how the New Preview is derived (Catalog +
+                          // adjustment, rounded). Live Storefront price is NOT
+                          // used as the denominator — it can be stale/uncoupled
+                          // from the rule math (gift cards, discounted items).
                           const diffFromOriginal =
                             originalPrice !== 0
                               ? ((targetPrice - originalPrice) /

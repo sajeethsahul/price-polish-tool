@@ -170,6 +170,7 @@
     "roundingWhole": "Nombre entier uniquement",
     "roundingKeepCents": "Conserver les centimes",
     "roundingNearest005": "Arrondi à 0,05 près",
+    "zeroDecimalNote": "La devise de cette boutique ({currency}) n'a pas d'unités décimales, donc les options de terminaison et d'arrondi aux centimes ne sont pas disponibles.",
     "safeguards": "Mesures de protection",
     "minimumPriceOptional": "Prix minimum (facultatif)",
     "maximumPriceOptional": "Prix maximum (facultatif)",
@@ -1105,6 +1106,22 @@
       "override_label": "Remplacement manuel du prix :",
       "override_desc": "Remplacez manuellement un prix calculé pour un élément individuel. Les remplacements manuels sont conservés séparément des prix automatiquement calculés."
     },
+    "priceReviews": {
+      "title": "Comprendre les aperçus de prix et la grille du tableau de bord",
+      "subtitle": "Les grilles d'aperçu et du tableau de bord affichent trois colonnes de prix pour chaque produit. Comprendre la signification de chacune — et d'où vient le pourcentage de variation — est essentiel pour examiner correctement les changements de prix.",
+      "originalCatalog_title": "Catalogue d'origine",
+      "originalCatalog_desc": "Le prix de référence de votre produit enregistré dans Price Polish. C'est à partir de ce prix que votre règle de tarification (marge, arrondi, prix psychologique) est calculée. Toutes les modifications de prix proposées et les badges de pourcentage sont mesurés par rapport à cette valeur.",
+      "liveStorefront_title": "Vitrine en direct",
+      "liveStorefront_desc": "Le prix actuellement affiché aux clients sur votre vitrine Shopify en direct. Il est fourni à titre indicatif uniquement — il n'intervient ni dans le calcul du nouvel aperçu ni dans celui du pourcentage de variation. Si la vitrine en direct diffère sensiblement du catalogue d'origine, cela signifie généralement que le prix a été modifié manuellement dans l'admin Shopify ou qu'une opération de tarification antérieure ne s'est pas encore reflétée ici. Vérifiez toujours directement dans l'admin Shopify si cet écart vous semble inattendu.",
+      "newPreview_title": "Nouvel aperçu",
+      "newPreview_desc": "Le prix que votre règle de tarification active appliquera, calculé à partir du catalogue d'origine (p. ex. « Augmenter de ₹15.00 • Arrondi à 0.50 », affiché dans le bandeau de contexte de l'aperçu).",
+      "newPreview_edit_desc": "Ce champ est également modifiable : vous pouvez saisir manuellement un prix personnalisé pour n'importe quel produit directement dans le champ Nouvel aperçu, remplaçant la valeur calculée par la règle pour ce produit uniquement. C'est utile lorsqu'un article nécessite un prix différent de celui que la règle appliquerait (p. ex. un article promotionnel, un produit avec des besoins tarifaires particuliers ou une correction avant application). Les prix modifiés manuellement sont conservés séparément des prix calculés automatiquement — voir Remplacement manuel de prix ci-dessus pour savoir comment les remplacements sont suivis et appliqués.",
+      "formula_title": "Fonctionnement du badge de pourcentage",
+      "formula_desc": "Le badge de pourcentage compare toujours le nouvel aperçu au catalogue d'origine — jamais à la vitrine en direct : % de variation = (nouvel aperçu − catalogue d'origine) / catalogue d'origine × 100. Exemple : catalogue d'origine ₹20.00 → nouvel aperçu ₹35.50 → +77.5 %, même si la vitrine en direct affiche un autre prix comme ₹2.00.",
+      "formula_manual": "Si vous modifiez manuellement le prix du nouvel aperçu, le badge de pourcentage se met à jour immédiatement pour refléter votre valeur personnalisée au lieu de celle calculée par la règle.",
+      "tip_title": "Pourquoi c'est important",
+      "tip": "Votre règle de tarification étant définie par rapport au catalogue d'origine, le badge de pourcentage reflète l'effet réel de la règle (ou votre remplacement manuel, le cas échéant). Ce n'est pas une prévision de l'augmentation du prix vitrine pour les clients — utilisez la valeur de la vitrine en direct uniquement pour détecter les écarts, pas pour interpréter le badge de pourcentage."
+    },
     "sectionF": {
       "title": "Appliquer la tarification",
       "subtitle": "Validez les modifications de prix après avoir vérifié l'aperçu.",
@@ -1279,6 +1296,20 @@
     "continue": "Continuer →",
     "continueAria": "Passer à l'étape 3 : Appliquer la tarification",
     "priceChange": "Ancien : {old} → Nouveau : {new}",
+    "livePricingActive": "Tarification en direct ACTIVÉE",
+    "livePricingActiveDesc": "Votre boutique affiche des prix dynamiques basés sur vos règles de tarification actuelles.",
+    "livePricingInactive": "Tarification en direct DÉSACTIVÉE",
+    "livePricingInactiveDesc": "Les prix d'aperçu affichés ici n'apparaîtront PAS sur votre boutique tant que vous n'aurez pas activé le mode en direct depuis le Tableau de bord.",
+    "filter": {
+      "all": "Tous",
+      "increased": "Augmenté",
+      "reduced": "Réduit",
+      "unchanged": "Inchangé"
+    },
+    "currentPrice": "Actuel",
+    "newPrice": "Nouveau",
+    "noChange": "Aucun changement",
+    "livePrice": "En direct : {price}",
     "empty": {
       "heading": "Aucun produit à prévisualiser pour l'instant",
       "action": "Ajuster la règle de tarification",

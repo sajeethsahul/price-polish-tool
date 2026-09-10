@@ -170,6 +170,7 @@
     "roundingWhole": "Solo número entero",
     "roundingKeepCents": "Mantener centavos",
     "roundingNearest005": "Más cercano a 0.05",
+    "zeroDecimalNote": "La moneda de esta tienda ({currency}) no tiene unidades decimales, por lo que las opciones de terminación y redondeo a centavos no están disponibles.",
     "safeguards": "Salvaguardas",
     "minimumPriceOptional": "Precio mínimo (opcional)",
     "maximumPriceOptional": "Precio máximo (opcional)",
@@ -1106,6 +1107,22 @@
       "override_label": "Ajuste Manual de Precio:",
       "override_desc": "Ajuste manualmente el precio calculado de un artículo individual. Los ajustes manuales se conservan por separado de los precios calculados automáticamente."
     },
+    "priceReviews": {
+      "title": "Entender las vistas previas de precios y la cuadrícula del panel",
+      "subtitle": "Las cuadrículas de vista previa y del panel muestran tres columnas de precio para cada producto. Comprender qué significa cada una —y de dónde sale el porcentaje de cambio— es clave para revisar correctamente los cambios de precios.",
+      "originalCatalog_title": "Catálogo original",
+      "originalCatalog_desc": "El precio base de tu producto almacenado en Price Polish. Es el precio a partir del cual se calcula tu regla de precios (margen, redondeo, precio psicológico). Todos los cambios de precio propuestos y las insignias de porcentaje se miden contra este valor.",
+      "liveStorefront_title": "Tienda en vivo",
+      "liveStorefront_desc": "El precio que se muestra actualmente a los clientes en tu tienda Shopify en vivo. Se muestra solo como referencia: no influye en el cálculo de la nueva vista previa ni del porcentaje de cambio. Si la tienda en vivo difiere mucho del catálogo original, normalmente significa que el precio se cambió manualmente en el administrador de Shopify o que una operación de precios anterior aún no se ha reflejado aquí. Verifica siempre directamente en el administrador de Shopify si esta diferencia te parece inesperada.",
+      "newPreview_title": "Nueva vista previa",
+      "newPreview_desc": "El precio que tu regla de precios activa establecerá al aplicarse, calculado a partir del catálogo original (p. ej., \"Aumentar ₹15.00 • Redondear a 0.50\", mostrado en el encabezado de contexto de la vista previa).",
+      "newPreview_edit_desc": "Este campo también es editable: puedes escribir manualmente un precio personalizado para cualquier producto directamente en el cuadro de nueva vista previa, anulando el valor calculado por la regla solo para ese producto. Es útil cuando un artículo necesita un precio distinto al que aplicaría la regla (p. ej., un artículo promocional, un producto con necesidades de precio únicas o una corrección antes de aplicar). Los precios editados manualmente se conservan por separado de los calculados automáticamente; consulta Anulación manual de precio arriba para saber cómo se registran y aplican.",
+      "formula_title": "Cómo funciona la insignia de porcentaje de cambio",
+      "formula_desc": "La insignia de porcentaje siempre compara la nueva vista previa con el catálogo original —nunca con la tienda en vivo: % de cambio = (nueva vista previa − catálogo original) / catálogo original × 100. Ejemplo: catálogo original ₹20.00 → nueva vista previa ₹35.50 → +77.5%, aunque la tienda en vivo muestre un precio diferente como ₹2.00.",
+      "formula_manual": "Si editas manualmente el precio de la nueva vista previa, la insignia de porcentaje se actualiza de inmediato para reflejar tu valor personalizado en lugar del calculado por la regla.",
+      "tip_title": "Por qué es importante",
+      "tip": "Como tu regla de precios se define en relación con el catálogo original, la insignia de porcentaje refleja el efecto real de la regla (o tu anulación manual, si la aplicaste). No es una previsión de cuánto subirá el precio de tu tienda para los clientes: usa el valor de la tienda en vivo solo para detectar desfases, no para interpretar la insignia de porcentaje."
+    },
     "sectionF": {
       "title": "Aplicar Precios",
       "subtitle": "Confirme los cambios de precios después de revisar la vista previa.",
@@ -1280,6 +1297,20 @@
     "continue": "Continuar →",
     "continueAria": "Continuar al Paso 3: Aplicar precios",
     "priceChange": "Antes: {old} → Después: {new}",
+    "livePricingActive": "Precios en vivo ACTIVADOS",
+    "livePricingActiveDesc": "Tu tienda muestra precios dinámicos basados en tus reglas de precios actuales.",
+    "livePricingInactive": "Precios en vivo DESACTIVADOS",
+    "livePricingInactiveDesc": "Los precios de vista previa mostrados aquí NO aparecerán en tu tienda hasta que actives el modo en vivo desde el Panel.",
+    "filter": {
+      "all": "Todos",
+      "increased": "Aumentado",
+      "reduced": "Reducido",
+      "unchanged": "Sin cambios"
+    },
+    "currentPrice": "Actual",
+    "newPrice": "Nuevo",
+    "noChange": "Sin cambios",
+    "livePrice": "En vivo: {price}",
     "empty": {
       "heading": "Aún no hay productos para previsualizar",
       "action": "Ajustar la regla de precios",

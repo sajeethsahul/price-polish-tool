@@ -3,7 +3,10 @@ import { useNavigate, useOutletContext, useSearchParams } from "react-router";
 import type { PricingPreviewItem } from "../types/pricing";
 import { useAppFetch } from "../utils/fetch";
 import { t } from "../utils/i18n";
+import { parseShopifyPrice } from "../utils/price-utils";
+import { formatMoney } from "../utils/format";
 import {
+  Badge,
   Banner,
   BlockStack,
   Button,
@@ -11,12 +14,74 @@ import {
   EmptyState,
   InlineStack,
   Page,
+  Pagination,
   SkeletonBodyText,
   SkeletonDisplayText,
   Text,
+  TextField,
 } from "@shopify/polaris";
 
 const PREVIEW_SAMPLE_SIZE = 30;
+
+type PriceMovement = {
+  oldPrice: number;
+  livePrice: number;
+  newPrice: number;
+  delta: number;
+  deltaPercent: string;
+  isIncrease: boolean;
+  isDecrease: boolean;
+  isUnchanged: boolean;
+};
+
+function getPriceMovement(p: PricingPreviewItem): PriceMovement {
+  // % change is relative to the Original Catalog price (originalBasePrice) —
+  // the same baseline the New Preview is derived from (Catalog + adjustment,
+  // rounded). Live Storefront price is NOT used as the denominator: it can be
+  // stale, discounted, or out of sync with the rule math (e.g. gift cards),
+  // which would produce alarming/incorrect percentages.
+  // The card's "Current" value shows the Original Catalog baseline, with the
+  // live price surfaced separately (subdued "Live: ₹X") when it has drifted.
+  const originalPrice = parseShopifyPrice(
+    p.originalBasePrice ?? p.oldPrice,
+  );
+  const livePrice = parseShopifyPrice(p.oldPrice);
+  const proposedRaw =
+    p.overriddenPrice !== undefined ? p.overriddenPrice : p.newPrice;
+  const newPrice = parseShopifyPrice(proposedRaw);
+
+  // Mirror the dashboard's guard: skip items with invalid prices instead of
+  // treating them as increases/decreases.
+  if (
+    !Number.isFinite(originalPrice) ||
+    !Number.isFinite(newPrice) ||
+    originalPrice <= 0
+  ) {
+    return {
+      oldPrice: originalPrice,
+      livePrice,
+      newPrice,
+      delta: 0,
+      deltaPercent: "0",
+      isIncrease: false,
+      isDecrease: false,
+      isUnchanged: true,
+    };
+  }
+
+  const delta = newPrice - originalPrice;
+  const deltaPercent = ((delta / originalPrice) * 100).toFixed(1);
+  return {
+    oldPrice: originalPrice,
+    livePrice,
+    newPrice,
+    delta,
+    deltaPercent,
+    isIncrease: delta > 0,
+    isDecrease: delta < 0,
+    isUnchanged: delta === 0,
+  };
+}
 
 export default function PreviewPage() {
   const navigate = useNavigate();
@@ -30,8 +95,14 @@ export default function PreviewPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<PricingPreviewItem[]>([]);
-  const [showAll, setShowAll] = useState(false);
-  const toggleButtonRef = useRef<HTMLDivElement | null>(null);
+  // Live Pricing status — not available from the outlet context, so we fetch
+  // it from /api/metrics (same source the dashboard uses). Defaults to false.
+  const [isLive, setIsLive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     let active = true;
@@ -40,8 +111,16 @@ export default function PreviewPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await appFetch("/api/preview-price");
+        const locale =
+          typeof window !== "undefined" ? (window as any).__LOCALE__ ?? "" : "";
+        const [data, metricsData] = await Promise.all([
+          appFetch("/api/preview-price"),
+          appFetch(`/api/metrics?locale=${encodeURIComponent(locale)}`).catch(
+            () => null,
+          ),
+        ]);
         if (!active) return;
+        setIsLive((metricsData as any)?.isLive === true);
         setPreviews(
           Array.isArray(data?.previews)
             ? (data.previews as PricingPreviewItem[])
@@ -61,37 +140,69 @@ export default function PreviewPage() {
     };
   }, [appFetch]);
 
-  // Phase 3 (UX): client-side sample display. The API response is
-  // unchanged — we only slice on the client so the wizard preview stays
-  // lightweight. Users can opt in to the full list via "View Full Preview".
+  // Client-side filtering + pagination. The API response is unchanged —
+  // we only filter/slice on the client so the preview stays lightweight.
   const totalCount = previews.length;
-  const hasMoreThanSample = totalCount > PREVIEW_SAMPLE_SIZE;
+
+  // Movement counts over the full preview set — used for the filter chip labels.
+  const { increaseCount, decreaseCount, unchangedCount } = useMemo(() => {
+    let increaseCount = 0;
+    let decreaseCount = 0;
+    let unchangedCount = 0;
+    for (const p of previews) {
+      const { isIncrease, isDecrease, isUnchanged } = getPriceMovement(p);
+      if (isIncrease) increaseCount += 1;
+      else if (isDecrease) decreaseCount += 1;
+      else unchangedCount += 1;
+    }
+    return { increaseCount, decreaseCount, unchangedCount };
+  }, [previews]);
+
+  const filteredPreviews = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return previews.filter((p) => {
+      if (query) {
+        const matchesSearch =
+          (p.title ?? "").toLowerCase().includes(query) ||
+          (p.variantTitle ?? "").toLowerCase().includes(query) ||
+          (p.vendor ?? "").toLowerCase().includes(query) ||
+          (p.productType ?? "").toLowerCase().includes(query) ||
+          (p.sku ?? "").toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+      if (activeFilter !== "all") {
+        const { isIncrease, isDecrease, isUnchanged } = getPriceMovement(p);
+        if (activeFilter === "increase" && !isIncrease) return false;
+        if (activeFilter === "decrease" && !isDecrease) return false;
+        if (activeFilter === "unchanged" && !isUnchanged) return false;
+      }
+      return true;
+    });
+  }, [previews, searchQuery, activeFilter]);
+
+  const filteredCount = filteredPreviews.length;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+
   const visiblePreviews = useMemo(
     () =>
-      showAll || !hasMoreThanSample
-        ? previews
-        : previews.slice(0, PREVIEW_SAMPLE_SIZE),
-    [previews, showAll, hasMoreThanSample],
+      filteredPreviews.slice(
+        (safePage - 1) * PAGE_SIZE,
+        safePage * PAGE_SIZE,
+      ),
+    [filteredPreviews, safePage],
   );
   const visibleCount = visiblePreviews.length;
 
-  // Verification refinement (Phase 3): when collapsing the expanded list,
-  // scroll the toggle button back into view so the merchant keeps their
-  // anchor. Expanding never moves scroll; collapsing focuses the button.
-  const handleTogglePreviewScope = useCallback(() => {
-    setShowAll((prev) => {
-      const next = !prev;
-      if (prev === true) {
-        // We are collapsing — restore anchor after the DOM updates.
-        requestAnimationFrame(() => {
-          toggleButtonRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          });
-        });
-      }
-      return next;
-    });
+  // Any change to search or filters resets to the first page.
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  }, []);
+
+  const handleFilterChange = useCallback((value: string) => {
+    setActiveFilter(value);
+    setPage(1);
   }, []);
 
   // Phase 2 (UX): when arriving from the onboarding wizard, hide the tiny
@@ -118,6 +229,33 @@ export default function PreviewPage() {
           <Banner tone="critical" title={t("common.error.previewFailed")}>
             <p>{error}</p>
           </Banner>
+        ) : null}
+
+        {/* Live Pricing Status Banner */}
+        {!isLoading && !error ? (
+          isLive ? (
+            <Banner tone="success">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="span" fontWeight="semibold">
+                  {t("preview.livePricingActive")}
+                </Text>
+                <Text as="span" tone="subdued">
+                  {t("preview.livePricingActiveDesc")}
+                </Text>
+              </InlineStack>
+            </Banner>
+          ) : (
+            <Banner tone="warning">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="span" fontWeight="semibold">
+                  {t("preview.livePricingInactive")}
+                </Text>
+                <Text as="span" tone="subdued">
+                  {t("preview.livePricingInactiveDesc")}
+                </Text>
+              </InlineStack>
+            </Banner>
+          )
         ) : null}
 
         <Card>
@@ -159,43 +297,208 @@ export default function PreviewPage() {
                     .replace("{visible}", visibleCount.toLocaleString())
                     .replace("{total}", totalCount.toLocaleString())}
                 </Text>
-                {hasMoreThanSample ? (
-                  <div ref={toggleButtonRef}>
-                    <Button
-                      variant="plain"
-                      onClick={handleTogglePreviewScope}
-                      accessibilityLabel={
-                        showAll
-                          ? t("preview.collapseAria").replace(
-                              "{count}",
-                              String(PREVIEW_SAMPLE_SIZE),
-                            )
-                          : t("preview.expandAria").replace(
-                              "{count}",
-                              totalCount.toLocaleString(),
-                            )
-                      }
-                    >
-                      {showAll ? t("preview.showFewer") : t("preview.viewFull")}
-                    </Button>
-                  </div>
-                ) : null}
               </InlineStack>
+              <BlockStack gap="300">
+                <TextField
+                  label=""
+                  labelHidden
+                  placeholder={t("preview.searchPlaceholder")}
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  autoComplete="off"
+                  clearButton
+                  onClearButtonClick={() => handleSearchChange("")}
+                  ariaLabel={t("preview.searchLabel")}
+                />
+                <InlineStack gap="200" wrap blockAlign="center">
+                  {[
+                    {
+                      label: `${t("preview.filter.all")} (${totalCount})`,
+                      value: "all",
+                    },
+                    {
+                      label: `▲ ${t("preview.filter.increased")} (${increaseCount})`,
+                      value: "increase",
+                    },
+                    {
+                      label: `▼ ${t("preview.filter.reduced")} (${decreaseCount})`,
+                      value: "decrease",
+                    },
+                    {
+                      label: `— ${t("preview.filter.unchanged")} (${unchangedCount})`,
+                      value: "unchanged",
+                    },
+                  ].map((opt) => {
+                    const isActive = activeFilter === opt.value;
+                    return (
+                      <div
+                        key={opt.value}
+                        style={{
+                          borderBottom: isActive
+                            ? "2px solid var(--p-color-text-interactive, #005bd3)"
+                            : "2px solid transparent",
+                          paddingBottom: "2px",
+                        }}
+                      >
+                        <Button
+                          size="slim"
+                          variant={isActive ? "primary" : "secondary"}
+                          onClick={() => handleFilterChange(opt.value)}
+                          ariaPressed={isActive}
+                        >
+                          <Text
+                            as="span"
+                            variant="bodySm"
+                            fontWeight={isActive ? "bold" : "regular"}
+                          >
+                            {opt.label}
+                          </Text>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </InlineStack>
+              </BlockStack>
               <BlockStack gap="150">
-                {visiblePreviews.map((p) => (
-                  <Card key={String(p.variantId)}>
-                    <BlockStack gap="100">
-                      <Text as="h3" variant="headingMd">
-                        {p.title}
-                      </Text>
-                      <Text as="p" tone="subdued">
-                        {t("preview.priceChange")
-                          .replace("{old}", String(p.oldPrice))
-                          .replace("{new}", String(p.newPrice))}
-                      </Text>
-                    </BlockStack>
-                  </Card>
-                ))}
+                {filteredCount === 0 ? (
+                  <BlockStack gap="200" align="center" paddingBlock="600">
+                    <Text as="p" variant="bodyMd" tone="subdued" fontWeight="semibold">
+                      {t("preview.noResultsHeading")}
+                    </Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      {t("preview.noResultsBody")}
+                    </Text>
+                  </BlockStack>
+                ) : (
+                  <>
+                    {visiblePreviews.map((p) => {
+                      const {
+                        oldPrice,
+                        livePrice,
+                        newPrice,
+                        deltaPercent,
+                        isIncrease,
+                        isDecrease,
+                      } = getPriceMovement(p);
+                      const badgeTone = isIncrease
+                        ? "success"
+                        : isDecrease
+                          ? "critical"
+                          : "info";
+                      const badgeLabel = isIncrease
+                        ? `+${deltaPercent}%`
+                        : isDecrease
+                          ? `${deltaPercent}%`
+                          : t("preview.noChange");
+                      return (
+                        <div
+                          key={String(p.variantId)}
+                          style={{
+                            border: "1px solid #e1e3e5",
+                            borderRadius: "8px",
+                            padding: "16px",
+                            background: "#ffffff",
+                            boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                            marginBottom: "8px",
+                          }}
+                        >
+                          <InlineStack
+                            align="space-between"
+                            blockAlign="center"
+                            wrap={false}
+                          >
+                            {/* LEFT — Product info */}
+                            <BlockStack gap="100">
+                              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                {p.title}
+                              </Text>
+                              <InlineStack gap="200" wrap>
+                                {p.vendor ? (
+                                  <Text as="span" variant="bodySm" tone="subdued">
+                                    {p.vendor}
+                                  </Text>
+                                ) : null}
+                                {p.sku ? (
+                                  <Badge tone="info" size="small">
+                                    {p.sku}
+                                  </Badge>
+                                ) : null}
+                                {p.productType ? (
+                                  <Badge size="small">{p.productType}</Badge>
+                                ) : null}
+                              </InlineStack>
+                            </BlockStack>
+
+                            {/* RIGHT — Price movement (same contract as the
+                                Dashboard grid: Original Catalog → New Preview,
+                                with Live Storefront shown when it has drifted) */}
+                            <InlineStack gap="300" blockAlign="center" wrap={false}>
+                              <BlockStack gap="0" inlineAlign="end">
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  {t("preview.currentPrice")}
+                                </Text>
+                                <Text as="span" variant="bodyMd">
+                                  {formatMoney(oldPrice, currencyCode)}
+                                </Text>
+                                {Math.abs(livePrice - oldPrice) > 0.005 ? (
+                                  <Text as="span" variant="bodySm" tone="subdued">
+                                    {t("preview.livePrice").replace(
+                                      "{price}",
+                                      formatMoney(livePrice, currencyCode),
+                                    )}
+                                  </Text>
+                                ) : null}
+                              </BlockStack>
+
+                              <Text as="span" tone="subdued">
+                                →
+                              </Text>
+
+                              <BlockStack gap="0" inlineAlign="end">
+                                <Text as="span" variant="bodySm" tone="subdued">
+                                  {t("preview.newPrice")}
+                                </Text>
+                                <Text
+                                  as="span"
+                                  variant="bodyMd"
+                                  fontWeight="bold"
+                                  tone={
+                                    isIncrease
+                                      ? "success"
+                                      : isDecrease
+                                        ? "critical"
+                                        : "subdued"
+                                  }
+                                >
+                                  {formatMoney(newPrice, currencyCode)}
+                                </Text>
+                              </BlockStack>
+
+                              <Badge tone={badgeTone}>{badgeLabel}</Badge>
+                            </InlineStack>
+                          </InlineStack>
+                        </div>
+                      );
+                    })}
+                    {totalPages > 1 && (
+                      <InlineStack align="center" paddingBlockStart="400">
+                        <Pagination
+                          label={t("preview.pageInfo")
+                            .replace("{page}", String(safePage))
+                            .replace("{pages}", String(totalPages))}
+                          hasPrevious={safePage > 1}
+                          hasNext={safePage < totalPages}
+                          onPrevious={() => setPage((pg) => Math.max(1, pg - 1))}
+                          onNext={() =>
+                            setPage((pg) => Math.min(totalPages, pg + 1))
+                          }
+                          previousTooltip={t("preview.previousPage")}
+                          nextTooltip={t("preview.nextPage")}
+                        />
+                      </InlineStack>
+                    )}
+                  </>
+                )}
               </BlockStack>
             </BlockStack>
           )}
