@@ -6,4 +6,28 @@
 }
 {% endschema %}
 
+<script>
+  // FOUC protection: hide known price elements until Price Polish has
+  // processed them. Fail-open by design — the class is removed by
+  // price-polish.js after its first pass, and unconditionally by the
+  // deadline below even if that script never loads or throws.
+  (function () {
+    if (!document.documentElement.classList.contains("pp-wait")) {
+      document.documentElement.classList.add("pp-wait");
+      var css = document.createElement("style");
+      css.id = "pp-fouc-style";
+      css.textContent =
+        ".pp-wait .price-item,.pp-wait .price,.pp-wait .money," +
+        ".pp-wait [itemprop='price'],.pp-wait [data-price]," +
+        ".pp-wait [data-product-price],.pp-wait [data-price-polish-price]" +
+        "{visibility:hidden !important}";
+      document.head.appendChild(css);
+      // Fail-open cap: never leave prices hidden, even if price-polish.js
+      // fails to load, throws, or the config API is unreachable.
+      window.setTimeout(function () {
+        document.documentElement.classList.remove("pp-wait");
+      }, 2500);
+    }
+  })();
+</script>
 <script src="{{ 'price-polish.js' | asset_url }}" defer></script>
