@@ -98,7 +98,13 @@
   function isVisiblePrice(el) {
     if (el.closest(EXCLUDED_SELECTOR)) return false;
     for (let parent = el; parent; parent = parent.parentElement) {
-      if (EXCLUDED_CLASS.test(parent.getAttribute("class") || "")) return false;
+      // FIX 11: test the exclusion pattern per class TOKEN, and never let a
+      // token that begins with "price" trigger it. Dawn's PDP price container
+      // carries "price--show-badge", which the substring regex previously
+      // matched via "badge", excluding the entire main price block (and its
+      // leaf .price-item spans) from polishing — the stripped ₹205.6 bug.
+      const classTokens = (parent.getAttribute("class") || "").split(/\s+/);
+      if (classTokens.some((t) => t && !t.startsWith("price") && EXCLUDED_CLASS.test(t))) return false;
       const style = getComputedStyle(parent);
       if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse" || style.opacity === "0") return false;
     }

@@ -1,0 +1,21 @@
+url        https://price-polish-test-2.myshopify.com/products/the-3p-fulfilled-snowboard
+http       200
+load       8464ms
+title      "price-polish-test"
+bodyChars  154
+patchright C:\Users\Admin\.vscode\extensions\danielsanmedium.dscodegpt-3.24.74\standalone/
+text       price-polish-test This store is password protected. Use the password to enter the store. Enter store password Enter Are you the store owner? Log in here
+script     {
+ "url": "https://price-polish-test-2.myshopify.com/password",
+ "htmlClass": "",
+ "elements": []
+}
+
+console errors/warnings (3):
+  [error] Failed to load resource: the server responded with a status of 404 ()
+  [warning] The resource https://price-polish-test-2.myshopify.com/cdn/shopifycloud/portable-wallets/latest/accelerated-checkout.css (as=style crossorigin=anonymous) was preloaded using link preload in Early Hints but not used within a few seconds from the window's load event. Please make sure it has an appropr
+  [warning] The resource https://price-polish-test-2.myshopify.com/cdn/shop/t/2/assets/base.css?v=140624990073879848751771937952 (as=style) was preloaded using link preload in Early Hints but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value, a correct
+
+requests failed (2):
+  HTTP 404 https://cdn.shopify.com/shopify-marketing_assets/static/ShopifySans--regular.woff
+  net::ERR_ABORTED https://cdn.shopify.com/shopify-marketing_assets/static/ShopifySans--regular.woff

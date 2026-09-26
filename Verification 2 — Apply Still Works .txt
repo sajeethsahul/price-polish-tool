@@ -1,0 +1,71 @@
+Verification 2 — Apply Still Works After Schedule Exists
+
+Flow:
+
+Create scheduled campaign
+DO NOT wait
+Apply another manual campaign
+Verify:
+apply succeeds
+scheduled job still exists
+scheduled job later still executes
+
+This validates:
+
+campaign isolation really works
+✅ Verification 3 — Undo/Revert Still Works
+
+Pick:
+
+one manual apply
+
+Then:
+
+Undo
+
+Verify:
+
+Shopify price restored correctly
+no partial failure
+no 500
+WHY IMPORTANT
+
+Undo is still:
+
+legacy/non-isolated
+
+We need to ensure:
+
+new campaign fields did not accidentally break it
+✅ Verification 4 — No Worker Errors
+
+Watch:
+
+shopify app dev
+
+during scheduled execution.
+
+Verify:
+
+no Prisma errors
+no undefined campaignId issues
+no staged lookup crashes
+✅ Verification 5 — PriceHistory Still Writes
+
+After:
+
+apply
+scheduled execution
+
+Check:
+
+SELECT "campaignId", "variantId", "newPrice", "isManual"
+FROM "PriceHistory"
+ORDER BY "createdAt" DESC
+LIMIT 10;
+
+Verify:
+
+rows still insert
+campaignId populated for new flows
+no null corruption
