@@ -179,7 +179,7 @@ export default function PrivacyPolicy() {
             </li>
             <li style={listItemStyle}>
               <span style={bulletStyle}>•</span>
-              Respond to support and data requests.
+              Respond to privacy and data requests.
             </li>
           </ul>
           <p style={paragraphStyle}>
@@ -292,8 +292,6 @@ export default function PrivacyPolicy() {
             >
               pricepolish.support@gmail.com
             </a>
-            <br />
-            Response time: within 48 business hours.
           </p>
 
           {/* Footer */}

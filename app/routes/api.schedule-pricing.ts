@@ -65,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
         console.log("[BILLING] Free plan limit check — enforcement pending", {
             shop, action: "campaign_create"
         });
-        // TODO: enforce campaignsPerMonth: 2 limit after beta
+        // TODO: enforce campaignsPerMonth: 2 limit — deferred beta gap, see docs/billing-enforcement-plan.md (before leaving beta)
     }
 
     applyLocaleFromSession(session);

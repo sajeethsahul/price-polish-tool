@@ -383,7 +383,7 @@ export default function AppLayout() {
                     Unlock Price Polish
                   </Text>
                   <Text as="p">
-                    Start your 7-day free trial.
+                    Start your 14-day free trial.
                   </Text>
                   <Button
                     variant="primary"

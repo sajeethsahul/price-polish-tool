@@ -30,6 +30,7 @@ type BillingPageData = {
     createdAt: string;
     updatedAt: string;
   } | null;
+  testBilling: boolean | null;
   shopLifecycle: {
     isInstalled: boolean;
     installedAt: string | null;
@@ -54,9 +55,11 @@ function resolveBillingHealth(params: {
   isInstalled: boolean;
 }) {
   if (!params.isInstalled) return "inactive";
+  if (!params.subscription) return "active";
   const status = normalize(params.subscription?.status);
-  if (!status) return "inactive";
-  if (["active", "accepted", "trialing", "free"].includes(status)) return "active";
+  if (!status) return "active";
+  if (["active", "accepted", "trialing", "free"].includes(status))
+    return "active";
   return "inactive";
 }
 
@@ -66,7 +69,7 @@ export const loader = async ({
   const auth = await authenticate.admin(request);
   if (auth instanceof Response) return auth as any;
 
-  const { session } = auth;
+  const { session, admin } = auth;
   const shop = session.shop;
 
   const [subscription, lifecycle] = await Promise.all([
@@ -92,6 +95,37 @@ export const loader = async ({
     }),
   ]);
 
+  let testBilling: boolean | null = null;
+
+  if (subscription?.plan === BILLING_PLANS.BASIC.name) {
+    try {
+      const response = await admin.graphql(`
+        query BillingDiagnostics {
+          currentAppInstallation {
+            activeSubscriptions {
+              name
+              test
+            }
+          }
+        }
+      `);
+      const json = (await response.json().catch(() => null)) as any;
+      const subs: Array<{ name?: string | null; test?: boolean | null }> =
+        json?.data?.currentAppInstallation?.activeSubscriptions ?? [];
+      const match =
+        subs.find((s) => normalize(s.name) === BILLING_PLANS.BASIC.name) ??
+        subs[0] ??
+        null;
+      testBilling = typeof match?.test === "boolean" ? match.test : null;
+    } catch {
+      testBilling = null;
+    }
+  } else if (subscription) {
+    testBilling = false;
+  } else {
+    testBilling = false;
+  }
+
   return {
     shop,
     subscription: subscription
@@ -104,10 +138,13 @@ export const loader = async ({
           updatedAt: subscription.updatedAt.toISOString(),
         }
       : null,
+    testBilling,
     shopLifecycle: lifecycle
       ? {
           isInstalled: lifecycle.isInstalled,
-          installedAt: lifecycle.installedAt.toISOString(),
+          installedAt: lifecycle.installedAt
+            ? lifecycle.installedAt.toISOString()
+            : null,
           uninstalledAt: lifecycle.uninstalledAt
             ? lifecycle.uninstalledAt.toISOString()
             : null,
@@ -155,7 +192,55 @@ export default function BillingPage() {
     billingHealth === "active" ? ("success" as const) : ("critical" as const);
 
   const testBillingValue = useMemo(() => {
-    return t("common.yes");
+    if (data.testBilling === null) return "—";
+    return data.testBilling ? t("common.yes") : t("common.no");
+  }, [data.testBilling]);
+
+  const planLabels = useMemo(() => {
+    const formatTemplate = (
+      key:
+        | "billing.page.plans.campaignsPerMonth"
+        | "billing.page.plans.productsPerCampaign"
+        | "billing.page.plans.freeTrialDays",
+      count: number,
+    ) => t(key).replace("{count}", String(count));
+
+    const freeCampaigns = BILLING_PLANS.FREE.limits.campaignsPerMonth;
+    const freeProducts = BILLING_PLANS.FREE.limits.productsPerCampaign;
+    const basicCampaigns = BILLING_PLANS.BASIC.limits.campaignsPerMonth;
+    const basicProducts = BILLING_PLANS.BASIC.limits.productsPerCampaign;
+    const basicTrialDays = BILLING_PLANS.BASIC.trialDays;
+
+    return {
+      free: {
+        campaigns:
+          freeCampaigns === null
+            ? t("billing.page.plans.unlimitedCampaigns")
+            : formatTemplate("billing.page.plans.campaignsPerMonth", freeCampaigns),
+        products: formatTemplate(
+          "billing.page.plans.productsPerCampaign",
+          freeProducts,
+        ),
+      },
+      basic: {
+        campaigns:
+          basicCampaigns === null
+            ? t("billing.page.plans.unlimitedCampaigns")
+            : formatTemplate(
+                "billing.page.plans.campaignsPerMonth",
+                basicCampaigns,
+              ),
+        products: formatTemplate(
+          "billing.page.plans.productsPerCampaign",
+          basicProducts,
+        ),
+        trial: formatTemplate("billing.page.plans.freeTrialDays", basicTrialDays),
+      },
+      prices: {
+        free: t("billing.page.plans.freePrice"),
+        basic: t("billing.page.plans.basicPrice"),
+      },
+    };
   }, []);
 
   const toggleDiagnostics = useCallback(() => {
@@ -353,7 +438,7 @@ export default function BillingPage() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                Plans
+                {t("billing.page.plans.title")}
               </Text>
               <InlineStack gap="400" wrap>
                 <Box width="100%" maxWidth="460px">
@@ -361,25 +446,28 @@ export default function BillingPage() {
                     <BlockStack gap="300">
                       <InlineStack align="space-between" blockAlign="center" wrap>
                         <Text as="h3" variant="headingSm">
-                          Free
+                          {t("billing.page.plans.freeTitle")}
                         </Text>
                         {(data.subscription?.plan ?? "free") === "free" ? (
-                          <Badge tone="success">Current plan</Badge>
+                          <Badge tone="success">
+                            {t("billing.page.plans.currentPlan")}
+                          </Badge>
                         ) : null}
                       </InlineStack>
                       <Text as="p" variant="headingLg">
-                        $0
+                        {planLabels.prices.free}
                         <Text as="span" tone="subdued">
-                          {" "}/month
+                          {" "}
+                          {t("billing.page.plans.perMonth")}
                         </Text>
                       </Text>
                       <Text as="p" tone="subdued">
-                        Get started with Price Polish at no cost.
+                        {t("billing.page.plans.freeDesc")}
                       </Text>
                       <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
-                        <li>1 campaign per month</li>
-                        <li>Up to 50 products per campaign</li>
-                        <li>Core pricing rules &amp; scheduling</li>
+                        <li>{planLabels.free.campaigns}</li>
+                        <li>{planLabels.free.products}</li>
+                        <li>{t("billing.page.plans.fullFeatureSet")}</li>
                       </ul>
                     </BlockStack>
                   </Card>
@@ -390,27 +478,33 @@ export default function BillingPage() {
                     <BlockStack gap="300">
                       <InlineStack align="space-between" blockAlign="center" wrap>
                         <Text as="h3" variant="headingSm">
-                          Basic
+                          {t("billing.page.plans.basicTitle")}
                         </Text>
                         {data.subscription?.plan === "basic" ? (
-                          <Badge tone="success">Current plan</Badge>
+                          <Badge tone="success">
+                            {t("billing.page.plans.currentPlan")}
+                          </Badge>
                         ) : (
-                          <Badge tone="info">Recommended</Badge>
+                          <Badge tone="info">
+                            {t("billing.page.plans.recommended")}
+                          </Badge>
                         )}
                       </InlineStack>
                       <Text as="p" variant="headingLg">
-                        $9.99
+                        {planLabels.prices.basic}
                         <Text as="span" tone="subdued">
-                          {" "}/month
+                          {" "}
+                          {t("billing.page.plans.perMonth")}
                         </Text>
                       </Text>
                       <Text as="p" tone="subdued">
-                        For growing stores running regular price campaigns.
+                        {t("billing.page.plans.basicDesc")}
                       </Text>
                       <ul style={{ paddingLeft: "1.2rem", margin: 0 }}>
-                        <li>Unlimited campaigns</li>
-                        <li>Up to 1,000 products per campaign</li>
-                        <li>14-day free trial</li>
+                        <li>{planLabels.basic.campaigns}</li>
+                        <li>{planLabels.basic.products}</li>
+                        <li>{t("billing.page.plans.sameFullFeatureSet")}</li>
+                        <li>{planLabels.basic.trial}</li>
                       </ul>
                       <Form method="post">
                         <input type="hidden" name="plan" value="basic" />
@@ -419,7 +513,7 @@ export default function BillingPage() {
                           disabled={data.subscription?.plan === "basic"}
                           submit
                         >
-                          Upgrade to Basic
+                          {t("billing.page.plans.upgradeToBasic")}
                         </Button>
                       </Form>
                     </BlockStack>
