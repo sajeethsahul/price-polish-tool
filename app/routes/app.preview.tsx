@@ -9,6 +9,7 @@ import {
   Badge,
   Banner,
   BlockStack,
+  Box,
   Button,
   Card,
   EmptyState,
@@ -300,7 +301,7 @@ export default function PreviewPage() {
               </InlineStack>
               <BlockStack gap="300">
                 <TextField
-                  label=""
+                  label={t("preview.searchLabel")}
                   labelHidden
                   placeholder={t("preview.searchPlaceholder")}
                   value={searchQuery}
@@ -308,7 +309,6 @@ export default function PreviewPage() {
                   autoComplete="off"
                   clearButton
                   onClearButtonClick={() => handleSearchChange("")}
-                  ariaLabel={t("preview.searchLabel")}
                 />
                 <InlineStack gap="200" wrap blockAlign="center">
                   {[
@@ -346,13 +346,7 @@ export default function PreviewPage() {
                           onClick={() => handleFilterChange(opt.value)}
                           ariaPressed={isActive}
                         >
-                          <Text
-                            as="span"
-                            variant="bodySm"
-                            fontWeight={isActive ? "bold" : "regular"}
-                          >
-                            {opt.label}
-                          </Text>
+                          {opt.label}
                         </Button>
                       </div>
                     );
@@ -361,14 +355,16 @@ export default function PreviewPage() {
               </BlockStack>
               <BlockStack gap="150">
                 {filteredCount === 0 ? (
-                  <BlockStack gap="200" align="center" paddingBlock="600">
-                    <Text as="p" variant="bodyMd" tone="subdued" fontWeight="semibold">
-                      {t("preview.noResultsHeading")}
-                    </Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      {t("preview.noResultsBody")}
-                    </Text>
-                  </BlockStack>
+                  <Box paddingBlock="600">
+                    <BlockStack gap="200" align="center">
+                      <Text as="p" variant="bodyMd" tone="subdued" fontWeight="semibold">
+                        {t("preview.noResultsHeading")}
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        {t("preview.noResultsBody")}
+                      </Text>
+                    </BlockStack>
+                  </Box>
                 ) : (
                   <>
                     {visiblePreviews.map((p) => {
@@ -481,21 +477,23 @@ export default function PreviewPage() {
                       );
                     })}
                     {totalPages > 1 && (
-                      <InlineStack align="center" paddingBlockStart="400">
-                        <Pagination
-                          label={t("preview.pageInfo")
-                            .replace("{page}", String(safePage))
-                            .replace("{pages}", String(totalPages))}
-                          hasPrevious={safePage > 1}
-                          hasNext={safePage < totalPages}
-                          onPrevious={() => setPage((pg) => Math.max(1, pg - 1))}
-                          onNext={() =>
-                            setPage((pg) => Math.min(totalPages, pg + 1))
-                          }
-                          previousTooltip={t("preview.previousPage")}
-                          nextTooltip={t("preview.nextPage")}
-                        />
-                      </InlineStack>
+                      <Box paddingBlockStart="400">
+                        <InlineStack align="center">
+                          <Pagination
+                            label={t("preview.pageInfo")
+                              .replace("{page}", String(safePage))
+                              .replace("{pages}", String(totalPages))}
+                            hasPrevious={safePage > 1}
+                            hasNext={safePage < totalPages}
+                            onPrevious={() => setPage((pg) => Math.max(1, pg - 1))}
+                            onNext={() =>
+                              setPage((pg) => Math.min(totalPages, pg + 1))
+                            }
+                            previousTooltip={t("preview.previousPage")}
+                            nextTooltip={t("preview.nextPage")}
+                          />
+                        </InlineStack>
+                      </Box>
                     )}
                   </>
                 )}
