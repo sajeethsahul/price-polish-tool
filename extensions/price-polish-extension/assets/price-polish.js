@@ -202,8 +202,25 @@
     const lastComma = compactToken.lastIndexOf(",");
     const lastPeriod = compactToken.lastIndexOf(".");
 
-    // Decimal separator used by the storefront
-    const decSep = lastComma > lastPeriod ? "," : ".";
+    // Currency-marker position, used below to infer the locale's decimal
+    // separator when the number itself carries none. Suffix notation
+    // ("34 €", "1.234,50 €", "34 EUR") is the European convention; a prefix
+    // marker ("€34", "$34", "Rs. 20") is the period convention.
+    const textBeforeToken = originalText.slice(0, tokenMatch.index);
+    const textAfterToken = originalText.slice(tokenMatch.index + token.length);
+    const hasPrefixMarker = textBeforeToken.trim().length > 0;
+    const hasSuffixMarker = textAfterToken.trim().length > 0;
+
+    // Decimal separator used by the storefront. If the token contains a
+    // separator, the later one is the decimal separator ("1.234,50" → comma,
+    // "1,234.50" → period). A separator-free token ("34 €") defaults to a
+    // period — but a SUFFIX currency marker identifies the German/European
+    // style, so those must get comma decimals instead of the period default
+    // (the "34 € → 37.40 €" regression; correct output is "37,40 €").
+    let decSep = lastComma > lastPeriod ? "," : ".";
+    if (lastComma === -1 && lastPeriod === -1 && hasSuffixMarker && !hasPrefixMarker) {
+      decSep = ",";
+    }
     // Grouping separator: if the original token used spaces (e.g. "1 000,00"),
     // keep spaces; otherwise use the "other" separator, only if the original
     // integer part actually contained it
