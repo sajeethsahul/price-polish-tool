@@ -38,7 +38,26 @@
       "updatedAt": "Aktualisiert am",
       "futureTitle": "Zukünftiges",
       "futureDesc": "Upgrade-Workflows und Planverwaltung werden in einem zukünftigen Release hinzugefügt.",
-      "upgradePlan": "Plan upgraden"
+      "upgradePlan": "Plan upgraden",
+      "plans": {
+        "title": "Pläne",
+        "freeTitle": "Kostenlos",
+        "freeDesc": "Starten Sie mit den wichtigsten Pre-Tools.",
+        "basicTitle": "Basic",
+        "basicDesc": "Für wachsende Shops mit höherem Volumen.",
+        "currentPlan": "Aktueller Plan",
+        "recommended": "Empfohlen",
+        "campaignsPerMonth": "{count} Kampagnen pro Monat",
+        "productsPerCampaign": "Bis zu {count} Produkte pro Kampagne",
+        "unlimitedCampaigns": "Unbegrenzte Kampagnen",
+        "freeTrialDays": "{count} Tage kostenlos testen",
+        "freePrice": "0 $",
+        "basicPrice": "9,99 $",
+        "perMonth": "pro Monat",
+        "fullFeatureSet": "Voller Funktionsumfang",
+        "sameFullFeatureSet": "Derselbe volle Funktionsumfang",
+        "upgradeToBasic": "Auf Basic upgraden"
+      }
     }
   },
   "common": {

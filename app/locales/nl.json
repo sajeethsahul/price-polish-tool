@@ -38,7 +38,26 @@
       "updatedAt": "Bijgewerkt op",
       "futureTitle": "Toekomst",
       "futureDesc": "Upgrade-processen en planbeheer worden in een toekomstige release toegevoegd.",
-      "upgradePlan": "Plan upgraden"
+      "upgradePlan": "Plan upgraden",
+      "plans": {
+        "title": "Plannen",
+        "freeTitle": "Gratis",
+        "freeDesc": "Begin met de essentiële prijstools.",
+        "basicTitle": "Basic",
+        "basicDesc": "Voor groeiende winkels die meer volume nodig hebben.",
+        "currentPlan": "Huidig plan",
+        "recommended": "Aanbevolen",
+        "campaignsPerMonth": "{count} campagnes per maand",
+        "productsPerCampaign": "Tot {count} producten per campagne",
+        "unlimitedCampaigns": "Onbeperkte campagnes",
+        "freeTrialDays": "{count} dagen gratis proberen",
+        "freePrice": "€0",
+        "basicPrice": "€9,99",
+        "perMonth": "per maand",
+        "fullFeatureSet": "Volledige functieset",
+        "sameFullFeatureSet": "Dezelfde volledige functieset",
+        "upgradeToBasic": "Upgraden naar Basic"
+      }
     }
   },
   "common": {

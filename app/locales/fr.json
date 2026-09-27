@@ -38,7 +38,26 @@
       "updatedAt": "Mis à jour le",
       "futureTitle": "À venir",
       "futureDesc": "Les flux de mise à niveau et la gestion des formules seront ajoutés dans une version ultérieure.",
-      "upgradePlan": "Mettre à niveau la formule"
+      "upgradePlan": "Mettre à niveau la formule",
+      "plans": {
+        "title": "Formules",
+        "freeTitle": "Gratuit",
+        "freeDesc": "Commencez avec les outils de tarification essentiels.",
+        "basicTitle": "Basique",
+        "basicDesc": "Pour les boutiques en croissance qui ont besoin de plus de volume.",
+        "currentPlan": "Formule actuelle",
+        "recommended": "Recommandée",
+        "campaignsPerMonth": "{count} campagnes par mois",
+        "productsPerCampaign": "Jusqu'à {count} produits par campagne",
+        "unlimitedCampaigns": "Campagnes illimitées",
+        "freeTrialDays": "Essai gratuit de {count} jours",
+        "freePrice": "0 $",
+        "basicPrice": "9,99 $",
+        "perMonth": "par mois",
+        "fullFeatureSet": "Ensemble complet de fonctionnalités",
+        "sameFullFeatureSet": "Même ensemble complet de fonctionnalités",
+        "upgradeToBasic": "Passer à Basique"
+      }
     }
   },
   "common": {

@@ -38,7 +38,26 @@
       "updatedAt": "Updated At",
       "futureTitle": "Future",
       "futureDesc": "Upgrade flows and plan management will be added in a future release.",
-      "upgradePlan": "Upgrade Plan"
+      "upgradePlan": "Upgrade Plan",
+      "plans": {
+        "title": "Plans",
+        "freeTitle": "Free",
+        "freeDesc": "Get started with core pricing tools.",
+        "basicTitle": "Basic",
+        "basicDesc": "For growing stores that need more volume.",
+        "currentPlan": "Current Plan",
+        "recommended": "Recommended",
+        "campaignsPerMonth": "{count} campaigns per month",
+        "productsPerCampaign": "Up to {count} products per campaign",
+        "unlimitedCampaigns": "Unlimited campaigns",
+        "freeTrialDays": "{count}-day free trial",
+        "freePrice": "$0",
+        "basicPrice": "$9.99",
+        "perMonth": "per month",
+        "fullFeatureSet": "Full feature set",
+        "sameFullFeatureSet": "Same full feature set",
+        "upgradeToBasic": "Upgrade to Basic"
+      }
     }
   },
   "common": {
@@ -711,7 +730,7 @@
     },
     "marketsWarning": "Price Polish updates your base currency prices. Shopify Markets will apply your market exchange rates automatically. Preview prices are shown in your base currency.",
     "billingUpsell": {
-      "title": "Start Your 7-Day Free Trial",
+      "title": "Start Your 14-Day Free Trial",
       "body": "Apply smart pricing, increase profits, and manage bulk updates safely.",
       "cta": "Start Free Trial",
       "noCharge": "No charge today • Cancel anytime"

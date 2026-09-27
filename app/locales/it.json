@@ -38,7 +38,26 @@
       "updatedAt": "Aggiornato il",
       "futureTitle": "Futuro",
       "futureDesc": "I flussi di upgrade e la gestione dei piani saranno aggiunti in una versione futura.",
-      "upgradePlan": "Aggiorna piano"
+      "upgradePlan": "Aggiorna piano",
+      "plans": {
+        "title": "Piani",
+        "freeTitle": "Gratis",
+        "freeDesc": "Inizia con gli strumenti di prezzo essenziali.",
+        "basicTitle": "Basic",
+        "basicDesc": "Per negozi in crescita che necessitano di più volume.",
+        "currentPlan": "Piano attuale",
+        "recommended": "Consigliato",
+        "campaignsPerMonth": "{count} campagne al mese",
+        "productsPerCampaign": "Fino a {count} prodotti per campagna",
+        "unlimitedCampaigns": "Campagne illimitate",
+        "freeTrialDays": "Prova gratuita di {count} giorni",
+        "freePrice": "0 $",
+        "basicPrice": "9,99 $",
+        "perMonth": "al mese",
+        "fullFeatureSet": "Set completo di funzionalità",
+        "sameFullFeatureSet": "Stesso set completo di funzionalità",
+        "upgradeToBasic": "Passa a Basic"
+      }
     }
   },
   "common": {
