@@ -42,3 +42,4 @@ extensions/**/assets/*.gif
 .trae/
 *.bat
 seed.mjs
+ScriptRanResult.txt
