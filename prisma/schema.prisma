@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Session {
@@ -162,6 +163,8 @@ model AppState {
   onboardingCelebratedAt      DateTime?
   reviewRequestShownAt        DateTime?
   reviewRequestDismissedAt    DateTime?
+  revertReviewPromptShownAt     DateTime?
+  revertReviewPromptDismissedAt DateTime?
   activeCampaignId              String?
 }
 
