@@ -22,6 +22,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       onboardingCelebratedAt: null,
       reviewRequestShownAt: null,
       reviewRequestDismissedAt: null,
+      revertReviewPromptShownAt: null,
+      revertReviewPromptDismissedAt: null,
     },
   });
   console.log("[ONBOARDING RESET]", {

@@ -27,6 +27,7 @@ import { formatMoney } from "../utils/format";
 import { resolveWindowLifecycleState } from "../utils/window-lifecycle";
 import { PricePolishLoader, PRICE_POLISH_LOADER_COPY, useDelayedVisibility } from "../components/PricePolishLoader";
 import { BillingBlockModal, type BillingBlockModalCode } from "../components/BillingBlockModal";
+import { RevertReviewPromptModal } from "../components/RevertReviewPromptModal";
 import { CampaignConflictExplorerModal } from "../components/CampaignConflictExplorerModal";
 import { ModalPagination } from "../components/ModalPagination";
 import { ModalScrollableSection } from "../components/ModalScrollableSection";
@@ -403,6 +404,54 @@ export default function CampaignHistoryPage() {
   // Billing block modal state
   const [billingBlockModalOpen, setBillingBlockModalOpen] = useState(false);
   const [billingBlockModalCode, setBillingBlockModalCode] = useState<BillingBlockModalCode | null>(null);
+
+  // Post-revert review prompt state. Eligibility is resolved from the server
+  // (AppState.revertReviewPromptShownAt/DismissedAt) so a revert that fires
+  // before the state loads is silently skipped rather than double-prompted.
+  const [revertReviewPromptOpen, setRevertReviewPromptOpen] = useState(false);
+
+  const maybeShowRevertReviewPrompt = useCallback(async () => {
+    try {
+      const fetcher = await appFetch;
+      const data = await fetcher("/api/onboarding");
+      const state = (data as any)?.state;
+      if (!state) return;
+      const shownAt = state.revertReviewPromptShownAt
+        ? new Date(state.revertReviewPromptShownAt).getTime()
+        : null;
+      const dismissedAt = state.revertReviewPromptDismissedAt
+        ? new Date(state.revertReviewPromptDismissedAt).getTime()
+        : null;
+      const now = Date.now();
+      const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+      // Show only once ever; a dismissal permits exactly one re-show after a
+      // 90-day cooldown — never more (shownAt is written only once).
+      const eligible =
+        shownAt === null ||
+        (dismissedAt !== null && now - dismissedAt >= NINETY_DAYS_MS);
+      if (!eligible) return;
+      void fetcher("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "revert-review.shown" }),
+      });
+      setRevertReviewPromptOpen(true);
+    } catch (error) {
+      console.error("[ReviewPrompt] eligibility check failed", error);
+    }
+  }, [appFetch]);
+
+  const dismissRevertReviewPrompt = useCallback(() => {
+    setRevertReviewPromptOpen(false);
+    const fetcher = appFetch;
+    void fetcher("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "revert-review.dismiss" }),
+    }).catch((error) =>
+      console.error("[ReviewPrompt] dismiss tracking failed", error),
+    );
+  }, [appFetch]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setCampaignRuntimeNow(new Date()), 1000);
@@ -1219,6 +1268,10 @@ export default function CampaignHistoryPage() {
         (shopify as any)?.toast?.show?.(operationalMessage);
       } else if ((data as any)?.restoredCount > 0) {
         (shopify as any)?.toast?.show?.(t("server.revertRestoredCount").replace("{count}", String((data as any).restoredCount)));
+        // Genuine full revert success (not terminal, no failures): trigger the
+        // one-time post-revert feedback prompt. Fire-and-forget — never blocks
+        // the merchant's workflow.
+        void maybeShowRevertReviewPrompt();
       } else {
         const noRetryMessage = terminalReason
           ? t("server.revertNoRetryWithReason").replace("{reason}", terminalReason.toLowerCase())
@@ -1247,7 +1300,7 @@ export default function CampaignHistoryPage() {
     } finally {
       setIsProcessing(false);
     }
-  }, [handleRefreshCampaignHistory, resetRevertPreviewViewState, revertPreviewRetryFailedOnly, selectedCampaignForRevert, shopify]);
+  }, [handleRefreshCampaignHistory, maybeShowRevertReviewPrompt, resetRevertPreviewViewState, revertPreviewRetryFailedOnly, selectedCampaignForRevert, shopify]);
 
   return (
     <>
@@ -2281,6 +2334,11 @@ export default function CampaignHistoryPage() {
         shop={shop}
         host={host}
         onClose={() => setBillingBlockModalOpen(false)}
+      />
+
+      <RevertReviewPromptModal
+        open={revertReviewPromptOpen}
+        onDismiss={dismissRevertReviewPrompt}
       />
     </>
   );

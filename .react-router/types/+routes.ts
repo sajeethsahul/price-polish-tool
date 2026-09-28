@@ -74,6 +74,9 @@ type Pages = {
   "/api/undo-price": {
     params: {};
   };
+  "/api/feedback": {
+    params: {};
+  };
   "/api/products": {
     params: {};
   };
@@ -135,7 +138,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/webhooks/app/subscriptions-update" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/export-impact" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/privacy" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
+    page: "/" | "/webhooks/app/subscriptions-update" | "/api/publish-lifecycle-action" | "/api/campaign-revert-preview" | "/api/window-lifecycle-action" | "/webhooks/app/scopes_update" | "/webhooks/app/uninstalled" | "/api/campaign-history" | "/api/schedule-history" | "/api/schedule-pricing" | "/api/push-storefront" | "/api/proxy/settings" | "/auth/session-token" | "/api/export-impact" | "/api/preview-price" | "/api/staging-price" | "/api/retry-failed" | "/api/push-status" | "/api/bulk-price" | "/api/onboarding" | "/api/undo-price" | "/api/feedback" | "/api/products" | "/api/billing" | "/api/metrics" | "/api/test-db" | "/api/health" | "/auth/login" | "/privacy" | "/auth/*" | "/app" | "/app/campaign-history" | "/app/additional" | "/app/settings" | "/app/billing" | "/app/preview" | "/app/welcome" | "/app/rules" | "/app/bulk" | "/app/help";
   };
   "routes/webhooks.app.subscriptions-update.tsx": {
     id: "routes/webhooks.app.subscriptions-update";
@@ -216,6 +219,10 @@ type RouteFiles = {
   "routes/api.undo-price.ts": {
     id: "routes/api.undo-price";
     page: "/api/undo-price";
+  };
+  "routes/api.feedback.ts": {
+    id: "routes/api.feedback";
+    page: "/api/feedback";
   };
   "routes/api.products.ts": {
     id: "routes/api.products";
@@ -321,6 +328,7 @@ type RouteModules = {
   "routes/api.bulk-price": typeof import("./app/routes/api.bulk-price.ts");
   "routes/api.onboarding": typeof import("./app/routes/api.onboarding.ts");
   "routes/api.undo-price": typeof import("./app/routes/api.undo-price.ts");
+  "routes/api.feedback": typeof import("./app/routes/api.feedback.ts");
   "routes/api.products": typeof import("./app/routes/api.products.ts");
   "routes/api.billing": typeof import("./app/routes/api.billing.ts");
   "routes/api.metrics": typeof import("./app/routes/api.metrics.ts");

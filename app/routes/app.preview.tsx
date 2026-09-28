@@ -344,7 +344,7 @@ export default function PreviewPage() {
                           size="slim"
                           variant={isActive ? "primary" : "secondary"}
                           onClick={() => handleFilterChange(opt.value)}
-                          ariaPressed={isActive}
+                          pressed={isActive}
                         >
                           {opt.label}
                         </Button>

@@ -516,7 +516,22 @@
       "body": "Seu feedback nos ajuda a melhorar o aplicativo e ajuda outros lojistas a descobri-lo.",
       "primary": "Deixar feedback",
       "secondary": "Talvez depois",
-      "url": "https://apps.shopify.com/price-polish-tool"
+      "url": "https://apps.shopify.com/price-polish-tool",
+      "revert": {
+        "title": "Que bom que funcionou! Gostaria de deixar um feedback rápido sobre o Price Polish?",
+        "ratingQuestion": "Como você avaliaria o Price Polish?",
+        "neutralNote": "Opcional e sempre pode ser ignorado — sua resposta não afeta o funcionamento do aplicativo.",
+        "thanksPositive": "Obrigado! Ficamos felizes que o Price Polish esteja funcionando para você.",
+        "positiveNote": "Se quiser compartilhar sua experiência publicamente, você pode deixar uma avaliação na Shopify App Store. De qualquer forma, obrigado por usar o Price Polish.",
+        "openAppStore": "Avaliar na Shopify App Store",
+        "sorryHear": "Sentimos muito — o que deu errado?",
+        "whatWentWrong": "O que deu errado?",
+        "commentPlaceholder": "Conte-nos o que aconteceu e iremos investigar.",
+        "sendFeedback": "Enviar feedback",
+        "notNow": "Agora não",
+        "skip": "Pular",
+        "submitError": "Não foi possível enviar o feedback. Tente novamente."
+      }
     },
     "products": {
       "searchLabel": "Pesquisar produtos",

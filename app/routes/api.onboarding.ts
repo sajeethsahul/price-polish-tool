@@ -23,6 +23,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       onboardingCelebratedAt: true,
       reviewRequestShownAt: true,
       reviewRequestDismissedAt: true,
+      revertReviewPromptShownAt: true,
+      revertReviewPromptDismissedAt: true,
     },
   });
 
@@ -33,7 +35,9 @@ type OnboardingEvent =
   | "celebration.dismiss"
   | "onboarding.started"
   | "review.dismiss"
-  | "review.shown";
+  | "review.shown"
+  | "revert-review.shown"
+  | "revert-review.dismiss";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const auth = await authenticate.admin(request);
@@ -98,6 +102,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: { shop },
       update: { reviewRequestShownAt: now },
       create: { shop, isLive: false, reviewRequestShownAt: now },
+    });
+    return Response.json({ ok: true });
+  }
+
+  // Post-revert review prompt lifecycle. shownAt is written ONCE (first
+  // display) and never overwritten, so "show only once ever" plus the
+  // 90-day dismissal cooldown can both be derived from the pair.
+  if (event === "revert-review.shown") {
+    const existing = await prisma.appState.findUnique({
+      where: { shop },
+      select: { revertReviewPromptShownAt: true },
+    });
+    if (!existing?.revertReviewPromptShownAt) {
+      await prisma.appState.upsert({
+        where: { shop },
+        update: { revertReviewPromptShownAt: now },
+        create: { shop, isLive: false, revertReviewPromptShownAt: now },
+      });
+    }
+    return Response.json({ ok: true });
+  }
+
+  if (event === "revert-review.dismiss") {
+    await prisma.appState.upsert({
+      where: { shop },
+      update: { revertReviewPromptDismissedAt: now },
+      create: { shop, isLive: false, revertReviewPromptDismissedAt: now },
     });
     return Response.json({ ok: true });
   }

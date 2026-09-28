@@ -66,6 +66,7 @@ import {
   type BillingBlockModalCode,
 } from "../components/BillingBlockModal";
 import { DiscardChangesModal } from "../components/DiscardChangesModal";
+import { RevertReviewPromptModal } from "../components/RevertReviewPromptModal";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 import type {
   OperationalSafeguardNotice,
@@ -845,6 +846,12 @@ function DashboardContent({
   const [billingBlockModalCode, setBillingBlockModalCode] =
     useState<BillingBlockModalCode | null>(null);
 
+  // Post-revert review prompt state. Eligibility comes from the server
+  // (AppState.revertReviewPromptShownAt/DismissedAt); shown only once ever,
+  // with a 90-day cooldown after a dismissal — never more. The callbacks are
+  // declared after `appFetch` below (use-before-declaration).
+  const [revertReviewPromptOpen, setRevertReviewPromptOpen] = useState(false);
+
   // Billing placeholders — do not modify
   const handleUpgrade = useCallback(() => {
     if (shopify) shopify.toast.show(t("toast.billingComingSoon"));
@@ -864,6 +871,45 @@ function DashboardContent({
   const navigate = useNavigate();
   const appFetch = useAppFetch();
   const currencySymbol = getCurrencySymbol(currencyCode);
+
+  const maybeShowRevertReviewPrompt = useCallback(async () => {
+    try {
+      const data = await appFetch("/api/onboarding");
+      const state = (data as any)?.state;
+      if (!state) return;
+      const shownAt = state.revertReviewPromptShownAt
+        ? new Date(state.revertReviewPromptShownAt).getTime()
+        : null;
+      const dismissedAt = state.revertReviewPromptDismissedAt
+        ? new Date(state.revertReviewPromptDismissedAt).getTime()
+        : null;
+      const nowMs = Date.now();
+      const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+      const eligible =
+        shownAt === null ||
+        (dismissedAt !== null && nowMs - dismissedAt >= NINETY_DAYS_MS);
+      if (!eligible) return;
+      void appFetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "revert-review.shown" }),
+      });
+      setRevertReviewPromptOpen(true);
+    } catch (error) {
+      console.error("[ReviewPrompt] eligibility check failed", error);
+    }
+  }, [appFetch]);
+
+  const dismissRevertReviewPrompt = useCallback(() => {
+    setRevertReviewPromptOpen(false);
+    void appFetch("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event: "revert-review.dismiss" }),
+    }).catch((error) =>
+      console.error("[ReviewPrompt] dismiss tracking failed", error),
+    );
+  }, [appFetch]);
 
   // ADDED: Guard helper — shows toast and blocks execution when no rules exist
   const guardNoRules = useCallback(() => {
@@ -1857,6 +1903,9 @@ function DashboardContent({
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
         await handlePreview();
         setSelectedItems(new Set());
+        // Genuine undo success (restoredCount > 0): one-time post-revert
+        // feedback prompt. Fire-and-forget, non-blocking.
+        if (data.restoredCount > 0) void maybeShowRevertReviewPrompt();
       } else {
         if (data.code === "BILLING_INACTIVE") {
           throw new Error(
@@ -1895,7 +1944,7 @@ function DashboardContent({
       console.log("DEBUG: Finalizing handleUndo processing state.");
       setIsProcessing(false);
     }
-  }, [lastUpdate, shopify, handlePreview]);
+  }, [lastUpdate, maybeShowRevertReviewPrompt, shopify, handlePreview]);
 
   const openCampaignDetailView = useCallback(
     async (campaign: CampaignHistoryItem) => {
@@ -2068,6 +2117,9 @@ function DashboardContent({
             ),
           );
         else console.log(`BYPASS: Restored ${data.restoredCount} products`);
+        // Genuine full revert success (not terminal, no failures): one-time
+        // post-revert feedback prompt. Fire-and-forget, non-blocking.
+        void maybeShowRevertReviewPrompt();
       } else {
         const noRetryMessage = terminalReason
           ? t("server.revertNoRetryWithReason").replace(
@@ -2112,6 +2164,7 @@ function DashboardContent({
     }
   }, [
     handlePreview,
+    maybeShowRevertReviewPrompt,
     resetRevertPreviewViewState,
     revertPreviewRetryFailedOnly,
     selectedCampaignForRevert,
@@ -5413,6 +5466,13 @@ function DashboardContent({
         </div>
 
         {/* ── TASK 4: Confirmation Modals ── */}
+
+        {shopify && (
+          <RevertReviewPromptModal
+            open={revertReviewPromptOpen}
+            onDismiss={dismissRevertReviewPrompt}
+          />
+        )}
 
         {shopify && (
           <ImmediateApplyConfirmationModal
